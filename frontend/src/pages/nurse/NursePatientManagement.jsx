@@ -79,8 +79,8 @@ const NursePatientManagement = () => {
     setShowReassignModal(true);
 
     try {
-      const res = await api.get('/admin/users?role=DOCTOR');
-      setDoctors(res.data.users || res.data || []);
+      const res = await api.get('/nurses/doctors');
+      setDoctors(res.data.doctors || res.data || []);
     } catch (err) {
       toast.error('Failed to load doctors');
     }

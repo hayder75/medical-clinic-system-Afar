@@ -8,6 +8,7 @@ import Layout from './components/common/Layout';
 // Import pages
 import LoginPage from './pages/LoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminExpenseTracker from './pages/admin/AdminExpenseTracker';
 import DiseaseReports from './pages/admin/DiseaseReports';
 import SelectedDiseaseReportPage from './pages/admin/SelectedDiseaseReportPage';
 import AgeGenderDiseaseDistribution from './pages/admin/AgeGenderDiseaseDistribution';

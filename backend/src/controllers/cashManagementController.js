@@ -28,8 +28,9 @@ const addBankDepositSchema = z.object({
 const addExpenseSchema = z.object({
   amount: z.number().positive(),
   category: z.enum(['OFFICE_SUPPLIES', 'MEDICAL_SUPPLIES', 'MAINTENANCE', 'UTILITIES', 'FOOD_BEVERAGE', 'TRANSPORTATION', 'STAFF_LOAN', 'RETURNED_TO_PATIENT', 'WRONG_TRANSACTION', 'OTHER']),
-  description: z.string().min(1),
-  vendor: z.string().optional()
+  description: z.string().min(1, 'Description is required'),
+  vendor: z.string().optional(),
+  departmentId: z.number().int().optional()
 });
 
 const resetSessionSchema = z.object({
@@ -1318,8 +1319,14 @@ exports.getAcceptedServicesSummary = async (req, res) => {
 exports.getDailyExpenses = async (req, res) => {
   try {
     const { date } = req.query;
-    const targetDate = date ? new Date(date) : new Date();
-    targetDate.setHours(0, 0, 0, 0);
+    let targetDate;
+    if (date) {
+      const [y, m, d] = date.split('-').map(Number);
+      targetDate = new Date(y, m - 1, d);
+    } else {
+      targetDate = new Date();
+      targetDate.setHours(0, 0, 0, 0);
+    }
     const nextDay = new Date(targetDate);
     nextDay.setDate(nextDay.getDate() + 1);
 
@@ -1328,7 +1335,8 @@ exports.getDailyExpenses = async (req, res) => {
         where: { createdAt: { gte: targetDate, lt: nextDay } },
         include: {
           recordedBy: { select: { fullname: true, username: true } },
-          session: { select: { id: true, sessionDate: true } }
+          session: { select: { id: true, sessionDate: true } },
+          department: { select: { id: true, name: true } }
         },
         orderBy: { createdAt: 'desc' }
       }),
@@ -1345,19 +1353,22 @@ exports.getDailyExpenses = async (req, res) => {
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
     const totalDeposits = bankDeposits.reduce((s, d) => s + d.amount, 0);
 
+    const displayDate = date || targetDate.toISOString().split('T')[0];
     res.json({
-      date: targetDate.toISOString().split('T')[0],
+      date: displayDate,
       expenses: expenses.map(e => ({
         id: e.id, amount: e.amount, category: e.category,
         description: e.description, vendor: e.vendor,
         recordedBy: e.recordedBy.fullname,
-        createdAt: e.createdAt
+        createdAt: e.createdAt,
+        department: e.department ? { id: e.department.id, name: e.department.name } : null
       })),
       bankDeposits: bankDeposits.map(d => ({
         id: d.id, amount: d.amount, bankName: d.bankName,
         accountNumber: d.accountNumber, transactionNumber: d.transactionNumber,
         notes: d.notes, recordedBy: d.depositedBy.fullname,
-        createdAt: d.createdAt
+        createdAt: d.createdAt,
+        status: d.status
       })),
       totals: {
         totalExpenses,
@@ -1367,6 +1378,36 @@ exports.getDailyExpenses = async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting daily expenses:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Update bank deposit status (Admin only)
+exports.updateDepositStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['CONFIRMED', 'VERIFIED'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be CONFIRMED or VERIFIED' });
+    }
+
+    const deposit = await prisma.bankDeposit.findUnique({ where: { id } });
+    if (!deposit) {
+      return res.status(404).json({ error: 'Bank deposit not found' });
+    }
+
+    const updated = await prisma.bankDeposit.update({
+      where: { id },
+      data: { status },
+      include: {
+        depositedBy: { select: { fullname: true, username: true } }
+      }
+    });
+
+    res.json({ message: `Deposit status updated to ${status}`, deposit: updated });
+  } catch (error) {
+    console.error('Error updating deposit status:', error);
     res.status(500).json({ error: error.message });
   }
 };

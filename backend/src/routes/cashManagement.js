@@ -119,6 +119,13 @@ router.get('/accepted-services-summary',
   cashManagementController.getAcceptedServicesSummary
 );
 
+// Update deposit status
+router.put('/deposit/:id/status',
+  authMiddleware,
+  roleGuard(['ADMIN']),
+  cashManagementController.updateDepositStatus
+);
+
 // Get daily expenses and bank deposits for a date
 router.get('/daily-expenses',
   authMiddleware,

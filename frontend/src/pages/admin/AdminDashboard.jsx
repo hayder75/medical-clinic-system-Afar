@@ -21,6 +21,7 @@ import BillingReport from './BillingReport';
 import PharmacyReport from './PharmacyReport';
 import AdminRadiologyReports from './AdminRadiologyReports';
 import DoctorCommissionManager from './DoctorCommissionManager';
+import AdminExpenseTracker from './AdminExpenseTracker';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import {
@@ -320,6 +321,7 @@ const AdminDashboard = () => {
       <Route path="/card-products" element={<CardProducts />} />
       <Route path="/radiology-reports" element={<AdminRadiologyReports />} />
       <Route path="/doctor-commissions" element={<DoctorCommissionManager />} />
+      <Route path="/expense-tracker" element={<AdminExpenseTracker />} />
     </Routes>
   );
 };
