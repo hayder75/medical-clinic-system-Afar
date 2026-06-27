@@ -4249,79 +4249,145 @@ const PatientConsultationPage = () => {
                         {/* New Lab Test Orders (New System) */}
                         {hasNewLabResults && (
                           <div className="mt-6 space-y-4">
-                            {labTestOrders
-                              .filter(order => order.results && order.results.length > 0)
-                              .map((order) => {
-                                const latestResult = order.results[0];
-                                return (
-                                  <div key={order.id} className="p-4 border rounded-lg border-green-200 bg-green-50">
-                                    <div className="flex justify-between items-start mb-3">
-                                      <div>
-                                        <p className="font-medium text-green-800">
-                                          {order.labTest.name}
-                                        </p>
-                                        <p className="text-sm text-green-600">
-                                          Completed: {new Date(latestResult.createdAt).toLocaleDateString()}
-                                        </p>
+                            {(() => {
+                              const completedOrders = labTestOrders.filter(order => order.results && order.results.length > 0);
+                              const panelGroups = {};
+                              const standaloneOrders = [];
+                              completedOrders.forEach(order => {
+                                const g = order.labTest?.group;
+                                if (g && g.id) {
+                                  if (!panelGroups[g.id]) panelGroups[g.id] = { group: g, orders: [], allResults: [], latestDate: null, additionalNotes: '' };
+                                  panelGroups[g.id].orders.push(order);
+                                  const r = order.results[0];
+                                  if (r) {
+                                    panelGroups[g.id].allResults.push({ order, result: r });
+                                    const d = new Date(r.createdAt);
+                                    if (!panelGroups[g.id].latestDate || d > panelGroups[g.id].latestDate) panelGroups[g.id].latestDate = d;
+                                    if (r.additionalNotes) panelGroups[g.id].additionalNotes = r.additionalNotes;
+                                  }
+                                } else {
+                                  standaloneOrders.push(order);
+                                }
+                              });
+                              const panelEntries = Object.values(panelGroups);
+                              return (<>
+                                {panelEntries.map(pg => {
+                                  const seenFields = new Set();
+                                  const combinedFields = [];
+                                  const panelImages = [];
+                                  const seenUrls = new Set();
+                                  pg.allResults.forEach(({ order, result }) => {
+                                    (order.labTest?.resultFields || []).forEach(field => {
+                                      const key = field.fieldName || field.id;
+                                      if (!seenFields.has(key)) {
+                                        seenFields.add(key);
+                                        const fv = getStructuredFieldValue(result.results, field);
+                                        combinedFields.push({ field, value: fv, result });
+                                      }
+                                    });
+                                    if (result.results?._images) {
+                                      result.results._images.forEach(img => {
+                                        const u = img.data || img.url || img;
+                                        if (!seenUrls.has(u)) { seenUrls.add(u); panelImages.push(img); }
+                                      });
+                                    }
+                                  });
+                                  return (
+                                    <div key={'panel-'+pg.group.id} className="p-4 border rounded-lg border-indigo-200 bg-indigo-50">
+                                      <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                          <p className="font-medium text-indigo-800">{pg.group.name} Panel</p>
+                                          <p className="text-sm text-indigo-600">{pg.orders.length} tests{pg.latestDate ? ' • '+new Date(pg.latestDate).toLocaleDateString() : ''}</p>
+                                        </div>
+                                        <span className="px-2 py-1 text-xs font-medium text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
                                       </div>
-                                      <span className="px-2 py-1 text-xs font-medium text-green-800 bg-green-200 rounded-full">
-                                        COMPLETED
-                                      </span>
+                                      {combinedFields.length > 0 && (
+                                        <div className="mb-3">
+                                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            {combinedFields.map(({ field, value }) => {
+                                              if (value === undefined) return null;
+                                              const rc = checkValueInNormalRange(value, field.normalRange);
+                                              return (
+                                                <div key={field.id} className={'p-2 rounded text-sm ' + (!rc.inRange ? 'bg-red-50 border border-red-200' : 'bg-white')}>
+                                                  <div className="font-medium text-gray-800">{field.label}</div>
+                                                  <div className={!rc.inRange ? 'text-red-600 font-semibold' : 'text-gray-600'}>{value} {field.unit || ''}</div>
+                                                  {!rc.inRange && rc.message && <div className="text-xs text-red-500 mt-1">{rc.message}</div>}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {pg.additionalNotes && (
+                                        <div className="mt-3">
+                                          <p className="text-sm font-medium text-gray-700 mb-1">Additional Notes:</p>
+                                          <p className="text-sm text-gray-600 bg-white p-2 rounded">{pg.additionalNotes}</p>
+                                        </div>
+                                      )}
+                                      {panelImages.length > 0 && (
+                                        <div className="mt-3 pt-3 border-t border-indigo-200">
+                                          <p className="text-sm font-medium text-gray-700 mb-2">Attached Images:</p>
+                                          <div className="grid grid-cols-3 gap-2">
+                                            {panelImages.map((img, idx) => {
+                                              const u = img.data || img.url || img;
+                                              return (<div key={idx} className="relative"><img src={u} alt={"Lab "+(idx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(u,"_blank")} /></div>);
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
-
-                                    {/* Display results with field labels */}
-                                    {order.labTest.resultFields && order.labTest.resultFields.length > 0 && latestResult.results && (
-                                      <div className="mb-3">
-                                        <h6 className="text-sm font-medium text-gray-700 mb-2">Test Results:</h6>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                          {order.labTest.resultFields.map((field) => {
-                                            const fieldValue = getStructuredFieldValue(latestResult.results, field);
-                                            if (fieldValue === undefined) return null;
-
-                                            const rangeCheck = checkValueInNormalRange(fieldValue, field.normalRange);
-                                            const isAbnormal = !rangeCheck.inRange;
-
-                                            return (
-                                              <div key={field.id} className={`p-2 rounded text-sm ${isAbnormal ? 'bg-red-50 border border-red-200' : 'bg-white'}`}>
-                                                <div className="font-medium text-gray-800">
-                                                  {field.label}
-                                                </div>
-                                                <div className={isAbnormal ? 'text-red-600 font-semibold' : 'text-gray-600'}>
-                                                  {fieldValue} {field.unit || ''}
-                                                </div>
-                                                {isAbnormal && rangeCheck.message && (
-                                                  <div className="text-xs text-red-500 mt-1">{rangeCheck.message}</div>
-                                                )}
-                                              </div>
-                                            );
-                                          })}
+                                  );
+                                })}
+                                {standaloneOrders.map(order => {
+                                  const latestResult = order.results[0];
+                                  return (
+                                    <div key={order.id} className="p-4 border rounded-lg border-green-200 bg-green-50">
+                                      <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                          <p className="font-medium text-green-800">{order.labTest.name}</p>
+                                          <p className="text-sm text-green-600">Completed: {new Date(latestResult.createdAt).toLocaleDateString()}</p>
                                         </div>
+                                        <span className="px-2 py-1 text-xs font-medium text-green-800 bg-green-200 rounded-full">COMPLETED</span>
                                       </div>
-                                    )}
-
-                                    {latestResult.additionalNotes && (
-                                      <div className="mt-3">
-                                        <p className="text-sm font-medium text-gray-700 mb-1">Additional Notes:</p>
-                                        <p className="text-sm text-gray-600 bg-white p-2 rounded">
-                                          {latestResult.additionalNotes}
-                                        </p>
-                                      </div>
-                                    )}
-                                    {(latestResult.results && latestResult.results._images && latestResult.results._images.length > 0) && (
-                                      <div className="mt-3 pt-3 border-t border-green-200">
-                                        <p className="text-sm font-medium text-gray-700 mb-2">Attached Images:</p>
-                                        <div className="grid grid-cols-3 gap-2">
-                                          {latestResult.results._images.map((img, idx) => (
-                                            <div key={idx} className="relative">
-                                              <img src={img.data} alt={"Lab " + (idx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.data, "_blank")} />
-                                            </div>
-                                          ))}
+                                      {order.labTest.resultFields && order.labTest.resultFields.length > 0 && latestResult.results && (
+                                        <div className="mb-3">
+                                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            {order.labTest.resultFields.map(field => {
+                                              const fv = getStructuredFieldValue(latestResult.results, field);
+                                              if (fv === undefined) return null;
+                                              const rc = checkValueInNormalRange(fv, field.normalRange);
+                                              return (
+                                                <div key={field.id} className={'p-2 rounded text-sm ' + (!rc.inRange ? 'bg-red-50 border border-red-200' : 'bg-white')}>
+                                                  <div className="font-medium text-gray-800">{field.label}</div>
+                                                  <div className={!rc.inRange ? 'text-red-600 font-semibold' : 'text-gray-600'}>{fv} {field.unit || ''}</div>
+                                                  {!rc.inRange && rc.message && <div className="text-xs text-red-500 mt-1">{rc.message}</div>}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                                      )}
+                                      {latestResult.additionalNotes && (
+                                        <div className="mt-3">
+                                          <p className="text-sm font-medium text-gray-700 mb-1">Additional Notes:</p>
+                                          <p className="text-sm text-gray-600 bg-white p-2 rounded">{latestResult.additionalNotes}</p>
+                                        </div>
+                                      )}
+                                      {(latestResult.results && latestResult.results._images && latestResult.results._images.length > 0) && (
+                                        <div className="mt-3 pt-3 border-t border-green-200">
+                                          <p className="text-sm font-medium text-gray-700 mb-2">Attached Images:</p>
+                                          <div className="grid grid-cols-3 gap-2">
+                                            {latestResult.results._images.map((img, idx) => (
+                                              <div key={idx} className="relative"><img src={img.data} alt={"Lab "+(idx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.data,"_blank")} /></div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </>);
+                            })()}
                           </div>
                         )}
                       </div>

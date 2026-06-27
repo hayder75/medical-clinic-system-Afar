@@ -48,6 +48,7 @@ const LabOrders = () => {
   const [savedFormData, setSavedFormData] = useState({});
   const [showCBCAdditionalFields, setShowCBCAdditionalFields] = useState({});
   const [labImages, setLabImages] = useState({});
+  const [panelGroupData, setPanelGroupData] = useState({});
   const [savingResults, setSavingResults] = useState(false); // Track which CBC tests have additional fields shown
 
   useEffect(() => {
@@ -432,6 +433,18 @@ const LabOrders = () => {
 
       console.log('✅ [handleOrderClick] Total initialResults:', Object.keys(initialResults).length);
       setTestResults(initialResults);
+      // Build panel groups
+      const panelGroups = {};
+      Object.entries(initialResults).forEach(([oid, res]) => {
+        const g = res.labTest?.group;
+        const gid = g?.id || '_solo_' + oid;
+        if (!panelGroups[gid]) {
+          panelGroups[gid] = { id: gid, name: g?.name || null, panel: g || null, entries: [], fields: [] };
+        }
+        panelGroups[gid].entries.push(oid);
+        (res.resultFields || []).forEach(f => panelGroups[gid].fields.push(f));
+      });
+      setPanelGroupData(panelGroups);
       return;
     }
 
@@ -638,9 +651,12 @@ const LabOrders = () => {
     setTestResults(initialResults);
   };
 
-  const handleServiceClick = (serviceId) => {
-    // Allow viewing completed orders, but will be read-only
-    setSelectedService(serviceId);
+  const handleServiceClick = (serviceId, isPanel = false) => {
+    if (isPanel) {
+      setSelectedService('panel_' + serviceId);
+    } else {
+      setSelectedService(serviceId);
+    }
     setShowServiceTemplate(true);
   };
 
@@ -1156,7 +1172,29 @@ const LabOrders = () => {
 
   const handleCloseServiceTemplate = async () => {
     // Auto-save the current form data to database if it has results
-    if (selectedService && testResults[selectedService] && selectedOrder && selectedOrder.status !== 'COMPLETED') {
+    // Handle panel mode save
+    if (selectedService && selectedService.startsWith('panel_')) {
+      const panelId = selectedService.replace('panel_', '');
+      const group = panelGroupData[panelId];
+      if (group) {
+        const panelImgs = labImages['panel_' + panelId] || [];
+        for (const oid of group.entries) {
+          const r = testResults[oid];
+          if (r && r.orderId && r.labTestId) {
+            try {
+              await api.post('/labs/results/lab-test', {
+                orderId: r.orderId,
+                labTestId: r.labTestId,
+                results: { ...(r.results || {}), _images: panelImgs },
+                additionalNotes: r.additionalNotes || '',
+                finalize: false
+              });
+            } catch (e) { console.error('Panel save error', oid, e); }
+          }
+        }
+        toast.success('Panel draft saved');
+      }
+    } else if (selectedService && testResults[selectedService] && selectedOrder && selectedOrder.status !== 'COMPLETED') {
       const result = testResults[selectedService];
       const hasResults = Object.values(result.results || {}).some(value => value && value.toString().trim() !== '') ||
         (result.additionalNotes && result.additionalNotes.trim() !== '');
@@ -1326,10 +1364,36 @@ const LabOrders = () => {
       const isWalkIn = selectedOrder.isWalkIn;
 
       if (isNewLabTestOrder) {
-        // NEW SYSTEM: Finalize each lab test order result in one explicit action
+        // Handle panel mode: save all panel orders first
+        const panelIds = new Set();
+        Object.entries(testResults).forEach(([oid, r]) => {
+          if (r.labTest?.group?.id) panelIds.add(r.labTest.group.id);
+        });
+        const skipOrderIds = new Set();
+        for (const pid of panelIds) {
+          const panelImgs = labImages['panel_' + pid] || [];
+          for (const [oid, r] of Object.entries(testResults)) {
+            if (r.labTest?.group?.id === pid && r.orderId && r.labTestId) {
+              skipOrderIds.add(oid);
+              try {
+                await api.post('/labs/results/lab-test', {
+                  orderId: r.orderId,
+                  labTestId: r.labTestId,
+                  results: { ...r.results, _images: panelImgs },
+                  additionalNotes: r.additionalNotes || '',
+                  finalize: true
+                });
+              } catch (error) {
+                console.error('Panel complete error', oid, error);
+                throw new Error(`Failed to save ${r.serviceName || r.labTest?.name}: ${error.response?.data?.error || error.message}`);
+              }
+            }
+          }
+        }
+        // NEW SYSTEM: Finalize remaining (standalone) lab test orders
         const finalizedResults = {};
         for (const [orderId, result] of Object.entries(testResults)) {
-          if (result.orderId) {
+          if (result.orderId && !skipOrderIds.has(orderId)) {
             try {
               await api.post('/labs/results/lab-test', {
                 orderId: result.orderId,
@@ -1667,116 +1731,108 @@ const LabOrders = () => {
             )}
 
             <div className="space-y-4">
-              {Object.entries(testResults).map(([orderId, result]) => {
-                const hasResults = Object.values(result.results || {}).some(value => value && value.toString().trim() !== '') ||
-                  (result.additionalNotes && result.additionalNotes.trim() !== '');
-                const isCompleted = result.completed || selectedOrder.status === 'COMPLETED';
-                const isNewSystem = !!result.labTest; // New system has labTest
-
+              {(() => {
+                const panelGroups = {};
+                const standaloneIds = [];
+                Object.entries(testResults).forEach(([oid, res]) => {
+                  const g = res.labTest?.group;
+                  const gid = g?.id || null;
+                  if (gid) {
+                    if (!panelGroups[gid]) {
+                      panelGroups[gid] = { name: g.name, entries: [], allCompleted: true, anyHasResults: false, panel: g };
+                    }
+                    panelGroups[gid].entries.push(oid);
+                    if (!res.completed) panelGroups[gid].allCompleted = false;
+                    const hasR = Object.values(res.results || {}).some(v => v && v.toString().trim() !== '');
+                    if (hasR) panelGroups[gid].anyHasResults = true;
+                  } else {
+                    standaloneIds.push(oid);
+                  }
+                });
+                const panels = Object.values(panelGroups);
                 return (
-                  <div key={orderId} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                    {/* Results Display Section for Completed Orders */}
-                    {isCompleted && hasResults && isNewSystem && (
-                      <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-semibold text-green-900">{result.serviceName || result.labTest?.name}</h4>
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {result.resultFields && result.resultFields.length > 0 && result.resultFields.map((field) => {
-                            const fieldValue = result.results?.[field.fieldName];
-                            if (!fieldValue && fieldValue !== 0) return null;
-
-                            return (
-                              <div key={field.id} className="bg-white p-3 rounded border">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <p className="text-sm font-medium text-gray-700">{field.label}</p>
-                                    {field.unit && <p className="text-xs text-gray-500">({field.unit})</p>}
-                                  </div>
-                                  <p
-                                    className="text-sm font-semibold ml-2"
-                                    style={(() => {
-                                      const rangeCheck = checkValueInNormalRange(fieldValue, field.normalRange);
-                                      if (!rangeCheck.inRange) {
-                                        return { color: '#dc2626' }; // red-600
-                                      }
-                                      return { color: '#111827' }; // gray-900
-                                    })()}
-                                  >
-                                    {fieldValue}
-                                  </p>
+                  <div className="space-y-3">
+                    {panels.map(p => {
+                      const allDone = p.allCompleted || selectedOrder.status === 'COMPLETED';
+                      const hasSome = p.anyHasResults;
+                      const everyFully = p.entries.every(oid => testResults[oid]?.completed);
+                      return (
+                        <div key={p.panel.id} className="border-2 border-indigo-200 rounded-xl overflow-hidden">
+                          <div className="bg-indigo-50 px-4 py-3 border-b border-indigo-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <TestTube className="h-5 w-5 text-indigo-600" />
+                                <div>
+                                  <h3 className="font-semibold text-indigo-900">{p.name} Panel</h3>
+                                  <p className="text-xs text-indigo-600">{p.entries.length} tests</p>
                                 </div>
-                                {field.normalRange && (
-                                  <p className="text-xs text-gray-500 mt-1">Normal: {field.normalRange}</p>
-                                )}
-                                {(() => {
-                                  const rangeCheck = checkValueInNormalRange(fieldValue, field.normalRange);
-                                  if (!rangeCheck.inRange) {
-                                    return (
-                                      <p className="text-xs text-red-600 font-medium mt-1">
-                                        {rangeCheck.message || 'Outside normal range'}
-                                      </p>
-                                    );
-                                  }
-                                  return null;
-                                })()}
                               </div>
-                            );
-                          })}
-                        </div>
-                        {result.additionalNotes && (
-                          <div className="mt-3 p-3 bg-white rounded border">
-                            <p className="text-sm font-medium text-gray-700 mb-1">Additional Notes:</p>
-                            <p className="text-sm text-gray-600">{result.additionalNotes}</p>
+                              <div className="flex items-center gap-3">
+                                {everyFully && <CheckCircle className="h-5 w-5 text-green-600" />}
+                                <span className={`px-2.5 py-1 rounded text-xs font-medium ${everyFully ? 'bg-green-100 text-green-800' : hasSome ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-600'}`}>
+                                  {everyFully ? 'Completed' : hasSome ? 'Partial' : 'Pending'}
+                                </span>
+                                <button onClick={() => handleServiceClick(p.panel.id, true)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${allDone ? 'bg-gray-600 text-white hover:bg-gray-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+                                  {allDone ? 'View Results' : hasSome ? 'Edit Results' : 'Fill Results'}
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        )}
+                          <div className="px-4 py-2 bg-white">
+                            <div className="flex flex-wrap gap-1.5">
+                              {p.entries.map(oid => {
+                                const r = testResults[oid];
+                                const done = r?.completed || selectedOrder.status === 'COMPLETED';
+                                const filled = Object.values(r?.results || {}).some(v => v && v.toString().trim() !== '');
+                                return (
+                                  <span key={oid} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${done ? 'bg-green-50 text-green-700' : filled ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-50 text-gray-500'}`}>
+                                    {r?.labTest?.name || r?.serviceName || oid}
+                                    {(done || filled) && <CheckCircle className="w-3 h-3" />}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {standaloneIds.length > 0 && (
+                      <div className="space-y-2">
+                        {panels.length > 0 && <h4 className="text-sm font-semibold text-gray-600 mt-4 mb-2">Individual Tests</h4>}
+                        {standaloneIds.map(oid => {
+                          const result = testResults[oid];
+                          if (!result) return null;
+                          const hasResults = Object.values(result.results || {}).some(v => v && v.toString().trim() !== '') || (result.additionalNotes && result.additionalNotes.trim() !== '');
+                          const isCompleted = result.completed || selectedOrder.status === 'COMPLETED';
+                          const isNewSystem = !!result.labTest;
+                          return (
+                            <div key={oid} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <TestTube className="h-5 w-5 text-blue-500" />
+                                  <div>
+                                    <h3 className="font-medium text-gray-900 text-sm">{result.serviceName || result.labTest?.name}</h3>
+                                    {isNewSystem && result.resultFields?.length > 0 && !isCompleted && <p className="text-xs text-gray-500">{result.resultFields.length} field(s)</p>}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {(hasResults || isCompleted) && <CheckCircle className="h-4 w-4 text-green-500" />}
+                                  <span className={`px-2 py-0.5 rounded text-xs ${(hasResults || isCompleted) ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                    {isCompleted ? 'Done' : hasResults ? 'Filled' : 'Empty'}
+                                  </span>
+                                  <button onClick={() => handleServiceClick(oid)} className={`px-3 py-1.5 rounded-md text-xs transition-colors ${isCompleted ? 'bg-gray-600 text-white hover:bg-gray-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                                    {isCompleted ? 'View' : hasResults ? 'Edit' : 'Fill'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <TestTube className="h-5 w-5 text-blue-500" />
-                        <div>
-                          <h3 className="font-medium text-gray-900">{result.serviceName || result.labTest?.name}</h3>
-                          {isNewSystem && result.labTest?.description && (
-                            <p className="text-sm text-gray-600">{result.labTest.description}</p>
-                          )}
-                          {!isNewSystem && result.template && (
-                            <p className="text-sm text-gray-600">{result.template.description}</p>
-                          )}
-                          {isNewSystem && result.resultFields && result.resultFields.length > 0 && !isCompleted && (
-                            <p className="text-xs text-gray-500">{result.resultFields.length} field(s) to fill</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        {(hasResults || isCompleted) && <CheckCircle className="h-4 w-4 text-green-500" />}
-                        <span className={`px-2 py-1 rounded text-xs ${(hasResults || isCompleted) ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                          }`}>
-                          {isCompleted ? 'Completed' : hasResults ? 'Filled' : 'Empty'}
-                        </span>
-                        {!isCompleted && (
-                          <button
-                            onClick={() => handleServiceClick(orderId)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                          >
-                            {hasResults ? 'Edit Results' : 'Fill Results'}
-                          </button>
-                        )}
-                        {isCompleted && (
-                          <button
-                            onClick={() => handleServiceClick(orderId)}
-                            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-                          >
-                            View/Edit Results
-                          </button>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 );
-              })}
+              })()}
             </div>
 
             <div className="flex justify-end mt-6 pt-4 border-t gap-2">
@@ -1818,7 +1874,7 @@ const LabOrders = () => {
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900">
-                {testResults[selectedService].serviceName} - {testResults[selectedService].template ? 'Template Form' : 'Test Results'}
+                {selectedService.startsWith('panel_') ? panelGroupData[selectedService.replace('panel_', '')]?.name + ' Panel Results' : testResults[selectedService].serviceName} - {selectedService.startsWith('panel_') ? 'Panel Results' : testResults[selectedService].template ? 'Template Form' : 'Test Results'}
               </h2>
               <button
                 onClick={handleCloseServiceTemplate}
@@ -1828,8 +1884,103 @@ const LabOrders = () => {
               </button>
             </div>
 
-            <div className="space-y-6">
+            {selectedService && selectedService.startsWith('panel_') ? (() => {
+            const panelId = selectedService.replace('panel_', '');
+            const group = panelGroupData[panelId];
+            if (!group) return <div className="text-red-500 p-4">Panel data not found</div>;
+            const allFields = [];
+            const allResults = {};
+            let allDone = true;
+            group.entries.forEach(oid => {
+              const r = testResults[oid];
+              if (r) {
+                (r.resultFields || []).forEach(f => allFields.push(f));
+                if (!r.completed) allDone = false;
+              }
+            });
+            const readOnly = allDone || selectedOrder?.status === 'COMPLETED';
+            const updPanel = (fName, val) => {
+              for (const oid of group.entries) {
+                const r = testResults[oid];
+                if (r && (r.resultFields || []).some(f => f.fieldName === fName)) {
+                  const nr = { ...(r.results || {}) };
+                  nr[fName] = val;
+                  updateTestResult(oid, 'results', nr);
+                  break;
+                }
+              }
+            };
+            const getVal = (fName) => {
+              for (const oid of group.entries) {
+                const r = testResults[oid];
+                if (r && r.results && r.results[fName] !== undefined && r.results[fName] !== '') return r.results[fName];
+              }
+              return '';
+            };
+            return (
+              <div className="space-y-6">
+                <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                  <div className="flex items-center gap-3 mb-2">
+                    <TestTube className="h-6 w-6 text-indigo-600" />
+                    <div>
+                      <h4 className="font-semibold text-indigo-900 text-lg">{group.name} Panel</h4>
+                      <p className="text-sm text-indigo-600">{group.entries.length} tests — {allFields.length} fields</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {group.entries.map(oid => {
+                      const r = testResults[oid];
+                      const d = r?.completed || selectedOrder?.status === 'COMPLETED';
+                      return <span key={oid} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${d ? 'bg-green-100 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>{r?.labTest?.name || oid}{d && <CheckCircle className="w-3 h-3" />}</span>;
+                    })}
+                  </div>
+                </div>
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-3">Attach Lab Images (for all tests in this panel)</h4>
+                  <ImageUpload onImagesChange={(imgs) => setLabImages(prev => ({ ...prev, ['panel_' + panelId]: imgs }))} existingImages={labImages['panel_' + panelId] || []} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {allFields.map(f => {
+                    const fv = getVal(f.fieldName);
+                    const owner = testResults[group.entries.find(oid => (testResults[oid].resultFields || []).some(x => x.fieldName === f.fieldName))];
+                    const isCBCAdd = owner?.labTest?.code === 'CBC001' && ['mcv','mch','mchc'].includes(f.fieldName);
+                    const showCBC = !isCBCAdd || showCBCAdditionalFields['panel_' + panelId];
+                    if (isCBCAdd && !showCBC) return null;
+                    const rc = checkValueInNormalRange(fv, f.normalRange);
+                    return (
+                      <div key={f.id || f.fieldName} className="space-y-1">
+                        <label className="block text-sm font-medium text-gray-700">{f.label || f.fieldName}{f.unit && <span className="text-gray-500 ml-1">({f.unit})</span>}</label>
+                        {f.normalRange && <p className="text-xs text-gray-500">Normal: {f.normalRange}</p>}
+                        {fv !== '' && fv !== null && fv !== undefined && !rc.inRange && <p className="text-xs text-red-600 font-medium">{rc.message}</p>}
+                        {f.fieldType === 'number' ? (
+                          <input type="number" step="any" value={fv} readOnly={readOnly} onChange={e => { if (readOnly) return; updPanel(f.fieldName, e.target.value); }}
+                            className={`w-full px-3 py-2 border rounded-md ${readOnly ? 'bg-gray-100 cursor-not-allowed border-gray-300' : fv !== '' && fv !== null && fv !== undefined && !rc.inRange ? 'border-red-500' : 'border-gray-300'}`} />
+                        ) : f.fieldType === 'select' ? (
+                          (() => {
+                            let opts = f.options ? (typeof f.options === 'string' ? (() => { try { return JSON.parse(f.options); } catch(e) { return []; } })() : f.options) : [];
+                            return <select value={fv} disabled={readOnly} onChange={e => { if (readOnly) return; updPanel(f.fieldName, e.target.value); }} className="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="">Select...</option>{opts.map(o => <option key={o} value={o}>{o}</option>)}</select>;
+                          })()
+                        ) : f.fieldType === 'textarea' ? (
+                          <textarea value={fv} readOnly={readOnly} onChange={e => { if (readOnly) return; updPanel(f.fieldName, e.target.value); }} className="w-full px-3 py-2 border border-gray-300 rounded-md" rows={3} />
+                        ) : (
+                          <input type="text" value={fv} readOnly={readOnly} onChange={e => { if (readOnly) return; updPanel(f.fieldName, e.target.value); }} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700">Additional Notes</label>
+                  <textarea value={testResults[group.entries[0]]?.additionalNotes || ''} readOnly={readOnly}
+                    onChange={e => { if (readOnly) return; group.entries.forEach(oid => updateTestResult(oid, 'additionalNotes', e.target.value)); }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md" rows={3} placeholder="Additional notes for all tests in this panel..." />
+                </div>
+              </div>
+            );
+          })() : (
+          <div className="space-y-6">
               {/* NEW SYSTEM: Show resultFields from labTest */}
+
               {testResults[selectedService].labTest && testResults[selectedService].resultFields ? (
                 <>
                   <div className="bg-blue-50 p-4 rounded-lg">
@@ -2413,7 +2564,7 @@ const LabOrders = () => {
                 </>
               )}
             </div>
-
+          )}
             <div className="flex justify-end mt-6 pt-4 border-t">
               <button
                 onClick={handleCloseServiceTemplate}
