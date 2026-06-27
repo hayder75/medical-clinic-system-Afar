@@ -33,7 +33,7 @@ const BASE_SERVICE_BUTTON_CONFIG = [
 ];
 
 const buildServiceButtonConfig = (cardProducts) => {
-  const cardButtons = (cardProducts || []).flatMap((cp, i) => {
+  const cardButtons = (cardProducts || []).filter(cp => cp.isActive !== false).flatMap((cp, i) => {
     const gIdx = i % CARD_PRODUCT_GRADIENTS.length;
     const slug = (cp.slug || cp.name || '').toLowerCase().replace(/\s+/g, '_');
     return [
@@ -52,6 +52,8 @@ const EXPENSE_CATEGORIES = [
   { value: 'FOOD_BEVERAGE', label: 'Food & Beverage', icon: HeartPulse },
   { value: 'TRANSPORTATION', label: 'Transportation', icon: TrendingUp },
   { value: 'STAFF_LOAN', label: 'Staff Loan', icon: User },
+  { value: 'RETURNED_TO_PATIENT', label: 'Returned to Patient', icon: ArrowUpRight },
+  { value: 'WRONG_TRANSACTION', label: 'Wrong Transaction', icon: AlertTriangle },
   { value: 'OTHER', label: 'Other', icon: Layers }
 ];
 
@@ -136,9 +138,9 @@ const DailyCashManagement = () => {
   const handleAddExpense = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/cash-management/add-expense', { ...expenseForm, amount: parseFloat(expenseForm.amount) });
-      toast.success('Expense recorded');
-      setExpenseForm({ amount: '', category: 'OFFICE_SUPPLIES', description: '', vendor: '' });
+    await api.post('/cash-management/add-expense', { ...expenseForm, amount: parseFloat(expenseForm.amount) });
+    toast.success('Expense recorded');
+    setExpenseForm({ amount: '', category: 'OFFICE_SUPPLIES', description: '', vendor: '' });
       fetchCurrentSession();
     } catch (e) { toast.error(e.response?.data?.error || 'Failed to record expense'); }
   };

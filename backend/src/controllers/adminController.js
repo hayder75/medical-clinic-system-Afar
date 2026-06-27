@@ -5844,6 +5844,18 @@ exports.completePatientVisit = async (req, res) => {
 };
 
 // Card Products Management
+exports.getDepartments = async (req, res) => {
+  try {
+    const departments = await prisma.department.findMany({
+      orderBy: { name: 'asc' }
+    });
+    res.json({ departments });
+  } catch (error) {
+    console.error('Error fetching departments:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 exports.getCardProducts = async (req, res) => {
   try {
     const cardProducts = await prisma.cardProduct.findMany({

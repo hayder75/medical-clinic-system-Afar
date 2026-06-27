@@ -99,6 +99,9 @@ router.put('/sidebar-visibility', roleGuard(['ADMIN']), sidebarVisibilityControl
 router.get('/sidebar-roles', sidebarVisibilityController.getSidebarRoles);
 router.get('/sidebar-items', sidebarVisibilityController.getSidebarItems);
 
+// Departments
+router.get('/departments', adminController.getDepartments);
+
 // Card Products Management
 router.get('/card-products', adminController.getCardProducts);
 router.post('/card-products', roleGuard(['ADMIN']), adminController.createCardProduct);

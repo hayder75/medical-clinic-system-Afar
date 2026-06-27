@@ -247,6 +247,7 @@ const Layout = ({ children, title, subtitle }) => {
           { name: 'Doctor Commissions', href: '/admin/doctor-commissions', icon: Percent, key: 'doctorCommissions' },
           { name: 'Audit Logs', href: '/admin/audit', icon: FileText, key: 'auditLogs' },
           { name: 'Loan Approval', href: '/admin/loan-approval', icon: DollarSign, key: 'loanApproval' },
+          { name: 'Expense Tracker', href: '/admin/expense-tracker', icon: DollarSign, key: 'dailyExpenses' },
           { name: 'System View', href: '/admin/system-view', icon: Settings, key: 'systemView' },
         ]);
 

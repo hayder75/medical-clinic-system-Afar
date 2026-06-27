@@ -4,10 +4,12 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { User, Phone, Mail, MapPin, Heart, Calendar, Search, UserPlus, Clock, CheckCircle, AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, CreditCard as CardIcon } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 import PatientAttachedImagesSection from '../../components/common/PatientAttachedImagesSection';
 import { ETHIOPIAN_REGIONS, ETHIOPIAN_ZONES, ETHIOPIAN_WOREDAS, getZonesForRegion, getWoredasForZone } from '../../data/ethiopianLocations';
 
 const ReceptionPatientRegistration = () => {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -48,6 +50,8 @@ const ReceptionPatientRegistration = () => {
     notes: searchParams.get('notes'),
     priority: searchParams.get('priority')
   };
+
+  const [genderValue, setGenderValue] = useState('');
 
   const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm();
 
@@ -360,292 +364,259 @@ const ReceptionPatientRegistration = () => {
           </button>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-              {/* Personal Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="label">Full Name *</label>
+          {/* Required Fields - Always Visible */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="label">Full Name *</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Patient full name"
+                {...register('name', { required: 'Name is required' })}
+              />
+              {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>}
+            </div>
+
+            <div>
+              <label className="label">Date of Birth *</label>
+              <div className="space-y-3">
+                <div className="flex space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => { setDateInputType('date'); setAgeError(''); }}
+                    className={`px-3 py-1 rounded text-sm ${dateInputType === 'date'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                  >
+                    📅 Enter Date
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDateInputType('age'); setAgeError(''); }}
+                    className={`px-3 py-1 rounded text-sm ${dateInputType === 'age'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                  >
+                    👴 Enter Age
+                  </button>
+                </div>
+
+                {dateInputType === 'date' && (
                   <input
-                    type="text"
+                    type="date"
                     className="input"
-                    {...register('name', { required: 'Name is required' })}
+                    {...register('dob', { required: 'Date of birth is required' })}
                   />
-                  {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>}
-                </div>
+                )}
 
-                <div>
-                  <label className="label">Date of Birth *</label>
-                  <div className="space-y-3">
-                    {/* Input Type Toggle */}
-                    <div className="flex space-x-4">
-                      <button
-                        type="button"
-                        onClick={() => { setDateInputType('date'); setAgeError(''); }}
-                        className={`px-3 py-1 rounded text-sm ${dateInputType === 'date'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          }`}
-                      >
-                        📅 Enter Date
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setDateInputType('age'); setAgeError(''); }}
-                        className={`px-3 py-1 rounded text-sm ${dateInputType === 'age'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          }`}
-                      >
-                        👴 Enter Age
-                      </button>
-                    </div>
-
-                    {/* Date Input */}
-                    {dateInputType === 'date' && (
-                      <input
-                        type="date"
-                        className="input"
-                        {...register('dob', { required: 'Date of birth is required' })}
-                      />
-                    )}
-
-                    {/* Age Input */}
-                    {dateInputType === 'age' && (
-                      <div className="space-y-2">
-                        <input
-                          type="number"
-                          className={`input ${ageError ? 'border-red-500' : ''}`}
-                          placeholder="Enter age (e.g., 25)"
-                          min="0"
-                          max="120"
-                          value={ageInput}
-                          onChange={(e) => handleAgeChange(e.target.value)}
-                        />
-                        {ageError && <p className="text-red-500 text-sm">{ageError}</p>}
-                        <p className="text-xs text-gray-600">
-                          💡 For illiterate patients: Enter their age and we'll generate a random date
-                        </p>
-                        {ageInput && (
-                          <div className="p-2 bg-green-50 rounded text-sm text-green-700">
-                            ✅ Generated date will be automatically filled below
-                          </div>
-                        )}
+                {dateInputType === 'age' && (
+                  <div className="space-y-2">
+                    <input
+                      type="number"
+                      className={`input ${ageError ? 'border-red-500' : ''}`}
+                      placeholder="Enter age (e.g., 25)"
+                      min="0" max="120"
+                      value={ageInput}
+                      onChange={(e) => handleAgeChange(e.target.value)}
+                    />
+                    {ageError && <p className="text-red-500 text-sm">{ageError}</p>}
+                    <p className="text-xs text-gray-600">
+                      💡 For illiterate patients: Enter their age and we'll generate a random date
+                    </p>
+                    {ageInput && (
+                      <div className="p-2 bg-green-50 rounded text-sm text-green-700">
+                        ✅ Generated date will be automatically filled below
                       </div>
                     )}
-                  </div>
-                  {errors.dob && <p className="text-red-500 text-sm mt-1">{errors.dob.message}</p>}
-                </div>
-
-                <div>
-                  <label className="label">Gender *</label>
-                  <select className="input" {...register('gender', { required: 'Gender is required' })}>
-                    <option value="">Select Gender</option>
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
-                  </select>
-                  {errors.gender && <p className="text-red-500 text-sm mt-1">{errors.gender.message}</p>}
-                </div>
-
-                <div>
-                  <label className="label">Patient Type *</label>
-                  <select className="input" {...register('type', { required: 'Patient type is required' })} defaultValue="REGULAR">
-                    <option value="">Select Type</option>
-                    <option value="REGULAR">Regular</option>
-                    <option value="EMERGENCY" style={{ color: 'red', fontWeight: 'bold' }}>🚨 Emergency</option>
-                    <option value="STAFF">Staff</option>
-                    <option value="CHARITY">Charity</option>
-                  </select>
-                  {errors.type && <p className="text-red-500 text-sm mt-1">{errors.type.message}</p>}
-                  <p className="text-xs text-gray-600 mt-1">
-                    💡 <strong>Emergency patients:</strong> Skip card payment, go directly to emergency billing
-                  </p>
-                </div>
-
-              </div>
-
-              {/* Contact Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="label">Mobile Number *</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <input
-                      type="tel"
-                      className="input pl-10"
-                      placeholder="0912345678"
-                      {...register('mobile', {
-                        required: 'Mobile number is required',
-                        pattern: {
-                          value: /^[0-9]{10}$/,
-                          message: 'Please enter a valid 10-digit mobile number'
-                        }
-                      })}
-                    />
-                  </div>
-                  {errors.mobile && <p className="text-red-500 text-sm mt-1">{errors.mobile.message}</p>}
-                </div>
-
-                <div>
-                  <label className="label">National ID</label>
-                  <div className="relative">
-                    <CardIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <input
-                      type="text"
-                      className="input pl-10"
-                      placeholder="National ID Number"
-                      {...register('nationalId')}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Optional - 13-digit National ID</p>
-                </div>
-              </div>
-
-              {/* Address - Ethiopian Administrative Divisions */}
-              <div>
-                <label className="label">Address *</label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div>
-                    <select
-                      className="input"
-                      value={selectedRegion}
-                      onChange={(e) => setSelectedRegion(e.target.value)}
-                    >
-                      <option value="">Select Region</option>
-                      {ETHIOPIAN_REGIONS.map(region => (
-                        <option key={region.id} value={region.id}>{region.name}</option>
-                      ))}
-                    </select>
-                    <input type="hidden" {...register('region')} value={selectedRegion} />
-                  </div>
-                  <div>
-                    <select
-                      className="input"
-                      value={selectedZone}
-                      onChange={(e) => setSelectedZone(e.target.value)}
-                      disabled={!selectedRegion}
-                    >
-                      <option value="">Select Zone</option>
-                      {availableZones.map(zone => (
-                        <option key={zone.id} value={zone.id}>{zone.name}</option>
-                      ))}
-                    </select>
-                    <input type="hidden" {...register('zone')} value={selectedZone} />
-                  </div>
-                  <div>
-                    <select
-                      className="input"
-                      value={selectedWoreda}
-                      onChange={(e) => setSelectedWoreda(e.target.value)}
-                      disabled={!selectedZone}
-                    >
-                      <option value="">Select Woreda</option>
-                      {availableWoredas.map(woreda => (
-                        <option key={woreda.id} value={woreda.id}>{woreda.name}</option>
-                      ))}
-                    </select>
-                    <input type="hidden" {...register('woreda')} value={selectedWoreda} />
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Kebele / City"
-                      {...register('kebele')}
-                    />
-                  </div>
-                </div>
-                {/* Also keep a text field for detailed address */}
-                <textarea
-                  className="input mt-2"
-                  rows="2"
-                  placeholder="Detailed address (house number, street, etc.) - Optional"
-                  {...register('address')}
-                />
-              </div>
-
-              {/* Additional Information - Collapsible */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowAdditionalInfo(!showAdditionalInfo)}
-                  className="w-full px-4 py-3 bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors"
-                >
-                  <span className="font-medium text-gray-700">Additional Information</span>
-                  {showAdditionalInfo ? (
-                    <ChevronUp className="h-5 w-5 text-gray-500" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-gray-500" />
-                  )}
-                </button>
-                
-                {showAdditionalInfo && (
-                  <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="label">Email Address</label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                          <input
-                            type="email"
-                            className="input pl-10"
-                            placeholder="patient@email.com"
-                            {...register('email', {
-                              pattern: {
-                                value: /^[A-Z0-9._%+-]+[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                message: 'Please enter a valid email address'
-                              }
-                            })}
-                          />
-                        </div>
-                        {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
-                      </div>
-
-                      <div>
-                        <label className="label">Marital Status</label>
-                        <select className="input" {...register('maritalStatus')}>
-                          <option value="">Select Status</option>
-                          <option value="SINGLE">Single</option>
-                          <option value="MARRIED">Married</option>
-                          <option value="DIVORCED">Divorced</option>
-                          <option value="WIDOWED">Widowed</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="label">Insurance ID</label>
-                        <input
-                          type="text"
-                          className="input"
-                          placeholder="Insurance ID"
-                          {...register('insuranceId')}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="label">Disability Status</label>
-                        <select className="input" {...register('disabilityStatus')}>
-                          <option value="">Select Disability</option>
-                          <option value="NO_DISABILITY">No Disability</option>
-                          <option value="VISION_LOSS">Vision Loss</option>
-                          <option value="HEARING_LOSS">Hearing Loss</option>
-                          <option value="MOBILITY_IMPAIRMENT">Mobility Impairment</option>
-                          <option value="OTHER">Other</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="label">Emergency Contact</label>
-                        <input
-                          type="text"
-                          className="input"
-                          placeholder="Name - Phone Number"
-                          {...register('emergencyContact')}
-                        />
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
+              {errors.dob && <p className="text-red-500 text-sm mt-1">{errors.dob.message}</p>}
+            </div>
+
+            <div>
+              <label className="label">Gender *</label>
+              <div className="flex space-x-3">
+                {['MALE', 'FEMALE'].map(g => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => { setValue('gender', g); setGenderValue(g); }}
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium border-2 transition-all ${
+                      genderValue === g
+                        ? g === 'MALE' ? 'bg-blue-500 text-white border-blue-500' : 'bg-pink-500 text-white border-pink-500'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    {g === 'MALE' ? '♂ Male' : '♀ Female'}
+                  </button>
+                ))}
+              </div>
+              <input type="hidden" {...register('gender', { required: 'Gender is required' })} />
+              {errors.gender && <p className="text-red-500 text-sm mt-1">{errors.gender.message}</p>}
+            </div>
+
+            <div>
+              <label className="label">Mobile Number *</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="tel"
+                  className="input pl-10"
+                  placeholder="0912345678"
+                  {...register('mobile', {
+                    required: 'Mobile number is required',
+                    pattern: { value: /^[0-9]{10}$/, message: 'Please enter a valid 10-digit mobile number' }
+                  })}
+                />
+              </div>
+              {errors.mobile && <p className="text-red-500 text-sm mt-1">{errors.mobile.message}</p>}
+            </div>
+          </div>
+
+          {/* Additional Information - Collapsible Dropdown */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowAdditionalInfo(!showAdditionalInfo)}
+              className="w-full px-4 py-3 bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors"
+            >
+              <span className="font-medium text-gray-700">Additional Information</span>
+              {showAdditionalInfo ? (
+                <ChevronUp className="h-5 w-5 text-gray-500" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-gray-500" />
+              )}
+            </button>
+
+            {showAdditionalInfo && (
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Patient Type</label>
+                    <select className="input" {...register('type')} defaultValue="REGULAR">
+                      <option value="REGULAR">Regular</option>
+                      <option value="EMERGENCY" style={{ color: 'red', fontWeight: 'bold' }}>🚨 Emergency</option>
+                      <option value="VIP">VIP</option>
+                      <option value="INSURANCE">Insurance</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Emergency patients skip card payment
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="label">National ID</label>
+                    <div className="relative">
+                      <CardIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        type="text"
+                        className="input pl-10"
+                        placeholder="National ID Number"
+                        {...register('nationalId')}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="label">Email Address</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        type="email"
+                        className="input pl-10"
+                        placeholder="patient@email.com"
+                        {...register('email', {
+                          pattern: {
+                            value: /^[A-Z0-9._%+-]+[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                            message: 'Please enter a valid email address'
+                          }
+                        })}
+                      />
+                    </div>
+                    {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
+                  </div>
+
+                  <div>
+                    <label className="label">Marital Status</label>
+                    <select className="input" {...register('maritalStatus')}>
+                      <option value="">Select Status</option>
+                      <option value="SINGLE">Single</option>
+                      <option value="MARRIED">Married</option>
+                      <option value="DIVORCED">Divorced</option>
+                      <option value="WIDOWED">Widowed</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">Insurance ID</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Insurance ID"
+                      {...register('insuranceId')}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Disability Status</label>
+                    <select className="input" {...register('disabilityStatus')}>
+                      <option value="">Select Disability</option>
+                      <option value="NO_DISABILITY">No Disability</option>
+                      <option value="VISION_LOSS">Vision Loss</option>
+                      <option value="HEARING_LOSS">Hearing Loss</option>
+                      <option value="MOBILITY_IMPAIRMENT">Mobility Impairment</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">Emergency Contact</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Name - Phone Number"
+                      {...register('emergencyContact')}
+                    />
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div>
+                  <label className="label">Address</label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <select className="input" value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value)}>
+                        <option value="">Select Region</option>
+                        {ETHIOPIAN_REGIONS.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                      <input type="hidden" {...register('region')} value={selectedRegion} />
+                    </div>
+                    <div>
+                      <select className="input" value={selectedZone} onChange={(e) => setSelectedZone(e.target.value)} disabled={!selectedRegion}>
+                        <option value="">Select Zone</option>
+                        {availableZones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                      </select>
+                      <input type="hidden" {...register('zone')} value={selectedZone} />
+                    </div>
+                    <div>
+                      <select className="input" value={selectedWoreda} onChange={(e) => setSelectedWoreda(e.target.value)} disabled={!selectedZone}>
+                        <option value="">Select Woreda</option>
+                        {availableWoredas.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                      <input type="hidden" {...register('woreda')} value={selectedWoreda} />
+                    </div>
+                    <div>
+                      <input type="text" className="input" placeholder="Kebele / City" {...register('kebele')} />
+                    </div>
+                  </div>
+                  <textarea className="input mt-2" rows="2" placeholder="Detailed address (house number, street, etc.)" {...register('address')} />
+                </div>
+              </div>
+            )}
+          </div>
 
               <div className="flex justify-end space-x-4">
                 <button
@@ -917,6 +888,14 @@ const ReceptionPatientRegistration = () => {
             >
               Finish & Next Patient
             </button>
+            {(user?.role === 'NURSE') && (
+              <button
+                onClick={() => navigate('/nurse/queue')}
+                className="px-8 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 transition-colors shadow-lg hover:shadow-xl"
+              >
+                Go to Nurse Queue
+              </button>
+            )}
           </div>
 
           <div className="mt-8 pt-6 border-t border-gray-100">
