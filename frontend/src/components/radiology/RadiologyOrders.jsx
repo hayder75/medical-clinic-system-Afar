@@ -968,46 +968,46 @@ const RadiologyOrders = () => {
           {getFilteredOrders().map((order) => (
             <div
               key={`${order.__kind || (order.isWalkIn ? 'walkin' : 'batch')}-${order.id}`}
-              className={`bg-white rounded-lg shadow-md border p-6 cursor-pointer hover:shadow-lg transition-shadow duration-200 ${order.status === 'QUEUED' ? 'border-yellow-200' :
+              className={`bg-white rounded-lg shadow-md border p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow duration-200 ${order.status === 'QUEUED' ? 'border-yellow-200' :
                 order.status === 'COMPLETED' ? 'border-green-200' : 'border-gray-200'
                 }`}
               onClick={() => handleOrderClick(order)}
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  {getStatusIcon(order.status)}
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h3 className="text-lg font-semibold text-gray-900">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+                <div className="flex items-start space-x-3 min-w-0">
+                  <div className="flex-shrink-0 mt-0.5">{getStatusIcon(order.status)}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <h3 className="text-sm sm:text-lg font-semibold text-gray-900 truncate">
                         Order {formatDisplayOrderId(order)} - {order.patient.name}
                       </h3>
                       {isDentalOrder(order) && (
-                        <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                        <span className="px-1.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium bg-purple-100 text-purple-800 flex-shrink-0">
                           🦷 Dental
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-xs sm:text-sm text-gray-600 mt-0.5">
                       {order.services
                         ?.filter(service => service.investigationType?.category === 'RADIOLOGY')
                         .map(service => service.investigationType?.name)
                         .join(', ') || order.type?.name || 'Radiology Test'}
-                      {order.isWalkIn && <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded">WALK-IN</span>}
+                      {order.isWalkIn && <span className="ml-1.5 px-1.5 py-0.5 bg-purple-100 text-purple-800 text-xs rounded">WALK-IN</span>}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-auto">
                   {order.status === 'COMPLETED' && (
                     <button
                       onClick={(e) => handlePrintResults(e, order)}
-                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+                      className="px-2 sm:px-3 py-1 sm:py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
                       title="Print results (findings and conclusion only, no images)"
                     >
-                      <Printer className="h-4 w-4" />
+                      <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       Print
                     </button>
                   )}
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
+                  <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${getStatusColor(order.status)}`}>
                     {order.status}
                   </span>
                 </div>
