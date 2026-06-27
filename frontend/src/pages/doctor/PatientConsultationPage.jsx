@@ -1722,38 +1722,38 @@ const PatientConsultationPage = () => {
   return (
     <Layout title={`Patient Consultation - ${visit?.visitUid || visit?.id || 'Loading...'}`} subtitle="Diagnose and treat patient">
       <div className="space-y-3 w-full">
-        {/* Patient Info Banner with Action Buttons - Horizontal Layout */}
-        <div className="border-b py-3" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4 flex-1 min-w-0">
+        {/* Patient Info Banner with Action Buttons */}
+        <div className="border-b py-3 overflow-x-hidden" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div className="flex items-center gap-4 min-w-0">
               <div className="flex items-center justify-center w-14 h-14 rounded-full flex-shrink-0" style={{ backgroundColor: '#2e13d1' }}>
                 <User className="h-7 w-7" style={{ color: '#FFFFFF' }} />
               </div>
-              <div className="flex items-center gap-6 flex-1 min-w-0 overflow-x-auto">
-                <div className="flex-shrink-0">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 min-w-0">
+                <div>
                   <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Patient ID</p>
-                  <p className="text-sm font-semibold whitespace-nowrap" style={{ color: '#0C0E0B' }}>#{visit.patient?.id || 'N/A'}</p>
+                  <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>#{visit.patient?.id || 'N/A'}</p>
                 </div>
-                <div className="flex-shrink-0">
+                <div>
                   <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Patient Name</p>
-                  <p className="text-sm font-semibold whitespace-nowrap" style={{ color: '#0C0E0B' }}>{visit.patient?.name || 'N/A'}</p>
+                  <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>{visit.patient?.name || 'N/A'}</p>
                 </div>
-                <div className="flex-shrink-0">
+                <div>
                   <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Age / Gender</p>
-                  <p className="text-sm font-semibold whitespace-nowrap" style={{ color: '#0C0E0B' }}>
+                  <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>
                     {visit.patient?.dob ? calculateAge(visit.patient.dob) : 'N/A'} /
                     {visit.patient?.gender || 'N/A'}
                   </p>
                 </div>
-                <div className="flex-shrink-0">
+                <div>
                   <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Blood Type</p>
-                  <p className="text-sm font-semibold whitespace-nowrap" style={{ color: '#0C0E0B' }}>{visit.patient?.bloodType || 'N/A'}</p>
+                  <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>{visit.patient?.bloodType || 'N/A'}</p>
                 </div>
-                <div className="flex-shrink-0">
+                <div>
                   <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Mobile</p>
-                  <p className="text-sm font-semibold whitespace-nowrap" style={{ color: '#0C0E0B' }}>{visit.patient?.mobile || 'N/A'}</p>
+                  <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>{visit.patient?.mobile || 'N/A'}</p>
                 </div>
-                <div className="flex-shrink-0">
+                <div>
                   <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Status</p>
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
@@ -1775,11 +1775,11 @@ const PatientConsultationPage = () => {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleManualRefresh}
                 disabled={isRefreshingVisit}
-                className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center text-base whitespace-nowrap border"
+                className="px-3 py-2 rounded-lg font-medium transition-colors flex items-center text-sm whitespace-nowrap border"
                 style={{
                   backgroundColor: '#FFFFFF',
                   color: '#2e13d1',
@@ -1788,30 +1788,30 @@ const PatientConsultationPage = () => {
                 }}
                 title="Refresh visit data"
               >
-                <RefreshCw className={`inline-block mr-2 h-4 w-4 ${isRefreshingVisit ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`inline-block mr-1.5 h-4 w-4 ${isRefreshingVisit ? 'animate-spin' : ''}`} />
                 {isRefreshingVisit ? 'Refreshing...' : 'Refresh'}
               </button>
               <button
                 onClick={handleBackToQueue}
-                className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center text-base whitespace-nowrap"
+                className="px-3 py-2 rounded-lg font-medium transition-colors flex items-center text-sm whitespace-nowrap"
                 style={{ backgroundColor: '#2e13d1', color: '#FFFFFF' }}
               >
-                <ArrowLeft className="inline-block mr-2 h-4 w-4" />
+                <ArrowLeft className="inline-block mr-1.5 h-4 w-4" />
                 Back to Queue
               </button>
               {!isCompletedMode && (
                 <>
                   <button
                     onClick={() => setShowTransferModal(true)}
-                    className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center text-base whitespace-nowrap"
+                    className="px-3 py-2 rounded-lg font-medium transition-colors flex items-center text-sm whitespace-nowrap"
                     style={{ backgroundColor: '#7C3AED', color: '#FFFFFF' }}
                     title="Transfer patient to another doctor"
                   >
-                    <ArrowLeft className="inline-block mr-2 h-4 w-4 rotate-90" />
+                    <ArrowLeft className="inline-block mr-1.5 h-4 w-4 rotate-90" />
                     Transfer
                   </button>
                   <button
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center text-base whitespace-nowrap ${hasPendingOrders ? 'opacity-50 cursor-not-allowed' : ''
+                    className={`px-3 py-2 rounded-lg font-medium transition-colors flex items-center text-sm whitespace-nowrap ${hasPendingOrders ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                     style={{
                       backgroundColor: hasPendingOrders ? '#9CA3AF' : '#EA2E00',
