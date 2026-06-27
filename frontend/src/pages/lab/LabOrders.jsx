@@ -49,7 +49,8 @@ const LabOrders = () => {
   const [showCBCAdditionalFields, setShowCBCAdditionalFields] = useState({});
   const [labImages, setLabImages] = useState({});
   const [panelGroupData, setPanelGroupData] = useState({});
-  const [savingResults, setSavingResults] = useState(false); // Track which CBC tests have additional fields shown
+  const [savingResults, setSavingResults] = useState(false);
+  const [savingPanel, setSavingPanel] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -1171,6 +1172,7 @@ const LabOrders = () => {
   };
 
   const handleCloseServiceTemplate = async () => {
+    setSavingPanel(true);
     // Auto-save the current form data to database if it has results
     // Handle panel mode save
     if (selectedService && selectedService.startsWith('panel_')) {
@@ -1249,6 +1251,7 @@ const LabOrders = () => {
 
     setShowServiceTemplate(false);
     setSelectedService(null);
+    setSavingPanel(false);
   };
 
   const updateTestResult = (serviceId, field, value) => {
@@ -1342,6 +1345,7 @@ const LabOrders = () => {
   };
 
   const handleCompleteBatchOrder = async () => {
+    setSavingResults(true);
     try {
       const isEmptyResult = (obj) => {
         if (!obj || typeof obj !== 'object') return true;
@@ -1355,8 +1359,8 @@ const LabOrders = () => {
         .map(([, r]) => r.serviceName || r.labTest?.name || 'Unknown test');
 
       if (emptyTests.length > 0) {
-        toast.error(`Cannot complete — please fill at least one result field for: ${emptyTests.join(', ')}`);
-        return;
+        const proceed = window.confirm(`Some tests have no results filled (${emptyTests.length} tests). Are you sure you want to complete and send anyway?`);
+        if (!proceed) return;
       }
 
       // Check if this is a new lab test order system (including grouped orders)
@@ -1491,6 +1495,8 @@ const LabOrders = () => {
       } else {
         toast.error('Failed to complete batch order');
       }
+    } finally {
+      setSavingResults(false);
     }
   };
 
@@ -2568,9 +2574,18 @@ const LabOrders = () => {
             <div className="flex justify-end mt-6 pt-4 border-t">
               <button
                 onClick={handleCloseServiceTemplate}
-                className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                disabled={savingPanel}
+                className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                Save & Close
+                {savingPanel ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Saving...
+                  </>
+                ) : 'Save & Close'}
               </button>
             </div>
           </div>
