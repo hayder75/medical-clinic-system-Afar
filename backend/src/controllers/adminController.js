@@ -5194,6 +5194,7 @@ exports.getLabTestsForOrdering = async (req, res) => {
           id: group.id,
           name: group.name,
           description: group.description,
+          price: group.price,
           tests: group.tests
         });
       }
