@@ -399,7 +399,7 @@ const Layout = ({ children, title, subtitle }) => {
                 alt={`${window.__CS__?.name || 'Clinic'} Logo`}
                 className="h-10 w-10 rounded-full object-cover border-2 border-white"
               />
-              <span className="ml-3 text-xl font-bold text-white">{window.__CS__?.name || 'Clinic'}</span>
+              <span className="ml-3 text-xl font-bold text-white hidden lg:inline">{window.__CS__?.name || 'Clinic'}</span>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -604,7 +604,7 @@ const Layout = ({ children, title, subtitle }) => {
         </header>
 
         {/* Page content */}
-        <main key={`${location.pathname}-${pageRefreshKey}`} className="flex-1 overflow-y-auto" style={{ backgroundColor: '#FFFFFF' }}>
+        <main key={`${location.pathname}-${pageRefreshKey}`} className="flex-1 overflow-y-auto overflow-x-hidden" style={{ backgroundColor: '#FFFFFF' }}>
           <div className="py-6">
             <div className={(location.pathname.startsWith('/admin') || location.pathname.includes('/doctor/consultation')) ? 'px-4 sm:px-6 lg:px-8' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
               {children}
