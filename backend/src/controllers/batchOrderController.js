@@ -1295,6 +1295,7 @@ exports.createLabTestOrders = async (req, res) => {
       // Create lab test orders
       const createdOrders = [];
       let totalAmount = 0;
+      const panelPricing = {}; // panelId -> price
 
       for (const testId of newTestIds) {
         const test = labTests.find(t => t.id === testId);
@@ -1322,8 +1323,17 @@ exports.createLabTestOrders = async (req, res) => {
         });
 
         createdOrders.push(order);
-        totalAmount += test.price;
+        if (test.groupId) {
+          if (!panelPricing[test.groupId]) {
+            const group = await tx.labTestGroup.findUnique({ where: { id: test.groupId }, select: { price: true } });
+            panelPricing[test.groupId] = group?.price || 0;
+          }
+        } else {
+          totalAmount += test.price;
+        }
       }
+      // Add panel prices once per panel
+      Object.values(panelPricing).forEach(p => totalAmount += p);
 
       // Create billing entry
       let billing = await tx.billing.findFirst({
@@ -1366,13 +1376,14 @@ exports.createLabTestOrders = async (req, res) => {
           });
 
           if (!existingBillingService) {
+            const effPrice1 = order.labTest.groupId ? (panelPricing[order.labTest.groupId] || 0) : order.labTest.price;
             await tx.billingService.create({
               data: {
                 billingId: billing.id,
                 serviceId: order.labTest.serviceId,
                 quantity: 1,
-                unitPrice: order.labTest.price,
-                totalPrice: order.labTest.price
+                unitPrice: effPrice1,
+                totalPrice: effPrice1
               }
             });
           }
@@ -1390,7 +1401,7 @@ exports.createLabTestOrders = async (req, res) => {
                   code: fallbackServiceCode,
                   name: order.labTest.name,
                   category: 'LAB',
-                  price: order.labTest.price,
+                  price: order.labTest.groupId ? (panelPricing[order.labTest.groupId] || 0) : order.labTest.price,
                   unit: order.labTest.unit || 'UNIT',
                   description: `Auto-generated LAB service for lab test ${order.labTest.name}`,
                   isActive: true

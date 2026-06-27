@@ -85,7 +85,7 @@ const LabOrdering = ({ visitId, patientId, patient, visit, onOrdersPlaced, exist
     Object.values(organizedTests).forEach(cat => {
       cat.panels?.forEach(panel => {
         panel.tests?.forEach(t => {
-          if (selectedTestIds.has(t.id)) result.push({ ...t, groupName: panel.name });
+          if (selectedTestIds.has(t.id)) result.push({ ...t, groupName: panel.name, panelId: panel.id, panelPrice: panel.price || 0 });
         });
       });
       cat.standalone?.forEach(t => {
@@ -116,7 +116,22 @@ const LabOrdering = ({ visitId, patientId, patient, visit, onOrdersPlaced, exist
     }
   };
 
-  const calculateTotal = () => getSelectedTests().reduce((s, t) => s + (t.price || 0), 0);
+  const calculateTotal = () => {
+    const tests = getSelectedTests();
+    const panelTotals = {};
+    let total = 0;
+    tests.forEach(t => {
+      if (t.panelId) {
+        if (!panelTotals[t.panelId]) {
+          panelTotals[t.panelId] = t.panelPrice || 0;
+        }
+      } else {
+        total += t.price || 0;
+      }
+    });
+    Object.values(panelTotals).forEach(p => total += p);
+    return total;
+  };
 
   const allTestsFlat = useMemo(() => {
     const tests = [];

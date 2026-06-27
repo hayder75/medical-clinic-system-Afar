@@ -1217,6 +1217,7 @@ model LabTestGroup {
   color        String    @default("")
   description  String?
   displayOrder Int       @default(0)
+  price      Float     @default(0)
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -1263,6 +1264,7 @@ model LabTestResultField {
   options      Json?
   isRequired   Boolean  @default(false)
   displayOrder Int      @default(0)
+  price      Float     @default(0)
   isAdditional Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
