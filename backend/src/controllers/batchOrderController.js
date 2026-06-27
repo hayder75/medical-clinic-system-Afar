@@ -1295,7 +1295,7 @@ exports.createLabTestOrders = async (req, res) => {
       // Create lab test orders
       const createdOrders = [];
       let totalAmount = 0;
-      const panelPricing = {}; // panelId -> price
+      const panelPricing = {};
 
       for (const testId of newTestIds) {
         const test = labTests.find(t => t.id === testId);
@@ -1332,7 +1332,6 @@ exports.createLabTestOrders = async (req, res) => {
           totalAmount += test.price;
         }
       }
-      // Add panel prices once per panel
       Object.values(panelPricing).forEach(p => totalAmount += p);
 
       // Create billing entry
@@ -1376,14 +1375,14 @@ exports.createLabTestOrders = async (req, res) => {
           });
 
           if (!existingBillingService) {
-            const effPrice1 = order.labTest.groupId ? (panelPricing[order.labTest.groupId] || 0) : order.labTest.price;
+            const panelMember = !!order.labTest.groupId;
             await tx.billingService.create({
               data: {
                 billingId: billing.id,
                 serviceId: order.labTest.serviceId,
                 quantity: 1,
-                unitPrice: effPrice1,
-                totalPrice: effPrice1
+                unitPrice: panelMember ? 0 : order.labTest.price,
+                totalPrice: panelMember ? 0 : order.labTest.price
               }
             });
           }
@@ -1401,7 +1400,7 @@ exports.createLabTestOrders = async (req, res) => {
                   code: fallbackServiceCode,
                   name: order.labTest.name,
                   category: 'LAB',
-                  price: order.labTest.groupId ? (panelPricing[order.labTest.groupId] || 0) : order.labTest.price,
+                  price: order.labTest.price,
                   unit: order.labTest.unit || 'UNIT',
                   description: `Auto-generated LAB service for lab test ${order.labTest.name}`,
                   isActive: true
@@ -1453,15 +1452,10 @@ exports.createLabTestOrders = async (req, res) => {
         }
       }
 
-      // Update billing total
-      const billingServices = await tx.billingService.findMany({
-        where: { billingId: billing.id }
-      });
-      const servicesTotal = billingServices.reduce((sum, bs) => sum + bs.totalPrice, 0);
-
+      // Update billing total — charge panel price once per panel, not per individual test
       await tx.billing.update({
         where: { id: billing.id },
-        data: { totalAmount: servicesTotal }
+        data: { totalAmount: { increment: totalAmount } }
       });
 
       // Update visit status - check if there are also radiology orders
