@@ -1347,21 +1347,6 @@ const LabOrders = () => {
   const handleCompleteBatchOrder = async () => {
     setSavingResults(true);
     try {
-      const isEmptyResult = (obj) => {
-        if (!obj || typeof obj !== 'object') return true;
-        const vals = Object.entries(obj).filter(([k]) => !k.startsWith('_'));
-        if (vals.length === 0) return true;
-        return vals.every(([, v]) => v === undefined || v === null || v === '' || (typeof v === 'object' && !Array.isArray(v) && isEmptyResult(v)));
-      };
-
-      const emptyTests = Object.entries(testResults)
-        .filter(([, r]) => isEmptyResult(r.results))
-        .map(([, r]) => r.serviceName || r.labTest?.name || 'Unknown test');
-
-      if (emptyTests.length > 0) {
-        const proceed = window.confirm(`Some tests have no results filled (${emptyTests.length} tests). Are you sure you want to complete and send anyway?`);
-        if (!proceed) return;
-      }
 
       // Check if this is a new lab test order system (including grouped orders)
       const isNewLabTestOrder = (selectedOrder.orders && Array.isArray(selectedOrder.orders)) || selectedOrder.__kind === 'labtest_group';
