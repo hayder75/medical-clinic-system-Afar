@@ -1,0 +1,1168 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Plus, Trash2, Printer, Pill, AlertCircle, CheckCircle, Clock, Save, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import api from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { formatMedicationName, formatMedicationInstruction } from '../../utils/medicalStandards';
+
+const DOSAGE_FORM_CATEGORIES = {
+  ORAL_SOLID: 'Oral - Solid',
+  ORAL_LIQUID: 'Oral - Liquid',
+  INJECTABLE: 'Injectable',
+  TOPICAL: 'Topical',
+  OPHTHALMIC: 'Ophthalmic',
+  OTIC: 'Otic',
+  NASAL: 'Nasal',
+  RESPIRATORY: 'Respiratory',
+  RECTAL: 'Rectal',
+  VAGINAL: 'Vaginal',
+  TRANSDERMAL: 'Transdermal',
+  IMPLANTABLE_SPECIAL: 'Implantable/Special'
+};
+
+const DOSAGE_FORMS = {
+  ORAL_SOLID: ['Tablet', 'Tablet – Film Coated', 'Tablet – Enteric Coated', 'Tablet – Extended Release', 'Capsule – Hard Gelatin', 'Capsule – Soft Gel', 'Powder – Oral', 'Sachet', 'Lozenge'],
+  ORAL_LIQUID: ['Oral Solution', 'Oral Suspension', 'Syrup', 'Elixir', 'Oral Drops'],
+  INJECTABLE: ['Injection – IV', 'Injection – IM', 'Injection – SC', 'Injection – ID', 'IV Infusion', 'Ampoule', 'Vial', 'Prefilled Syringe', 'Powder for Injection'],
+  TOPICAL: ['Cream', 'Ointment', 'Gel', 'Lotion', 'Foam', 'Topical Spray', 'Medicated Shampoo'],
+  OPHTHALMIC: ['Eye Drops – Solution', 'Eye Drops – Suspension', 'Eye Ointment'],
+  OTIC: ['Ear Drops – Solution', 'Ear Drops – Suspension'],
+  NASAL: ['Nasal Spray', 'Nasal Drops', 'Nasal Gel'],
+  RESPIRATORY: ['Metered Dose Inhaler', 'Dry Powder Inhaler', 'Nebulizer Solution'],
+  RECTAL: ['Suppository – Rectal', 'Rectal Cream', 'Enema'],
+  VAGINAL: ['Vaginal Tablet', 'Vaginal Suppository', 'Vaginal Cream', 'Vaginal Gel', 'Vaginal Foam'],
+  TRANSDERMAL: ['Transdermal Patch'],
+  IMPLANTABLE_SPECIAL: ['Implant', 'IUD', 'Depot Injection', 'Dialysis Solution', 'Irrigation Solution', 'Mouthwash']
+};
+
+const ROUTES = {
+  ORAL: 'Oral (PO)',
+  INTRAVENOUS: 'Intravenous (IV)',
+  INTRAMUSCULAR: 'Intramuscular (IM)',
+  SUBCUTANEOUS: 'Subcutaneous (SC)',
+  INTRADERMAL: 'Intradermal (ID)',
+  TOPICAL: 'Topical',
+  INHALATION: 'Inhalation',
+  RECTAL: 'Rectal',
+  VAGINAL: 'Vaginal',
+  OPHTHALMIC: 'Ophthalmic',
+  OTIC: 'Otic',
+  NASAL: 'Nasal',
+  TRANSDERMAL: 'Transdermal',
+  EPIDURAL: 'Epidural',
+  INTRATHECAL: 'Intrathecal'
+};
+
+const ROUTE_VALIDATION = {
+  ORAL_SOLID: ['ORAL'],
+  ORAL_LIQUID: ['ORAL'],
+  INJECTABLE: ['INTRAVENOUS', 'INTRAMUSCULAR', 'SUBCUTANEOUS', 'INTRADERMAL', 'EPIDURAL', 'INTRATHECAL'],
+  TOPICAL: ['TOPICAL'],
+  OPHTHALMIC: ['OPHTHALMIC'],
+  OTIC: ['OTIC'],
+  NASAL: ['NASAL'],
+  RESPIRATORY: ['INHALATION'],
+  RECTAL: ['RECTAL'],
+  VAGINAL: ['VAGINAL'],
+  TRANSDERMAL: ['TRANSDERMAL'],
+  IMPLANTABLE_SPECIAL: ['INTRAVENOUS', 'INTRAMUSCULAR', 'SUBCUTANEOUS']
+};
+
+const FREQUENCY_TYPES = {
+  ONCE_DAILY: 'Once Daily',
+  TWICE_DAILY: 'Twice Daily',
+  THREE_TIMES_DAILY: 'Three Times Daily',
+  EVERY_6_HOURS: 'Every 6 Hours',
+  EVERY_8_HOURS: 'Every 8 Hours',
+  EVERY_12_HOURS: 'Every 12 Hours',
+  STAT: 'STAT (Immediate)',
+  PRN: 'PRN (As Needed)',
+  CUSTOM: 'Custom'
+};
+
+const FREQUENCY_MAP = {
+  ONCE_DAILY: { value: 1, unit: 'times', perUnit: 'day' },
+  TWICE_DAILY: { value: 2, unit: 'times', perUnit: 'day' },
+  THREE_TIMES_DAILY: { value: 3, unit: 'times', perUnit: 'day' },
+  EVERY_6_HOURS: { value: 4, unit: 'times', perUnit: 'day' },
+  EVERY_8_HOURS: { value: 3, unit: 'times', perUnit: 'day' },
+  EVERY_12_HOURS: { value: 2, unit: 'times', perUnit: 'day' },
+  STAT: { value: 1, unit: 'time', perUnit: 'day' },
+  PRN: { value: 0, unit: 'times', perUnit: 'day' }
+};
+
+const DURATION_UNITS = {
+  DAYS: 'Days',
+  WEEKS: 'Weeks',
+  MONTHS: 'Months'
+};
+
+const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlaced, existingOrders = [] }) => {
+  const { user: currentUser } = useAuth();
+  const [medicationSearch, setMedicationSearch] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedMedications, setSelectedMedications] = useState([]);
+  const [prescribedMedications, setPrescribedMedications] = useState([]);
+  const [loadingPrescribed, setLoadingPrescribed] = useState(false);
+
+  const [customMedication, setCustomMedication] = useState({
+    name: '',
+    genericName: '',
+    strength: '',
+    strengthText: '',
+    dosageFormCategory: '',
+    dosageForm: '',
+    routeCode: '',
+    quantity: '',
+    frequencyType: '',
+    frequencyValue: '',
+    frequencyUnit: 'times',
+    frequencyUnitPer: 'day',
+    durationValue: '',
+    durationUnit: 'DAYS',
+    instructions: ''
+  });
+
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customMedSearchQuery, setCustomMedSearchQuery] = useState('');
+  const [customMedSearchResults, setCustomMedSearchResults] = useState([]);
+  const [isSearchingCustomMeds, setIsSearchingCustomMeds] = useState(false);
+  const [showCustomMedSuggestions, setShowCustomMedSuggestions] = useState(false);
+  const [isSavingCustomMed, setIsSavingCustomMed] = useState(false);
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(null);
+
+  const availableDosageForms = useMemo(() => {
+    if (!customMedication.dosageFormCategory) return [];
+    return DOSAGE_FORMS[customMedication.dosageFormCategory] || [];
+  }, [customMedication.dosageFormCategory]);
+
+  const availableRoutes = useMemo(() => {
+    if (!customMedication.dosageFormCategory) return ROUTES;
+    const allowedRoutes = ROUTE_VALIDATION[customMedication.dosageFormCategory] || [];
+    const filtered = {};
+    allowedRoutes.forEach(route => {
+      if (ROUTES[route]) filtered[route] = ROUTES[route];
+    });
+    return filtered;
+  }, [customMedication.dosageFormCategory]);
+
+  const calculatedQuantity = useMemo(() => {
+    const freqType = customMedication.frequencyType;
+    const freqValue = parseFloat(customMedication.frequencyValue) || FREQUENCY_MAP[freqType]?.value || 0;
+    const durationValue = parseFloat(customMedication.durationValue) || 0;
+    const durationUnit = customMedication.durationUnit;
+
+    if (freqValue === 0 || durationValue === 0) return null;
+
+    let days = durationValue;
+    if (durationUnit === 'WEEKS') days = durationValue * 7;
+    if (durationUnit === 'MONTHS') days = durationValue * 30;
+
+    return Math.ceil(freqValue * days);
+  }, [customMedication.frequencyType, customMedication.frequencyValue, customMedication.durationValue, customMedication.durationUnit]);
+
+  useEffect(() => {
+    fetchPrescribedMedications();
+  }, [visitId]);
+
+  const fetchPrescribedMedications = async () => {
+    if (!visitId) return;
+    try {
+      setLoadingPrescribed(true);
+      const response = await api.get(`/doctors/visits/${visitId}`);
+      const visitData = response.data;
+      setPrescribedMedications(visitData.medicationOrders || []);
+    } catch (error) {
+      console.error('Error fetching prescribed medications:', error);
+    } finally {
+      setLoadingPrescribed(false);
+    }
+  };
+
+  const searchMedications = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    try {
+      setIsSearching(true);
+      const response = await api.get(`/medications/search?query=${encodeURIComponent(query)}&limit=20`);
+      setSearchResults(response.data.medications || []);
+    } catch (error) {
+      console.error('Error searching medications:', error);
+      toast.error('Failed to search medications');
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSearchChange = (e) => {
+    const query = e.target.value;
+    setMedicationSearch(query);
+    if (window.medsearchTimeout) clearTimeout(window.medsearchTimeout);
+    window.medsearchTimeout = setTimeout(() => {
+      searchMedications(query);
+    }, 300);
+  };
+
+  const addMedicationFromSearch = (medication) => {
+    const newMedication = {
+      id: medication.id,
+      name: medication.name,
+      genericName: medication.genericName,
+      dosageForm: medication.dosageForm,
+      strength: medication.strength,
+      manufacturer: medication.manufacturer,
+      availableQuantity: medication.availableQuantity,
+      unitPrice: medication.unitPrice,
+      category: medication.category || 'TABLETS',
+      quantity: '',
+      frequencyType: '',
+      frequencyValue: '',
+      frequencyUnit: 'times',
+      frequencyUnitPer: 'day',
+      duration: '',
+      durationValue: '',
+      durationUnit: 'DAYS',
+      route: '',
+      instructions: '',
+      isCustom: false
+    };
+    setSelectedMedications([...selectedMedications, newMedication]);
+    setMedicationSearch('');
+    setSearchResults([]);
+    toast.success(`${medication.name} added to prescription`);
+  };
+
+  const searchCustomMedications = async (query) => {
+    if (!query.trim() || query.trim().length < 2) {
+      setCustomMedSearchResults([]);
+      setShowCustomMedSuggestions(false);
+      return;
+    }
+    try {
+      setIsSearchingCustomMeds(true);
+      const response = await api.get(`/doctors/custom-medications/search?query=${encodeURIComponent(query)}`);
+      setCustomMedSearchResults(response.data.customMedications || []);
+      setShowCustomMedSuggestions(response.data.customMedications?.length > 0);
+    } catch (error) {
+      console.error('Error searching custom medications:', error);
+      setCustomMedSearchResults([]);
+      setShowCustomMedSuggestions(false);
+    } finally {
+      setIsSearchingCustomMeds(false);
+    }
+  };
+
+  const handleCustomMedSearchChange = (e) => {
+    const query = e.target.value;
+    setCustomMedSearchQuery(query);
+    setCustomMedication({ ...customMedication, name: query, genericName: query });
+    const timeoutId = setTimeout(() => {
+      searchCustomMedications(query);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  };
+
+  const selectCustomMedication = (customMed) => {
+    setCustomMedication({
+      ...customMedication,
+      name: customMed.name,
+      genericName: customMed.genericName || customMed.name,
+      dosageFormCategory: customMed.dosageFormCategory || '',
+      dosageForm: customMed.dosageForm || '',
+      routeCode: customMed.routeCode || customMed.route || '',
+      strength: customMed.strength || '',
+      strengthText: customMed.strengthText || '',
+      quantity: customMed.quantity || '',
+      frequencyType: customMed.frequencyType || '',
+      frequencyValue: customMed.frequencyValue || '',
+      frequencyUnit: customMed.frequencyUnit || 'times',
+      durationValue: customMed.durationValue || '',
+      durationUnit: customMed.durationUnit || 'DAYS',
+      instructions: customMed.instructions || ''
+    });
+    setCustomMedSearchQuery('');
+    setCustomMedSearchResults([]);
+    setShowCustomMedSuggestions(false);
+  };
+
+  const handleCustomFieldChange = (field, value) => {
+    if (field === 'dosageFormCategory') {
+      setCustomMedication({
+        ...customMedication,
+        [field]: value,
+        dosageForm: '',
+        routeCode: ''
+      });
+    } else {
+      setCustomMedication({
+        ...customMedication,
+        [field]: value
+      });
+    }
+  };
+
+  const addCustomMedication = async (saveAndAddAnother = false) => {
+    if (!customMedication.name.trim()) {
+      toast.error('Please enter medication name');
+      return;
+    }
+    if (!customMedication.dosageForm) {
+      toast.error('Please select dosage form');
+      return;
+    }
+    if (!customMedication.strength.trim()) {
+      toast.error('Please enter medication strength');
+      return;
+    }
+
+    const wasSelectedFromSearch = customMedSearchResults.some(
+      med => med.name.toLowerCase() === customMedication.name.toLowerCase() &&
+        med.strength.toLowerCase() === customMedication.strength.toLowerCase()
+    );
+
+    if (!wasSelectedFromSearch && customMedication.name.trim() && customMedication.dosageForm && customMedication.strength) {
+      try {
+        setIsSavingCustomMed(true);
+        await api.post('/doctors/custom-medications', {
+          name: customMedication.name,
+          genericName: customMedication.genericName || customMedication.name,
+          dosageFormCategory: customMedication.dosageFormCategory || null,
+          dosageForm: customMedication.dosageForm,
+          strength: customMedication.strength,
+          strengthText: customMedication.strengthText || null,
+          routeCode: customMedication.routeCode || null,
+          quantity: customMedication.quantity || null,
+          frequencyType: customMedication.frequencyType || null,
+          frequencyValue: customMedication.frequencyValue ? parseFloat(customMedication.frequencyValue) : null,
+          frequencyUnit: customMedication.frequencyUnit || null,
+          frequencyText: customMedication.frequencyType ? FREQUENCY_TYPES[customMedication.frequencyType] : null,
+          durationValue: customMedication.durationValue ? parseFloat(customMedication.durationValue) : null,
+          durationUnit: customMedication.durationUnit || null,
+          durationText: customMedication.durationValue ? `${customMedication.durationValue} ${DURATION_UNITS[customMedication.durationUnit]}` : null,
+          instructions: customMedication.instructions || null
+        });
+        toast.success('Custom medication saved for future use');
+      } catch (error) {
+        console.error('Error saving custom medication:', error);
+      } finally {
+        setIsSavingCustomMed(false);
+      }
+    }
+
+    const calculatedQty = calculatedQuantity;
+    const newMedication = {
+      id: `custom-${Date.now()}`,
+      name: customMedication.name,
+      genericName: customMedication.genericName || customMedication.name,
+      dosageFormCategory: customMedication.dosageFormCategory,
+      dosageForm: customMedication.dosageForm || 'Tablet',
+      strength: customMedication.strength || 'N/A',
+      strengthText: customMedication.strengthText,
+      manufacturer: 'Custom',
+      availableQuantity: 0,
+      unitPrice: 0,
+      category: 'TABLETS',
+      quantity: customMedication.quantity || (calculatedQty ? String(calculatedQty) : ''),
+      quantityNumeric: calculatedQty || null,
+      calculatedQuantity: calculatedQty,
+      quantityOverridden: !!customMedication.quantity,
+      frequencyType: customMedication.frequencyType,
+      frequencyValue: customMedication.frequencyValue,
+      frequencyUnit: customMedication.frequencyUnit,
+      frequencyText: customMedication.frequencyType ? FREQUENCY_TYPES[customMedication.frequencyType] : '',
+      duration: customMedication.durationValue ? `${customMedication.durationValue} ${DURATION_UNITS[customMedication.durationUnit]}` : '',
+      durationValue: customMedication.durationValue,
+      durationUnit: customMedication.durationUnit,
+      routeCode: customMedication.routeCode,
+      route: customMedication.routeCode,
+      instructions: customMedication.instructions,
+      isCustom: true
+    };
+
+    setSelectedMedications([...selectedMedications, newMedication]);
+
+    if (saveAndAddAnother) {
+      setCustomMedication({
+        name: '',
+        genericName: '',
+        strength: '',
+        strengthText: '',
+        dosageFormCategory: '',
+        dosageForm: '',
+        routeCode: '',
+        quantity: '',
+        frequencyType: '',
+        frequencyValue: '',
+        frequencyUnit: 'times',
+        frequencyUnitPer: 'day',
+        durationValue: '',
+        durationUnit: 'DAYS',
+        instructions: ''
+      });
+      setCustomMedSearchQuery('');
+      setCustomMedSearchResults([]);
+      setShowCustomMedSuggestions(false);
+      toast.success('Custom medication added to prescription');
+    } else {
+      setCustomMedication({
+        name: '', genericName: '', strength: '', strengthText: '', dosageFormCategory: '',
+        dosageForm: '', routeCode: '', quantity: '', frequencyType: '', frequencyValue: '',
+        frequencyUnit: 'times', frequencyUnitPer: 'day', durationValue: '', durationUnit: 'DAYS', instructions: ''
+      });
+      setCustomMedSearchQuery('');
+      setCustomMedSearchResults([]);
+      setShowCustomMedSuggestions(false);
+      setShowCustomForm(false);
+      toast.success('Custom medication added to prescription');
+    }
+  };
+
+  const updateMedication = (index, field, value) => {
+    const updated = [...selectedMedications];
+    updated[index][field] = value;
+    setSelectedMedications(updated);
+  };
+
+  const removeMedication = (index) => {
+    const updated = selectedMedications.filter((_, i) => i !== index);
+    setSelectedMedications(updated);
+  };
+
+  const submitMedicationOrders = async () => {
+    if (selectedMedications.length === 0) {
+      toast.error('Please add at least one medication');
+      return;
+    }
+
+    const parsedVisitId = parseInt(visitId);
+    if (isNaN(parsedVisitId)) {
+      toast.error('Invalid visit ID');
+      return;
+    }
+
+    if (!patientId) {
+      toast.error('Invalid patient ID');
+      return;
+    }
+
+    try {
+      const orders = selectedMedications.map(med => ({
+        visitId: parsedVisitId,
+        patientId: String(patientId),
+        name: med.name || '',
+        genericName: med.genericName || null,
+        normalizedName: (med.name || '').toLowerCase(),
+        dosageFormCategory: med.dosageFormCategory || null,
+        dosageForm: med.dosageForm || 'Tablet',
+        strength: med.strength || 'N/A',
+        strengthText: med.strengthText || null,
+        quantity: med.quantity || null,
+        quantityNumeric: med.quantityNumeric || (med.quantity ? parseFloat(med.quantity) : null),
+        calculatedQuantity: med.calculatedQuantity || null,
+        finalQuantity: med.quantityOverridden ? (med.quantity ? parseFloat(med.quantity) : null) : (med.calculatedQuantity || null),
+        quantityOverridden: med.quantityOverridden || false,
+        frequencyType: med.frequencyType || null,
+        frequencyValue: med.frequencyValue ? parseFloat(med.frequencyValue) : null,
+        frequencyUnit: med.frequencyUnit || null,
+        frequencyText: med.frequencyText || null,
+        frequency: med.frequencyText || null,
+        duration: med.duration || null,
+        durationValue: med.durationValue ? parseFloat(med.durationValue) : null,
+        durationUnit: med.durationUnit || null,
+        durationText: med.duration || null,
+        routeCode: med.routeCode || null,
+        route: med.routeCode || null,
+        instructions: med.instructions || null,
+        additionalNotes: med.isCustom ? 'Custom medication - not in inventory' : '',
+        category: med.category || 'TABLETS'
+      }));
+
+      for (const order of orders) {
+        await api.post('/doctors/medication-orders', order);
+      }
+      toast.success(`${orders.length} medication(s) prescribed successfully`);
+      setSelectedMedications([]);
+      await fetchPrescribedMedications();
+      if (onOrdersPlaced) onOrdersPlaced();
+    } catch (error) {
+      console.error('Error prescribing medications:', error);
+      console.error('Error response data:', error.response?.data);
+      toast.error(error.response?.data?.error || error.response?.data?.details || JSON.stringify(error.response?.data) || 'Failed to prescribe medications');
+    }
+  };
+
+  const calculateAge = (dob) => {
+    if (!dob) return 'N/A';
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const printPrescription = async () => {
+    let medicationsToPrint = prescribedMedications.length > 0 ? prescribedMedications : selectedMedications;
+    if (medicationsToPrint.length === 0) {
+      toast.error('No medications to print. Please prescribe medications first.');
+      return;
+    }
+
+    medicationsToPrint = medicationsToPrint.reduce((acc, current) => {
+      const isDuplicate = acc.find(item =>
+        item.name === current.name &&
+        item.strength === current.strength &&
+        item.frequency === current.frequency &&
+        item.frequencyPeriod === current.frequencyPeriod &&
+        item.route === current.route &&
+        item.duration === current.duration
+      );
+      if (!isDuplicate) acc.push(current);
+      return acc;
+    }, []);
+
+    try {
+      let patientData = patient;
+      let doctorData = doctor;
+      let visitUid = visitId?.toString().substring(0, 8);
+
+      try {
+        const visitResponse = await api.get(`/doctors/visits/${visitId}`);
+        const visitData = visitResponse.data;
+        if (!patientData) patientData = visitData.patient;
+        if (!doctorData) doctorData = visitData.doctor || currentUser;
+        if (visitData.visitUid) visitUid = visitData.visitUid;
+      } catch (error) {
+        console.error('Error fetching visit details:', error);
+      }
+
+      if (!patientData) {
+        toast.error('Failed to get patient data');
+        return;
+      }
+
+      const patientAge = patientData?.dob ? calculateAge(patientData.dob) : 'N/A';
+      const patientGender = (patientData?.gender || 'N/A').charAt(0).toUpperCase();
+      const patientCardNumber = patientData?.id || 'N/A';
+      const patientName = patientData?.name || 'N/A';
+
+      const firstMed = medicationsToPrint[0];
+      const prescribingDoctor = firstMed?.doctor || firstMed?.medicationOrder?.doctor || doctorData || currentUser;
+      const doctorName = prescribingDoctor?.fullname || currentUser?.fullname || 'Dr. Unknown';
+      const doctorQualification = prescribingDoctor?.qualifications?.join(', ') || currentUser?.qualifications?.join(', ') || 'General Practitioner';
+
+      const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast.error('Popup blocked! Please allow popups for this site.');
+        return;
+      }
+      const prescriptionContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Prescription - ${patientName}</title>
+          <style>
+            @media print {
+              @page { size: A6; margin: 0 !important; }
+              html, body { margin: 0 !important; padding: 0 !important; background: white !important; visibility: visible !important; display: flex !important; flex-direction: column !important; align-items: center !important; overflow: visible !important; }
+              * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color: black !important; }
+              .no-print { display: none !important; }
+              .prescription-container { width: 105mm !important; min-height: 148mm !important; margin: 0 auto !important; padding: 8mm !important; border: none !important; box-shadow: none !important; background: white !important; display: block !important; position: relative !important; overflow: hidden !important; box-sizing: border-box !important; visibility: visible !important; }
+            }
+            body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; color: #333; line-height: 1.3; background: #f3f4f6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+            .no-print { padding: 10px; background: #fff; margin-bottom: 20px; border-radius: 8px; width: 100%; max-width: 300px; text-align: center; }
+            .no-print button { background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+            .prescription-container { width: 105mm; min-height: 148mm; background: white; padding: 8mm; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; box-sizing: border-box; display: block; margin: 0 auto; }
+            .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; margin-bottom: 12px; border-bottom: 2px solid #2563eb; }
+            .header-left { display: flex; align-items: center; gap: 8px; }
+            .logo { width: 40px; height: 40px; object-fit: contain; }
+            .clinic-name { font-size: 13px; font-weight: 700; margin: 0; color: #1e40af; text-transform: uppercase; }
+            .clinic-tagline { font-size: 9px; color: #64748b; margin: 0; font-style: italic; }
+            .report-title { font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; }
+            .report-info { font-size: 9px; color: #64748b; margin-top: 1px; text-align: right; }
+            .patient-section { margin-bottom: 12px; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px; }
+            .info-label { font-weight: 700; color: #64748b; }
+            .medications-section h3 { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; }
+            .medication-item { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed #e2e8f0; width: 100%; }
+            .medication-name { font-weight: 700; font-size: 12px; color: #0f172a; margin-bottom: 2px; }
+            .medication-details { font-size: 11px; color: #334155; font-weight: 500; }
+            .footer { margin-top: auto; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; font-size: 10px; }
+            .doctor-name { font-weight: 700; color: #1e293b; font-size: 11px; }
+            .signature-box { width: 100px; border-top: 1px solid #334155; padding-top: 4px; text-align: center; font-size: 8px; color: #64748b; }
+          </style>
+        </head>
+        <body>
+          <div class="no-print"><button onclick="window.print()">Print Prescription</button></div>
+          <div class="prescription-container">
+            <div class="header">
+              <div class="header-left">
+                <img src="/clinic-logo.jpg" alt="Clinic Logo" class="logo" onerror="this.style.display='none'">
+                <div class="clinic-info">
+                  <h1 class="clinic-name">Charite Medium Clinic</h1>
+                  <p class="clinic-tagline">Quality Healthcare You Can Trust</p>
+                </div>
+              </div>
+              <div class="header-right">
+                <h2 class="report-title">Prescription</h2>
+                <div class="report-info">
+                  Date: ${currentDate}<br>
+                  Time: ${currentTime}
+                </div>
+              </div>
+            </div>
+            <div class="patient-section">
+              <div><span class="info-label">Patient:</span> ${patientName?.toUpperCase()}</div>
+              <div><span class="info-label">Card No:</span> #${patientCardNumber}</div>
+              <div><span class="info-label">Age/Sex:</span> ${patientAge}Y / ${patientGender}</div>
+              <div style="text-align: right;"><span class="info-label">Visit ID:</span> #${visitUid}</div>
+            </div>
+            <div class="medications-section">
+              <h3>Prescribed Medications</h3>
+              ${medicationsToPrint.map((med, idx) => {
+        const cleanedName = formatMedicationName(med.name);
+        const strength = med.strength && med.strength !== 'N/A' ? med.strength : '';
+        const instructionLine = formatMedicationInstruction(med);
+        const medInstructions = med.instructions || med.additionalNotes || '';
+        const note = (medInstructions && medInstructions !== 'Custom medication - not in inventory') ? medInstructions : '';
+
+        return `
+                <div class="medication-item">
+                  <div class="medication-name"># ${idx + 1}. ${cleanedName} ${strength}</div>
+                  <div class="medication-details" style="padding-left: 25px;">
+                    ${instructionLine}
+                    ${note ? `<div style="font-size: 11px; margin-top: 3px; color: #64748b; font-style: italic;">Note: ${note}</div>` : ''}
+                  </div>
+                </div>
+              `;
+      }).join('')}
+            </div>
+            <div class="footer">
+              <div>
+                Prescribed by: <span class="doctor-name">${doctorName}</span><br>
+                <div style="font-size: 8px; color: #64748b;">${doctorQualification}</div>
+              </div>
+              <div class="signature-box">Doctor's Signature & Stamp</div>
+            </div>
+          </div>
+        </body>
+      </html>`;
+      printWindow.document.write(prescriptionContent);
+      printWindow.document.close();
+      setTimeout(() => { printWindow.print(); }, 800);
+    } catch (error) {
+      console.error('Print error:', error);
+      toast.error('Failed to print prescription');
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm('Are you sure you want to delete this medication order?')) return;
+    try {
+      setDeleteLoading(orderId);
+      await api.delete(`/doctors/medication-order/${orderId}`);
+      toast.success('Medication order deleted');
+      await fetchPrescribedMedications();
+      if (onOrdersPlaced) onOrdersPlaced();
+    } catch (error) {
+      console.error('Error deleting medication order:', error);
+      toast.error(error.response?.data?.error || 'Failed to delete order');
+    } finally {
+      setDeleteLoading(null);
+    }
+  };
+
+  const handleUpdateOrder = async (e) => {
+    e.preventDefault();
+    try {
+      await api.patch(`/doctors/medication-order/${editingOrder.id}`, editingOrder);
+      toast.success('Medication order updated');
+      setEditingOrder(null);
+      await fetchPrescribedMedications();
+      if (onOrdersPlaced) onOrdersPlaced();
+    } catch (error) {
+      console.error('Error updating medication order:', error);
+      toast.error(error.response?.data?.error || 'Failed to update order');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h4 className="font-semibold mb-3" style={{ color: '#0C0E0B' }}>Search Medications from Inventory</h4>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search medications by name..."
+            value={medicationSearch}
+            onChange={handleSearchChange}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+          {isSearching && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            </div>
+          )}
+        </div>
+
+        {searchResults.length > 0 && (
+          <div className="mt-3 border border-gray-200 rounded-lg max-h-60 overflow-y-auto bg-white shadow-sm">
+            {searchResults.map((medication) => (
+              <div
+                key={medication.id}
+                className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                onClick={() => addMedicationFromSearch(medication)}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-medium text-gray-900">{medication.name}</p>
+                    <p className="text-xs text-gray-500">{medication.strength} {medication.dosageForm}</p>
+                  </div>
+                  <span className="text-xs font-semibold text-green-600">{medication.availableQuantity} in stock</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-semibold" style={{ color: '#0C0E0B' }}>Manual Entry / Custom Medication</h4>
+          <button
+            onClick={() => setShowCustomForm(!showCustomForm)}
+            className="flex items-center px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            {showCustomForm ? 'Cancel' : 'Add Custom'}
+          </button>
+        </div>
+
+        {showCustomForm && (
+          <>
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 shadow-sm">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-indigo-900 mb-1">Medication Name *</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={customMedication.name}
+                    onChange={handleCustomMedSearchChange}
+                    className="w-full px-3 py-2 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 bg-white"
+                    placeholder="e.g. Paracetamol"
+                  />
+                  {showCustomMedSuggestions && customMedSearchResults.length > 0 && (
+                    <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-40 overflow-y-auto">
+                      {customMedSearchResults.map((med) => (
+                        <div
+                          key={med.id}
+                          onClick={() => selectCustomMedication(med)}
+                          className="px-3 py-2 hover:bg-indigo-50 cursor-pointer text-xs"
+                        >
+                          <span className="font-semibold">{med.name}</span> - {med.strength}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-indigo-900 mb-1">Strength</label>
+                <input
+                  type="text"
+                  value={customMedication.strength}
+                  onChange={(e) => handleCustomFieldChange('strength', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 bg-white"
+                  placeholder="e.g. 500mg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-indigo-900 mb-1">Dosage Form</label>
+                <select
+                  value={customMedication.dosageForm}
+                  onChange={(e) => handleCustomFieldChange('dosageForm', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 bg-white"
+                >
+                  <option value="">Select</option>
+                  <option value="Tablet">Tablet</option>
+                  <option value="Capsule">Capsule</option>
+                  <option value="Syrup">Syrup</option>
+                  <option value="Suspension">Suspension</option>
+                  <option value="Injection">Injection</option>
+                  <option value="Cream">Cream</option>
+                  <option value="Ointment">Ointment</option>
+                  <option value="Drops">Drops</option>
+                  <option value="Inhaler">Inhaler</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-indigo-900 mb-1">Category</label>
+                <select
+                  value={customMedication.category}
+                  onChange={(e) => handleCustomFieldChange('category', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 bg-white"
+                >
+                  <option value="">Select</option>
+                  <option value="Analgesic">Analgesic</option>
+                  <option value="Antibiotic">Antibiotic</option>
+                  <option value="Antipyretic">Antipyretic</option>
+                  <option value="Anti-inflammatory">Anti-inflammatory</option>
+                  <option value="Antihistamine">Antihistamine</option>
+                  <option value="Antiviral">Antiviral</option>
+                  <option value="Antifungal">Antifungal</option>
+                  <option value="Cardiovascular">Cardiovascular</option>
+                  <option value="Respiratory">Respiratory</option>
+                  <option value="Gastrointestinal">Gastrointestinal</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-indigo-900 mb-1">Type</label>
+                <select
+                  value={customMedication.type}
+                  onChange={(e) => handleCustomFieldChange('type', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 bg-white"
+                >
+                  <option value="">Select</option>
+                  <option value="Generic">Generic</option>
+                  <option value="Brand">Brand</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-indigo-900 mb-1">Unit</label>
+                <select
+                  value={customMedication.unit}
+                  onChange={(e) => handleCustomFieldChange('unit', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 bg-white"
+                >
+                  <option value="UNIT">UNIT</option>
+                  <option value="ML">ML</option>
+                  <option value="MG">MG</option>
+                  <option value="G">G</option>
+                </select>
+              </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3 pt-4 border-t border-indigo-200">
+              <button
+                onClick={() => addCustomMedication(true)}
+                disabled={isSavingCustomMed}
+                className="flex items-center px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors"
+              >
+                {isSavingCustomMed ? (
+                  <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                ) : (
+                  <Save className="h-5 w-5 mr-2" />
+                )}
+                Save & Add Another
+              </button>
+              <button
+                onClick={() => addCustomMedication(false)}
+                disabled={isSavingCustomMed}
+                className="flex items-center px-4 py-2.5 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors"
+              >
+                {isSavingCustomMed ? (
+                  <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                ) : (
+                  <CheckCircle className="h-5 w-5 mr-2" />
+                )}
+                Save & Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCustomForm(false);
+                  setCustomMedication({
+                    name: '', genericName: '', strength: '', strengthText: '', dosageFormCategory: '',
+                    dosageForm: '', routeCode: '', quantity: '', frequencyType: '', frequencyValue: '',
+                    frequencyUnit: 'times', frequencyUnitPer: 'day', durationValue: '', durationUnit: 'DAYS', instructions: ''
+                  });
+                }}
+                className="flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg font-bold hover:bg-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5 mr-2" />
+                Cancel
+              </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {selectedMedications.length > 0 && (
+        <div className="space-y-4">
+          <h4 className="font-semibold text-gray-900">Current Prescription</h4>
+          {selectedMedications.map((medication, index) => (
+            <div key={medication.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm border-l-4 border-l-blue-500">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h5 className="font-bold text-gray-900 text-lg">{index + 1}. {medication.name}</h5>
+                  <p className="text-sm text-gray-500">{medication.strength} {medication.dosageForm}</p>
+                </div>
+                <button
+                  onClick={() => removeMedication(index)}
+                  className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-full transition-colors"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              </div>
+
+              {medication.isCustom ? (
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-lg grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="block text-gray-500 font-semibold uppercase text-[10px]">Quantity</span>
+                    <span className="text-blue-900 font-bold">{medication.quantity || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-gray-500 font-semibold uppercase text-[10px]">Frequency</span>
+                    <span className="text-blue-900 font-bold">{medication.frequencyText || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-gray-500 font-semibold uppercase text-[10px]">Duration</span>
+                    <span className="text-blue-900 font-bold">{medication.duration || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-gray-500 font-semibold uppercase text-[10px]">Route</span>
+                    <span className="text-blue-900 font-bold">{ROUTES[medication.routeCode] || medication.route || 'N/A'}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                    <input
+                      type="text"
+                      value={medication.quantity}
+                      onChange={(e) => updateMedication(index, 'quantity', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g. 30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
+                    <select
+                      value={medication.frequencyType}
+                      onChange={(e) => updateMedication(index, 'frequencyType', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select</option>
+                      {Object.entries(FREQUENCY_TYPES).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Duration</label>
+                    <input
+                      type="text"
+                      value={medication.duration}
+                      onChange={(e) => updateMedication(index, 'duration', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g. 7 days"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Route</label>
+                    <select
+                      value={medication.routeCode}
+                      onChange={(e) => updateMedication(index, 'routeCode', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select</option>
+                      {Object.entries(ROUTES).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          <div className="flex flex-col items-end space-y-4 pt-4 border-t">
+            <button
+              onClick={submitMedicationOrders}
+              className="w-full font-bold py-4 rounded-xl shadow-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <CheckCircle className="h-6 w-6" />
+              <span>Complete Prescription</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {prescribedMedications.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="font-semibold text-gray-900">Prescribed Medication Record</h4>
+            <div className="flex gap-2">
+              <button
+                onClick={printPrescription}
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition"
+              >
+                <Printer className="h-4 w-4" /> Print Prescription
+              </button>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {prescribedMedications.map((order, idx) => (
+              <div key={idx} className="p-3 bg-gray-50 border rounded-lg flex justify-between items-center">
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{idx + 1}. {formatMedicationName(order.name)} {order.strength && order.strength !== 'N/A' ? order.strength : ''}</p>
+                  <p className="text-xs text-gray-600 ml-4 italic">
+                    {formatMedicationInstruction(order)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-blue-600 uppercase">{order.status}</span>
+                  {order.status === 'UNPAID' && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setEditingOrder(order)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
+                        title="Edit Order"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-5M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteOrder(order.id)}
+                        disabled={deleteLoading === order.id}
+                        className="p-1.5 text-red-600 hover:bg-red-100 rounded-md transition-colors disabled:opacity-50"
+                        title="Delete Order"
+                      >
+                        {deleteLoading === order.id ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {editingOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-bold">Edit Medication Order</h3>
+              <button onClick={() => setEditingOrder(null)} className="text-gray-400 hover:text-gray-600">
+                <Plus className="h-6 w-6 transform rotate-45" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateOrder} className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Medication Name</label>
+                  <input
+                    type="text"
+                    value={editingOrder.name}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Strength</label>
+                  <input
+                    type="text"
+                    value={editingOrder.strength}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, strength: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dosage Form</label>
+                  <input
+                    type="text"
+                    value={editingOrder.dosageForm}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, dosageForm: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                  <input
+                    type="text"
+                    value={editingOrder.quantity}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, quantity: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
+                  <input
+                    type="text"
+                    value={editingOrder.frequencyText || editingOrder.frequency}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, frequency: e.target.value, frequencyText: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration</label>
+                  <input
+                    type="text"
+                    value={editingOrder.durationText || editingOrder.duration}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, duration: e.target.value, durationText: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Route</label>
+                  <input
+                    type="text"
+                    value={editingOrder.route}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, route: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setEditingOrder(null)}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                >
+                  Update Order
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MedicationOrdering;

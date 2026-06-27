@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+.env
+*.log
+frontend/dist
+backend/dist
+.next
+.DS_Store
+*.sql.gz
+*.sql
+*.jpg
+*.png
+*.jpeg
+*.gif

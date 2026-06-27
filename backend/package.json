@@ -1,0 +1,53 @@
+{
+  "name": "tenalesew-medical-center-backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "bin": "server.js",
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
+  "scripts": {
+    "migrate": "prisma migrate dev",
+    "generate": "prisma generate",
+    "studio": "prisma studio",
+    "start": "node server.js",
+    "validate": "node scripts/validate-production.js",
+    "cleanup:demo": "node scripts/cleanup-demo-data.js",
+    "seed:demo": "node scripts/seed-demo-data.js",
+    "seed:all": "node scripts/seed-scripts/seed-everything.js",
+    "seed:diseases:csv": "node scripts/seed-diseases-from-csv.js",
+    "fix:cbc-template": "node scripts/update-cbc-template.js",
+    "fix:urinalysis-template": "node scripts/update-urinalysis-template.js",
+    "fix:h-pylori": "node scripts/fix-h-pylori-antigen-serology.js",
+    "build:exe": "pkg . --targets node18-win-x64 --output dist/backend.exe",
+    "service:install": "node scripts/install-windows-service.js",
+    "service:uninstall": "node scripts/uninstall-windows-service.js"
+  },
+  "dependencies": {
+    "@prisma/client": "5.20.0",
+    "axios": "^1.12.2",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
+    "pdfmake": "^0.2.20",
+    "roboto-font": "^0.1.0",
+    "socket.io": "^4.8.3",
+    "xlsx": "^0.18.5",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1",
+    "prisma": "5.20.0"
+  },
+  "optionalDependencies": {
+    "node-windows": "^1.0.0-beta.8"
+  }
+}

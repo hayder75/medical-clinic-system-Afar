@@ -1,0 +1,235 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #1a23d9ff;
+    --secondary: #6c8dfa;
+    --success: #1cc88a;
+    --info: #36b9cc;
+    --warning: #f6c23e;
+    --danger: #e74a3b;
+    --light: #f8f9fc;
+    --dark: #3a3b45;
+    --dental-blue: #2a5bd7;
+    --dental-teal: #20c997;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    background-color: #FFFFFF;
+    color: var(--dark);
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-sm hover:shadow-md;
+  }
+  
+  .btn-primary {
+    background-color: var(--primary);
+    color: white;
+    border: none;
+  }
+  
+  .btn-primary:hover {
+    background-color: var(--secondary);
+  }
+  
+  .btn-primary:focus {
+    ring-color: var(--primary);
+  }
+  
+  .btn-secondary {
+    background-color: var(--secondary);
+    color: white;
+    border: none;
+  }
+  
+  .btn-secondary:hover {
+    background-color: var(--primary);
+  }
+  
+  .btn-outline {
+    background-color: transparent;
+    color: var(--dark);
+    border: 2px solid var(--primary);
+  }
+  
+  .btn-outline:hover {
+    background-color: var(--primary);
+    color: white;
+  }
+  
+  .btn-success {
+    background-color: var(--success);
+    color: white;
+  }
+  
+  .btn-success:hover {
+    background-color: var(--dental-teal);
+  }
+  
+  .btn-danger {
+    background-color: var(--danger);
+    color: white;
+  }
+  
+  .btn-danger:hover {
+    background-color: #c0392b;
+  }
+  
+  .btn-warning {
+    background-color: var(--warning);
+    color: white;
+  }
+  
+  .btn-warning:hover {
+    background-color: #e0a800;
+  }
+  
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+  
+  .btn-lg {
+    @apply px-6 py-3 text-lg;
+  }
+  
+  .card {
+    background-color: #FFFFFF;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    border: 1px solid #E5E7EB;
+    padding: 1.5rem;
+  }
+  
+  .input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid var(--primary);
+    border-radius: 0.5rem;
+    background-color: #FFFFFF;
+    color: var(--dark);
+    transition: all 0.2s;
+  }
+  
+  .input:focus {
+    outline: none;
+    border-color: var(--secondary);
+    box-shadow: 0 0 0 3px rgba(42, 91, 215, 0.1);
+  }
+  
+  .label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--dark);
+    margin-bottom: 0.25rem;
+  }
+  
+  .table {
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  
+  .table th {
+    padding: 0.75rem 0.5rem;
+    background-color: var(--light);
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid var(--primary);
+  }
+  
+  .table td {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.875rem;
+    color: var(--dark);
+    border-bottom: 1px solid #E5E7EB;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  
+  .badge-success {
+    background-color: rgba(28, 200, 138, 0.1);
+    color: var(--success);
+    border: 1px solid var(--success);
+  }
+  
+  .badge-warning {
+    background-color: rgba(246, 194, 62, 0.1);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+  }
+  
+  .badge-danger {
+    background-color: rgba(231, 74, 59, 0.1);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+  }
+  
+  .badge-emergency {
+    background-color: rgba(231, 74, 59, 0.1);
+    color: var(--danger);
+    font-weight: 600;
+    border: 2px solid var(--danger);
+  }
+  
+  .badge-info {
+    background-color: rgba(54, 185, 204, 0.1);
+    color: var(--info);
+    border: 1px solid var(--info);
+  }
+  
+  .badge-primary {
+    background-color: rgba(42, 91, 215, 0.1);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+  }
+  
+  .badge-gray {
+    background-color: rgba(58, 59, 69, 0.1);
+    color: var(--dark);
+    border: 1px solid var(--dark);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Increase font size for ReactQuill editor */
+.ql-editor {
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+}
+
+.ql-editor p {
+  font-size: 16px !important;
+  margin-bottom: 0.5em;
+}
+
+.ql-snow .ql-tooltip {
+  font-size: 14px;
+}
