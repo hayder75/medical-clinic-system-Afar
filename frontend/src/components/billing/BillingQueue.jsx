@@ -776,14 +776,14 @@ const BillingQueue = () => {
                 </div>
               )}
 
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-1.5">
                 {(billing.status === "PENDING" ||
                   billing.status === "PARTIALLY_PAID") && (
                     <button
                       onClick={() => openPaymentForm(billing)}
-                      className="btn btn-primary btn-sm flex items-center"
+                      className="btn btn-primary btn-sm flex items-center text-xs sm:text-sm"
                     >
-                      <CreditCard className="h-4 w-4 mr-1" />
+                      <CreditCard className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
                       {billing.status === "PARTIALLY_PAID"
                         ? "Collect Balance"
                         : "Process Payment"}
@@ -793,27 +793,27 @@ const BillingQueue = () => {
                   <>
                     <button
                       onClick={() => setShowDeleteBillingModal(billing)}
-                      className="btn btn-outline btn-sm flex items-center text-red-600 hover:bg-red-50 hover:border-red-300"
+                      className="btn btn-outline btn-sm flex items-center text-red-600 hover:bg-red-50 hover:border-red-300 text-xs sm:text-sm"
                       title="Delete this billing"
                     >
-                      <Trash2 className="h-4 w-4 mr-1" />
+                      <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
                       Delete Billing
                     </button>
                     <button
                       onClick={() => deleteVisit(billing)}
-                      className="btn btn-outline btn-sm flex items-center text-red-600 hover:bg-red-50 hover:border-red-300"
+                      className="btn btn-outline btn-sm flex items-center text-red-600 hover:bg-red-50 hover:border-red-300 text-xs sm:text-sm"
                       title="Delete visit to allow recreation"
                     >
-                      <Trash2 className="h-4 w-4 mr-1" />
+                      <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
                       Delete Visit
                     </button>
                   </>
                 )}
                 <button
                   onClick={() => handlePrintBilling(billing)}
-                  className="btn btn-outline btn-sm flex items-center ml-auto"
+                  className="btn btn-outline btn-sm flex items-center text-xs sm:text-sm"
                 >
-                  <Printer className="h-4 w-4 mr-1" />
+                  <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
                   Print
                 </button>
               </div>
