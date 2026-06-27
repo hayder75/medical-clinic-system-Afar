@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { FileText, ChevronDown, ChevronUp, CheckCircle, Plus, X, AlertTriangle } from 'lucide-react';
 import AsyncCreatableSelect from 'react-select/async-creatable';
 import toast from 'react-hot-toast';
@@ -6,7 +6,7 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import api from '../../services/api';
 
-const DiagnosisNotes = ({ visitId, patientId, patientName, onSave }) => {
+const DiagnosisNotes = forwardRef(({ visitId, patientId, patientName, onSave }, ref) => {
   // --- Structured Diagnosis State ---
   const [diagnoses, setDiagnoses] = useState([]);
   const [selectedDisease, setSelectedDisease] = useState(null);
@@ -78,6 +78,10 @@ const DiagnosisNotes = ({ visitId, patientId, patientName, onSave }) => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const contentEditableRefs = useRef({});
+
+  useImperativeHandle(ref, () => ({
+    getNotes: () => notes
+  }), [notes]);
 
   // --- Effects ---
 
@@ -551,6 +555,6 @@ const DiagnosisNotes = ({ visitId, patientId, patientName, onSave }) => {
       </div>
     </div>
   );
-};
+});
 
 export default DiagnosisNotes;

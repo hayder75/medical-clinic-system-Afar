@@ -391,110 +391,123 @@ const Layout = ({ children, title, subtitle }) => {
     <div className="h-screen flex overflow-hidden" style={{ backgroundColor: '#FFFFFF' }}>
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 z-50 w-64 shadow-xl transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`} style={{ backgroundColor: 'var(--primary)' }}>
-        <div className="flex items-center justify-between h-16 px-4 border-b" style={{ borderColor: 'var(--secondary)' }}>
-          <div className="flex items-center">
-            <img
-              src={window.__CS__?.logoUrl || '/clinic-logo.jpg'}
-              alt={`${window.__CS__?.name || 'Clinic'} Logo`}
-              className="h-10 w-10 rounded-full object-cover border-2 border-white"
-            />
-            <span className="ml-3 text-xl font-bold text-white">{window.__CS__?.name || 'Clinic'}</span>
+        <div className="flex flex-col h-full">
+          <div className="flex items-center justify-between h-16 px-4 border-b flex-shrink-0" style={{ borderColor: 'var(--secondary)' }}>
+            <div className="flex items-center">
+              <img
+                src={window.__CS__?.logoUrl || '/clinic-logo.jpg'}
+                alt={`${window.__CS__?.name || 'Clinic'} Logo`}
+                className="h-10 w-10 rounded-full object-cover border-2 border-white"
+              />
+              <span className="ml-3 text-xl font-bold text-white">{window.__CS__?.name || 'Clinic'}</span>
+            </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-2 rounded-md text-white hover:bg-opacity-20 hover:bg-white transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
           </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-2 rounded-md text-white hover:bg-opacity-20 hover:bg-white transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
 
-        <nav className="mt-5 px-2 space-y-1 overflow-y-auto max-h-[calc(100vh-5rem)]">
-          {navigationItems.map((item, index) => {
-            // If item has children/group, render as dropdown
-            if (item.children) {
-              const hasActiveChild = item.children.some(child => isCurrentPage(child.href));
-              // Keep group open if toggled OR if a child is active
-              const isOpen = openGroups[item.group] || hasActiveChild;
+          <nav className="flex-1 px-2 space-y-1 overflow-y-auto mt-5">
+            {navigationItems.map((item, index) => {
+              // If item has children/group, render as dropdown
+              if (item.children) {
+                const hasActiveChild = item.children.some(child => isCurrentPage(child.href));
+                // Keep group open if toggled OR if a child is active
+                const isOpen = openGroups[item.group] || hasActiveChild;
 
-              return (
-                <div key={item.name} className="space-y-1">
-                  <button
-                    onClick={() => toggleGroup(item.group)}
-                    className={`group flex items-center justify-between px-3 py-3 text-sm font-medium rounded-lg w-full text-left transition-all duration-200 ${hasActiveChild ? 'bg-white bg-opacity-10 text-white' : 'text-gray-200 hover:text-white hover:bg-opacity-20 hover:bg-white'
-                      }`}
-                  >
-                    <div className="flex items-center">
-                      <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
-                      {item.name}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {Number(item.badgeCount || 0) > 0 && (
-                        <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold">
-                          {item.badgeCount > 99 ? '99+' : item.badgeCount}
-                        </span>
-                      )}
-                      <svg
-                        className={`ml-2 h-4 w-4 transform transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                  </button>
-
-                  {/* Dropdown Content */}
-                  {isOpen && (
-                    <div className="pl-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
-                      {item.children.map(child => (
-                        <button
-                          key={child.name}
-                          onClick={() => handleNavigation(child.href)}
-                          className={`group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg w-full text-left transition-all duration-200 ${isCurrentPage(child.href)
-                            ? 'text-white bg-white bg-opacity-20'
-                            : 'text-gray-300 hover:text-white hover:bg-opacity-10'
-                            }`}
+                return (
+                  <div key={item.name} className="space-y-1">
+                    <button
+                      onClick={() => toggleGroup(item.group)}
+                      className={`group flex items-center justify-between px-3 py-3 text-sm font-medium rounded-lg w-full text-left transition-all duration-200 ${hasActiveChild ? 'bg-white bg-opacity-10 text-white' : 'text-gray-200 hover:text-white hover:bg-opacity-20 hover:bg-white'
+                        }`}
+                    >
+                      <div className="flex items-center">
+                        <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
+                        {item.name}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {Number(item.badgeCount || 0) > 0 && (
+                          <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold">
+                            {item.badgeCount > 99 ? '99+' : item.badgeCount}
+                          </span>
+                        )}
+                        <svg
+                          className={`ml-2 h-4 w-4 transform transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
                         >
-                          <div className="flex items-center">
-                            <child.icon className={`mr-3 h-4 w-4 transition-colors ${isCurrentPage(child.href) ? 'text-white' : 'text-gray-400 group-hover:text-white'
-                              }`} />
-                            {child.name}
-                          </div>
-                          {Number(child.badgeCount || 0) > 0 && (
-                            <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold">
-                              {child.badgeCount > 99 ? '99+' : child.badgeCount}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            }
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </button>
 
-            // Standard item rendering (no children)
-            return (
-              <button
-                key={item.name}
-                onClick={() => handleNavigation(item.href)}
-                className={`group flex items-center px-3 py-3 text-sm font-medium rounded-lg w-full text-left transition-all duration-200 ${isCurrentPage(item.href)
-                  ? 'text-white shadow-lg'
-                  : 'text-gray-200 hover:text-white hover:bg-opacity-20 hover:bg-white'
-                  }`}
-                style={{
-                  backgroundColor: isCurrentPage(item.href) ? 'var(--secondary)' : 'transparent'
-                }}
-              >
-                <item.icon
-                  className={`mr-3 h-5 w-5 transition-colors ${isCurrentPage(item.href) ? 'text-white' : 'text-gray-300 group-hover:text-white'
+                    {/* Dropdown Content */}
+                    {isOpen && (
+                      <div className="pl-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
+                        {item.children.map(child => (
+                          <button
+                            key={child.name}
+                            onClick={() => handleNavigation(child.href)}
+                            className={`group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg w-full text-left transition-all duration-200 ${isCurrentPage(child.href)
+                              ? 'text-white bg-white bg-opacity-20'
+                              : 'text-gray-300 hover:text-white hover:bg-opacity-10'
+                              }`}
+                          >
+                            <div className="flex items-center">
+                              <child.icon className={`mr-3 h-4 w-4 transition-colors ${isCurrentPage(child.href) ? 'text-white' : 'text-gray-400 group-hover:text-white'
+                                }`} />
+                              {child.name}
+                            </div>
+                            {Number(child.badgeCount || 0) > 0 && (
+                              <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold">
+                                {child.badgeCount > 99 ? '99+' : child.badgeCount}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // Standard item rendering (no children)
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => handleNavigation(item.href)}
+                  className={`group flex items-center px-3 py-3 text-sm font-medium rounded-lg w-full text-left transition-all duration-200 ${isCurrentPage(item.href)
+                    ? 'text-white shadow-lg'
+                    : 'text-gray-200 hover:text-white hover:bg-opacity-20 hover:bg-white'
                     }`}
-                />
-                {item.name}
-              </button>
-            );
-          })}
-        </nav>
+                  style={{
+                    backgroundColor: isCurrentPage(item.href) ? 'var(--secondary)' : 'transparent'
+                  }}
+                >
+                  <item.icon
+                    className={`mr-3 h-5 w-5 transition-colors ${isCurrentPage(item.href) ? 'text-white' : 'text-gray-300 group-hover:text-white'
+                      }`}
+                  />
+                  {item.name}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Logout button at sidebar bottom */}
+          <div className="flex-shrink-0 px-2 pb-4 pt-2 border-t border-white/20">
+            <button
+              onClick={handleLogout}
+              className="group flex items-center px-3 py-3 text-sm font-medium rounded-lg w-full text-left text-gray-200 hover:text-white hover:bg-white/20 transition-all duration-200"
+            >
+              <LogOut className="mr-3 h-5 w-5" />
+              Logout
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Main content */}

@@ -288,9 +288,11 @@ const PatientConsultationPage = () => {
   const [imageViewerIndex, setImageViewerIndex] = useState(0);
 
   // Complete Visit state
+  const diagnosisNotesRef = useRef(null);
   const [showCompleteConfirmModal, setShowCompleteConfirmModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showMissingInvestigationsModal, setShowMissingInvestigationsModal] = useState(false);
   const [completingVisit, setCompletingVisit] = useState(false);
   const [countAsMedicalTreated, setCountAsMedicalTreated] = useState(false);
   const [completeForm, setCompleteForm] = useState({
@@ -1088,11 +1090,37 @@ const PatientConsultationPage = () => {
   };
 
   // Complete Visit Functions
-  const handleCompleteVisit = () => {
-    if (isCompletedMode) {
+  const handleCompleteVisit = async () => {
+    if (isCompletedMode) return;
+
+    const stripHtml = (html) => {
+      if (!html) return '';
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      return tmp.textContent || tmp.innerText || '';
+    };
+
+    const notesData = diagnosisNotesRef.current?.getNotes?.();
+    let investigationText = '';
+    if (notesData) {
+      investigationText = stripHtml(notesData.investigationFindings || '');
+    } else {
+      try {
+        const res = await api.get(`/doctors/visits/${visitId}/diagnosis-notes`);
+        const serverNotes = res.data?.notes;
+        if (serverNotes) {
+          investigationText = stripHtml(serverNotes.investigationFindings || '');
+        }
+      } catch (e) {
+        console.warn('Could not fetch diagnosis notes:', e);
+      }
+    }
+
+    if (!investigationText) {
+      setShowMissingInvestigationsModal(true);
       return;
     }
-    // Show custom confirmation modal
+
     setCountAsMedicalTreated(false);
     setShowCompleteConfirmModal(true);
   };
@@ -5014,12 +5042,12 @@ const PatientConsultationPage = () => {
           {activeTab === 'notes' && (
             <div>
               <DiagnosisNotes
+                ref={diagnosisNotesRef}
                 visitId={visitId}
                 patientId={visit?.patient?.id}
                 patientName={visit?.patient?.name}
                 onSave={(result) => {
                   console.log('Diagnosis notes auto-saved:', result);
-                  // Auto-save managed by component UI
                 }}
               />
             </div>
@@ -5130,6 +5158,55 @@ const PatientConsultationPage = () => {
           images={imageViewerImages}
           currentIndex={imageViewerIndex}
         />
+
+        {/* Missing Investigation Findings Warning Modal */}
+        {showMissingInvestigationsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowMissingInvestigationsModal(false)}>
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <div className="p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex-shrink-0">
+                    <div className="h-12 w-12 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FEF3C7' }}>
+                      <AlertTriangle className="h-6 w-6" style={{ color: '#F59E0B' }} />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold" style={{ color: '#0C0E0B' }}>Missing Investigation Findings</h3>
+                    <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
+                      Please fill in the Investigation Findings before completing this visit.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm" style={{ color: '#92400E' }}>
+                    Investigation Findings are required to complete the visit. Please go to the Diagnosis Notes tab and fill in the Investigation Findings field.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowMissingInvestigationsModal(false)}
+                    className="px-4 py-2 border rounded-lg font-medium transition-colors hover:bg-gray-50"
+                    style={{ borderColor: '#E5E7EB', color: '#6B7280' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMissingInvestigationsModal(false);
+                      setActiveTab('notes');
+                    }}
+                    className="px-4 py-2 rounded-lg font-medium text-white transition-colors hover:opacity-90"
+                    style={{ backgroundColor: '#2e13d1' }}
+                  >
+                    OK, I'll fill it
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Complete Visit Confirmation Modal */}
         {showCompleteConfirmModal && (
@@ -5281,14 +5358,13 @@ const PatientConsultationPage = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-2" style={{ color: '#2e13d1' }}>
-                          Appointment Time *
+                          Appointment Time
                         </label>
                         <input
                           type="time"
                           value={completeForm.appointmentTime}
                           onChange={(e) => handleCompleteFormChange('appointmentTime', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          required={completeForm.needsAppointment}
                         />
                       </div>
                     </div>
@@ -5321,11 +5397,11 @@ const PatientConsultationPage = () => {
               </button>
               <button
                 onClick={handleSubmitCompleteVisit}
-                disabled={completingVisit || (completeForm.needsAppointment && (!completeForm.appointmentDate || !completeForm.appointmentTime))}
+                disabled={completingVisit || (completeForm.needsAppointment && !completeForm.appointmentDate)}
                 className="px-4 py-2 rounded-md font-medium text-white transition-colors"
                 style={{
                   backgroundColor: completingVisit ? '#9CA3AF' : '#EA2E00',
-                  cursor: completingVisit || (completeForm.needsAppointment && (!completeForm.appointmentDate || !completeForm.appointmentTime)) ? 'not-allowed' : 'pointer'
+                  cursor: completingVisit || (completeForm.needsAppointment && !completeForm.appointmentDate) ? 'not-allowed' : 'pointer'
                 }}
               >
                 {completingVisit ? 'Completing...' : 'Complete Visit'}
