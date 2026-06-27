@@ -618,12 +618,12 @@ exports.getAssignedPatients = async (req, res) => {
   try {
     const visits = await prisma.visit.findMany({
       where: {
-        status: { in: ['WAITING_FOR_DOCTOR', 'IN_DOCTOR_QUEUE', 'UNDER_DOCTOR_REVIEW', 'TRIAGED'] },
+        status: { in: ['WAITING_FOR_DOCTOR', 'IN_DOCTOR_QUEUE', 'UNDER_DOCTOR_REVIEW', 'TRIAGED', 'AWAITING_CARD_BILLING'] },
         suggestedDoctorId: { not: null }
       },
       include: {
         patient: {
-          select: { id: true, name: true, gender: true, dob: true, type: true, mobile: true }
+          select: { id: true, name: true, gender: true, dob: true, type: true, mobile: true, cardType: true, cardStatus: true }
         },
         _count: {
           select: {
@@ -2872,7 +2872,30 @@ exports.reassignDoctor = async (req, res) => {
       });
     }
 
-    // No orders — safe to reassign
+    // No orders — safe to reassign. Check card requirement first.
+    const cardReq = await checkCardRequirement(patientId, toDoctorId);
+    let cardBilling = null;
+    let visitStatus = 'WAITING_FOR_DOCTOR';
+
+    if (cardReq.needsCardBilling) {
+      const cardBillingType = cardReq.billingType || 'CARD_ACTIVATION';
+      const cardService = await getOrCreateCardService(cardReq.cardProductSlug, cardBillingType);
+      const billingServices = [{ serviceId: cardService.id, quantity: 1, unitPrice: cardReq.billingAmount, totalPrice: cardReq.billingAmount }];
+
+      cardBilling = await prisma.billing.create({
+        data: {
+          patientId, visitId,
+          totalAmount: cardReq.billingAmount,
+          status: 'PENDING',
+          billingType: cardBillingType,
+          notes: `Card ${cardReq.reason === 'REGISTRATION' ? 'registration' : cardReq.reason === 'UPGRADE' ? 'upgrade' : 'activation'} — ${cardReq.cardProductSlug} (reassign)`,
+          services: { create: billingServices },
+        },
+      });
+
+      visitStatus = 'AWAITING_CARD_BILLING';
+    }
+
     // Create a PatientTransfer record for audit
     const transfer = await prisma.patientTransfer.create({
       data: {
@@ -2881,19 +2904,23 @@ exports.reassignDoctor = async (req, res) => {
         toDoctorId,
         visitId,
         reason: reason ? `Reassigned by nurse ${nurse?.fullname || nurseId}: ${reason}` : `Reassigned by nurse ${nurse?.fullname || nurseId}`,
-        paymentRequired: false,
-        paymentAmount: 0,
+        paymentRequired: !!cardReq.needsCardBilling,
+        paymentAmount: cardReq.needsCardBilling ? cardReq.billingAmount : 0,
         status: 'ACCEPTED',
       }
     });
 
     // Update the visit's suggestedDoctorId
+    const updateData = {
+      suggestedDoctorId: toDoctorId,
+      status: visitStatus,
+    };
+    if (cardReq.cardProductId) {
+      updateData.cardProductId = cardReq.cardProductId;
+    }
     await prisma.visit.update({
       where: { id: visitId },
-      data: {
-        suggestedDoctorId: toDoctorId,
-        status: 'WAITING_FOR_DOCTOR',
-      }
+      data: updateData,
     });
 
     // Check if an Assignment record exists for this patient+visit, update or create
@@ -2916,26 +2943,38 @@ exports.reassignDoctor = async (req, res) => {
         if (currentDoctorId) {
           io.to(`doctor:${currentDoctorId}`).emit('queue:visit-removed', { visitId, patientId });
         }
-        // Notify new doctor
-        io.to(`doctor:${toDoctorId}`).emit('queue:new-visit', {
-          visitId,
-          patientId,
-          patientName: visit.patient?.name,
-          doctorId: toDoctorId,
-          doctorName: toDoctor.fullname,
-          status: 'WAITING_FOR_DOCTOR',
-          timestamp: new Date().toISOString()
-        });
+        // Notify new doctor (only if not waiting for card billing)
+        if (visitStatus !== 'AWAITING_CARD_BILLING') {
+          io.to(`doctor:${toDoctorId}`).emit('queue:new-visit', {
+            visitId,
+            patientId,
+            patientName: visit.patient?.name,
+            doctorId: toDoctorId,
+            doctorName: toDoctor.fullname,
+            status: visitStatus,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     } catch (e) {
       console.error('Socket notification error (non-fatal):', e.message);
     }
 
-    res.json({
+    const response = {
       message: `Patient reassigned to Dr. ${toDoctor.fullname}`,
       transfer,
       visitId,
-    });
+    };
+    if (cardBilling) {
+      response.cardBilling = { id: cardBilling.id, totalAmount: cardBilling.totalAmount, status: cardBilling.status };
+      if (cardReq.reason === 'UPGRADE') {
+        response.message += ` Card upgrade billing created (ETB ${cardReq.billingAmount}). Patient must pay at billing counter.`;
+      } else if (cardReq.reason === 'REGISTRATION' || cardReq.reason === 'ACTIVATION') {
+        response.message += ` Card billing created (ETB ${cardReq.billingAmount}). Patient must pay at billing counter.`;
+      }
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Error reassigning doctor:', error);
     res.status(500).json({ error: error.message });

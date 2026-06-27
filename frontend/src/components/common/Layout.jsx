@@ -278,7 +278,17 @@ const Layout = ({ children, title, subtitle }) => {
           { name: 'Continuous Vitals', href: '/nurse/continuous-vitals', icon: Activity, key: 'continuousVitals' },
           { name: 'Family Planning', href: '/nurse/family-planning', icon: Users, key: 'familyPlanning' },
           { name: 'Patient Gallery', href: '/nurse/gallery', icon: Image, key: 'gallery' },
-          { name: 'Appointments', href: '/nurse/appointments', icon: Calendar, key: 'appointments' },
+          { name: 'Appointments', href: '/nurse/appointments', icon: Clock, key: 'appointments' },
+          {
+            name: 'Patient Management',
+            icon: Users,
+            group: 'nurse_patient_mgmt',
+            key: 'patientManagement',
+            children: [
+              { name: 'Patient Registration', href: '/nurse/register', icon: UserPlus, key: 'patientRegistration' },
+              { name: 'Patient Management', href: '/nurse/patients', icon: Users, key: 'patientManagement' },
+            ]
+          },
           { name: 'Loans', href: '/loans', icon: DollarSign, key: 'loans' },
         ]);
 

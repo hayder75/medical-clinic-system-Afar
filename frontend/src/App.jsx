@@ -40,6 +40,7 @@ import PreRegistration from './pages/reception/PreRegistration';
 import ReceptionDoctorQueueManagement from './pages/reception/DoctorQueueManagement';
 import PatientGallery from './pages/shared/PatientGallery';
 import FamilyPlanningPage from './pages/nurse/FamilyPlanningPage';
+import NursePatientManagement from './pages/nurse/NursePatientManagement';
 import AbortionCarePage from './pages/doctor/AbortionCarePage';
 import Loans from './components/shared/Loans';
 import AdmissionManagement from './pages/accommodation/AdmissionManagement';
@@ -257,6 +258,26 @@ const AppRoutes = () => {
           }
         />
 
+        <Route
+          path="/nurse/register"
+          element={
+            <ProtectedRoute allowedRoles={['NURSE', 'ADMIN']}>
+              <Layout title="Patient Registration & Visit Creation" subtitle="Register new patients or create visits">
+                <ReceptionPatientRegistration />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/nurse/patients"
+          element={
+            <ProtectedRoute allowedRoles={['NURSE', 'ADMIN']}>
+              <Layout title="Patient Management" subtitle="View and manage assigned patients">
+                <NursePatientManagement />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/nurse/*"
           element={
