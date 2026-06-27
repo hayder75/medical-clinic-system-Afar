@@ -134,7 +134,7 @@ const RadiologyOrdering = ({ visitId, patientId, onOrdersPlaced, existingOrders 
     const sel = selectedTests.some(t => t.id === test.id);
     const ord = isTestOrdered(test.id);
     return (
-      <label key={test.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${ord ? 'opacity-30 cursor-not-allowed' : sel ? 'bg-purple-50' : 'hover:bg-gray-50'}`}>
+      <label key={test.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors bg-white ${ord ? 'opacity-30 cursor-not-allowed' : sel ? 'bg-purple-50' : 'hover:bg-gray-50'}`}>
         <input
           type="checkbox"
           checked={sel}
@@ -151,21 +151,23 @@ const RadiologyOrdering = ({ visitId, patientId, onOrdersPlaced, existingOrders 
   };
 
   return (
-    <div className="flex gap-5 h-full">
-      {/* Left: Categories */}
-      <div className="w-48 flex-shrink-0 space-y-1">
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Categories</div>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search..."
-            className="w-full pl-8 pr-2 py-1.5 text-xs border border-gray-300 rounded-lg mb-2 focus:ring-1 focus:ring-purple-500"
-          />
+    <div className="flex flex-col md:flex-row gap-5">
+      {/* Left: Categories — horizontal scroll on mobile, vertical sidebar on desktop */}
+      <div className="w-full md:w-48 flex-shrink-0">
+        <div className="flex md:flex-col items-center md:items-stretch gap-2 mb-2">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:block px-2">Categories</div>
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="w-full pl-8 pr-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-purple-500"
+            />
+          </div>
         </div>
-        <div className="space-y-0.5 max-h-[calc(100vh-220px)] overflow-y-auto">
+        <div className="flex md:flex-col gap-1 overflow-x-auto md:overflow-y-auto md:max-h-[calc(100vh-280px)] pb-2 md:pb-0">
           {categoryKeys.map(cat => {
             const data = organizedTests[cat];
             const totalT = data?.tests?.length || 0;
@@ -174,11 +176,11 @@ const RadiologyOrdering = ({ visitId, patientId, onOrdersPlaced, existingOrders 
               <button
                 key={cat}
                 onClick={() => { setActiveCategory(cat); setSearchQuery(''); }}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-purple-600 text-white font-semibold shadow-sm' : 'text-gray-700 hover:bg-gray-100'}`}
+                className={`whitespace-nowrap md:whitespace-normal flex-shrink-0 md:w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-purple-600 text-white font-semibold shadow-sm' : 'text-gray-700 hover:bg-gray-100'}`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-1">
                   <span className="truncate">{cat}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-600'}`}>{totalT}</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${isActive ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-600'}`}>{totalT}</span>
                 </div>
               </button>
             );
@@ -204,7 +206,7 @@ const RadiologyOrdering = ({ visitId, patientId, onOrdersPlaced, existingOrders 
             <h3 className="text-lg font-bold text-gray-900">{activeCategory}</h3>
             <div className="text-xs text-gray-500 mb-2">{activeData.tests?.length || 0} test(s) available</div>
             {activeData.tests && activeData.tests.length > 0 ? (
-              <div className="border border-gray-200 rounded-xl bg-white divide-y divide-gray-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 rounded-xl overflow-hidden">
                 {activeData.tests.map(test => renderTestRow(test))}
               </div>
             ) : (
@@ -216,9 +218,9 @@ const RadiologyOrdering = ({ visitId, patientId, onOrdersPlaced, existingOrders 
         )}
       </div>
 
-      {/* Right: Selected Summary */}
-      <div className="w-72 flex-shrink-0">
-        <div className="bg-white border border-gray-200 rounded-xl p-4 sticky top-4 space-y-3">
+      {/* Right: Selected Summary — below on mobile, sticky sidebar on desktop */}
+      <div className="w-full md:w-72 flex-shrink-0">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 md:sticky md:top-4 space-y-3">
           <div className="text-sm font-semibold text-gray-700 flex items-center justify-between">
             <span>Selected Tests</span>
             <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{selectedCount}</span>
