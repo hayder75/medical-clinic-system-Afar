@@ -514,21 +514,21 @@ const Layout = ({ children, title, subtitle }) => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top navigation */}
         <header className="shadow-lg border-b" style={{ backgroundColor: '#FFFFFF', borderColor: 'var(--primary)' }}>
-          <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center">
+          <div className="flex items-center justify-between min-h-[3.5rem] sm:h-16 px-3 sm:px-6 lg:px-8">
+            <div className="flex items-center min-w-0 flex-1">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-md transition-colors"
+                className="lg:hidden p-2 rounded-md transition-colors flex-shrink-0"
                 style={{ color: 'var(--dark)' }}
                 onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--primary)'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
               >
-                <Menu className="h-6 w-6" />
+                <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
-              <div className="ml-4 lg:ml-0">
-                <h1 className="text-xl font-semibold" style={{ color: 'var(--dark)' }}>{title}</h1>
+              <div className="ml-2 sm:ml-4 lg:ml-0 min-w-0">
+                <h1 className="text-sm sm:text-lg lg:text-xl font-semibold truncate" style={{ color: 'var(--dark)' }}>{title}</h1>
                 {subtitle && (
-                  <p className="text-sm" style={{ color: 'var(--primary)' }}>{subtitle}</p>
+                  <p className="text-xs sm:text-sm truncate" style={{ color: 'var(--primary)' }}>{subtitle}</p>
                 )}
               </div>
             </div>
