@@ -214,7 +214,7 @@ const NoteDisplayWithEdit = ({ note, visitId, onUpdate }) => {
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+              className="flex items-center px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-indigo-200 disabled:opacity-50"
             >
               <Check className="h-3 w-3 mr-1" /> {isSaving ? 'Saving...' : 'Save'}
             </button>
@@ -583,9 +583,6 @@ const PatientConsultationPage = () => {
       { id: 'patient-history', label: 'Patient History', icon: User },
       { id: 'images', label: 'Attached Images', icon: Image },
       { id: 'procedures', label: 'Procedures', icon: Activity },
-      { id: 'dental', label: 'Dental Chart', icon: Smile },
-      { id: 'dental-services', label: 'Dental Services', icon: Smile },
-      { id: 'notes', label: 'Diagnosis Notes', icon: FileText },
       { id: 'medications', label: 'Medications', icon: Pill },
       { id: 'compound-prescription', label: 'Compound Rx', icon: Beaker },
       { id: 'emergency-drugs', label: 'Emergency Drugs', icon: AlertTriangle },
@@ -593,7 +590,10 @@ const PatientConsultationPage = () => {
       { id: 'lab', label: 'Lab Orders', icon: TestTube },
       { id: 'radiology', label: 'Radiology Orders', icon: Scan },
       { id: 'nurse-services', label: 'Nurse Services', icon: Stethoscope },
+      { id: 'notes', label: 'Diagnosis Notes', icon: FileText },
       { id: 'accommodation', label: 'Accommodation', icon: Bed },
+      { id: 'dental', label: 'Dental Chart', icon: Smile },
+      { id: 'dental-services', label: 'Dental Services', icon: Smile },
       { id: 'pregnancy', label: 'Pregnancy', icon: Heart },
       { id: 'growth-chart', label: 'Growth Chart', icon: Activity },
       { id: 'vaccination', label: 'Vaccination', icon: FileText },
@@ -1739,7 +1739,7 @@ const PatientConsultationPage = () => {
                     {visit.status === 'IN_DOCTOR_QUEUE' && visit?.batchOrders?.some(order =>
                       order.type === 'DENTAL' && order.status === 'PAID'
                     ) && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-indigo-800 whitespace-nowrap">
                           Back from Billing
                         </span>
                       )}
@@ -1843,12 +1843,29 @@ const PatientConsultationPage = () => {
         <div className="border-b" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
           <div className="p-3">
             <div className="flex flex-wrap gap-3">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
+              {(() => {
+                const group1 = ['triage', 'vitals', 'patient-history', 'images'];
+                const group2 = ['procedures', 'medications', 'compound-prescription', 'emergency-drugs', 'material-needs', 'lab', 'radiology', 'nurse-services'];
+                const group3 = ['notes', 'accommodation'];
+                const otherTabs = tabs.filter(t => !group1.includes(t.id) && !group2.includes(t.id) && !group3.includes(t.id));
+                const groups = [
+                  { title: 'Triage & Patient Information', ids: group1 },
+                  { title: 'Clinical Orders & Treatments', ids: group2 },
+                  { title: 'Diagnosis & Admission', ids: group3 },
+                ];
+                if (otherTabs.length > 0) groups.push({ title: 'Other', ids: otherTabs.map(t => t.id) });
+                return groups.map(group => (
+                  <div key={group.title} className="w-full mb-1">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 mt-1 border-b border-gray-200 pb-1">{group.title}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {group.ids.map(tabId => {
+                        const tab = tabs.find(t => t.id === tabId);
+                        if (!tab) return null;
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
 
-                // Define distinct colors for each tab
-                const tabColors = {
+                        // Define distinct colors for each tab
+                        const tabColors = {
                   'triage': { bg: '#FEF3C7', activeBg: '#FDE68A', text: '#92400E', border: '#F59E0B' },
                   'vitals': { bg: '#EFF6FF', activeBg: '#DBEAFE', text: '#1E40AF', border: '#3B82F6' },
                   'patient-history': { bg: '#F1F5F9', activeBg: '#E2E8F0', text: '#475569', border: '#94A3B8' },
@@ -1885,8 +1902,12 @@ const PatientConsultationPage = () => {
                     <Icon className="h-4 w-4 flex-shrink-0" />
                     <span className="whitespace-nowrap">{tab.label}</span>
                   </button>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
+              ))})
+            }()}
             </div>
           </div>
         </div>
@@ -2228,7 +2249,7 @@ const PatientConsultationPage = () => {
                         <h4 className="font-semibold" style={{ color: '#0C0E0B' }}>
                           Nurse Recorded Vitals
                         </h4>
-                        <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                        <span className="px-3 py-1 bg-green-100 text-indigo-800 text-xs font-medium rounded-full">
                           Recorded by Nurse
                         </span>
                       </div>
@@ -2500,7 +2521,7 @@ const PatientConsultationPage = () => {
                               <div className="flex-1">
                                 <div className="flex items-center space-x-3 mb-2">
                                   <p className="font-bold text-lg" style={{ color: '#0C0E0B' }}>{visitItem.visitUid}</p>
-                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${visitItem.status === 'COMPLETED' ? 'bg-green-100 text-green-700 border border-green-200' :
+                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${visitItem.status === 'COMPLETED' ? 'bg-green-100 text-green-700 border border-indigo-200' :
                                     visitItem.status === 'CANCELLED' ? 'bg-red-100 text-red-700 border border-red-200' :
                                       'bg-yellow-100 text-yellow-700 border border-yellow-200'
                                     }`}>
@@ -2640,7 +2661,7 @@ const PatientConsultationPage = () => {
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div className="p-3 bg-green-50 rounded-lg">
                                       <p className="text-xs text-green-700">Diagnoses</p>
-                                      <p className="text-2xl font-bold text-green-800">{selectedVisit.diagnoses?.length || 0}</p>
+                                      <p className="text-2xl font-bold text-indigo-800">{selectedVisit.diagnoses?.length || 0}</p>
                                     </div>
                                     <div className="p-3 bg-blue-50 rounded-lg">
                                       <p className="text-xs text-blue-700">Lab Orders</p>
@@ -3442,7 +3463,7 @@ const PatientConsultationPage = () => {
                                         <div key={idx} className="p-3 border rounded-lg">
                                           <p className="font-medium">{proc.name || 'Procedure'}</p>
                                           <div className="flex items-center gap-2 mt-1">
-                                            <span className={`px-2 py-0.5 rounded-full text-xs ${proc.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                            <span className={`px-2 py-0.5 rounded-full text-xs ${proc.status === 'COMPLETED' ? 'bg-green-100 text-indigo-800' : 'bg-yellow-100 text-yellow-800'}`}>
                                               {proc.status || 'PENDING'}
                                             </span>
                                             <p className="text-sm text-gray-500">{new Date(proc.createdAt).toLocaleString()}</p>
@@ -3544,11 +3565,11 @@ const PatientConsultationPage = () => {
                                       </h4>
                                       <div className="space-y-3">
                                         {selectedVisit.nurseServiceAssignments.map((nurseServ) => (
-                                          <div key={nurseServ.id} className="p-4 border rounded-lg shadow-sm bg-green-50 border-green-200">
+                                          <div key={nurseServ.id} className="p-4 border rounded-lg shadow-sm bg-green-50 border-indigo-200">
                                             <p className="font-semibold text-green-900">{nurseServ.service?.name || 'Nurse Service'}</p>
                                             <p className="text-sm text-green-700 mt-1">Status: <span className="font-medium">{nurseServ.status}</span></p>
-                                            {nurseServ.notes && <p className="text-sm text-green-800 mt-2 italic">{nurseServ.notes}</p>}
-                                            {nurseServ.assignedNurse && <p className="text-xs text-green-600 mt-2">Handled by: {nurseServ.assignedNurse.fullname}</p>}
+                                            {nurseServ.notes && <p className="text-sm text-indigo-800 mt-2 italic">{nurseServ.notes}</p>}
+                                            {nurseServ.assignedNurse && <p className="text-xs text-indigo-600 mt-2">Handled by: {nurseServ.assignedNurse.fullname}</p>}
                                           </div>
                                         ))}
                                       </div>
@@ -3620,7 +3641,7 @@ const PatientConsultationPage = () => {
                                 </div>
                               </div>
                               <div className="mt-2 text-center">
-                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold mb-1 ${image.imageType === 'BEFORE' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold mb-1 ${image.imageType === 'BEFORE' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-indigo-800'}`}>
                                   {image.imageType} IMAGE
                                 </span>
                                 <p className="text-sm font-medium text-gray-800 truncate">
@@ -3891,8 +3912,8 @@ const PatientConsultationPage = () => {
                                 Created: {new Date(order.createdAt).toLocaleDateString()}
                               </p>
                             </div>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${order.isDeferred ? 'bg-green-200 text-green-800' :
-                              order.status === 'PAID' ? 'bg-green-100 text-green-800' :
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${order.isDeferred ? 'bg-indigo-200 text-indigo-800' :
+                              order.status === 'PAID' ? 'bg-green-100 text-indigo-800' :
                                 order.status === 'UNPAID' ? 'bg-yellow-100 text-yellow-800' :
                                   'bg-gray-100 text-gray-800'
                               }`}>
@@ -3902,7 +3923,7 @@ const PatientConsultationPage = () => {
 
                           {/* Info banner for deferred orders */}
                           {order.isDeferred && (
-                            <div className="mb-3 p-2 bg-green-100 border border-green-300 rounded-lg text-xs text-green-800">
+                            <div className="mb-3 p-2 bg-green-100 border border-green-300 rounded-lg text-xs text-indigo-800">
                               <strong>🔗 Follow-up Service:</strong> This order is connected to a previous payment/credit agreement.
                               No additional payment is required — billing was automatically marked as paid.
                             </div>
@@ -3916,7 +3937,7 @@ const PatientConsultationPage = () => {
                                 const isCompleted = service.dentalProcedureCompletion !== null;
 
                                 return (
-                                  <div key={index} className={`p-3 rounded-lg border ${isCompleted ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
+                                  <div key={index} className={`p-3 rounded-lg border ${isCompleted ? 'bg-green-50 border-indigo-200' : 'bg-white border-gray-200'
                                     }`}>
                                     <div className="flex items-center justify-between">
                                       <div className="flex-1">
@@ -3928,7 +3949,7 @@ const PatientConsultationPage = () => {
                                             <CheckCircle className="h-5 w-5" style={{ color: '#059669' }} />
                                           )}
                                           {order.isDeferred && !isCompleted && (
-                                            <span className="text-[10px] font-bold bg-green-200 text-green-800 px-1.5 py-0.5 rounded">
+                                            <span className="text-[10px] font-bold bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded">
                                               ✓ PRE-PAID
                                             </span>
                                           )}
@@ -4075,7 +4096,7 @@ const PatientConsultationPage = () => {
 
                     return hasLabResults ? (
                       <div className="mb-6">
-                        <h4 className="font-medium mb-3 text-green-600" style={{ color: '#059669' }}>
+                        <h4 className="font-medium mb-3 text-indigo-600" style={{ color: '#059669' }}>
                           📊 Lab Results Available
                         </h4>
                         <div className="space-y-4">
@@ -4084,26 +4105,26 @@ const PatientConsultationPage = () => {
 
                             return ((batchOrder.labResults && batchOrder.labResults.length > 0) ||
                             batchDetailedResults.length > 0) && (
-                              <div key={batchOrder.id} className="p-4 border rounded-lg border-green-200 bg-green-50">
+                              <div key={batchOrder.id} className="p-4 border rounded-lg border-indigo-200 bg-indigo-50">
                                 <div className="flex justify-between items-start mb-3">
                                   <div>
-                                    <p className="font-medium text-green-800">
+                                    <p className="font-medium text-indigo-800">
                                       Order #{batchOrder.id} - Lab Results
                                     </p>
-                                    <p className="text-sm text-green-600">
+                                    <p className="text-sm text-indigo-600">
                                       Completed: {new Date(batchOrder.updatedAt).toLocaleDateString()}
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <button
                                       onClick={() => printLabOrders(batchOrder)}
-                                      className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-green-800 bg-green-100 hover:bg-green-200 rounded transition-colors"
+                                      className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-indigo-800 bg-green-100 hover:bg-indigo-200 rounded transition-colors"
                                       title="Print Lab Order"
                                     >
                                       <Printer className="h-4 w-4" />
                                       Print
                                     </button>
-                                    <span className="px-2 py-1 text-xs font-medium text-green-800 bg-green-200 rounded-full">
+                                    <span className="px-2 py-1 text-xs font-medium text-indigo-800 bg-indigo-200 rounded-full">
                                       COMPLETED
                                     </span>
                                   </div>
@@ -4127,7 +4148,7 @@ const PatientConsultationPage = () => {
                                             </span>
                                             <div className="mt-1">
                                               <span className={`px-2 py-1 text-xs font-medium rounded-full ${detailedResult.status === 'COMPLETED'
-                                                ? 'bg-green-100 text-green-800'
+                                                ? 'bg-green-100 text-indigo-800'
                                                 : 'bg-yellow-100 text-yellow-800'
                                                 }`}>
                                                 {detailedResult.status}
@@ -4341,13 +4362,13 @@ const PatientConsultationPage = () => {
                                 {standaloneOrders.map(order => {
                                   const latestResult = order.results[0];
                                   return (
-                                    <div key={order.id} className="p-4 border rounded-lg border-green-200 bg-green-50">
+                                    <div key={order.id} className="p-4 border rounded-lg border-indigo-200 bg-indigo-50">
                                       <div className="flex justify-between items-start mb-3">
                                         <div>
-                                          <p className="font-medium text-green-800">{order.labTest.name}</p>
-                                          <p className="text-sm text-green-600">Completed: {new Date(latestResult.createdAt).toLocaleDateString()}</p>
+                                          <p className="font-medium text-indigo-800">{order.labTest.name}</p>
+                                          <p className="text-sm text-indigo-600">Completed: {new Date(latestResult.createdAt).toLocaleDateString()}</p>
                                         </div>
-                                        <span className="px-2 py-1 text-xs font-medium text-green-800 bg-green-200 rounded-full">COMPLETED</span>
+                                        <span className="px-2 py-1 text-xs font-medium text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
                                       </div>
                                       {order.labTest.resultFields && order.labTest.resultFields.length > 0 && latestResult.results && (
                                         <div className="mb-3">
@@ -4374,7 +4395,7 @@ const PatientConsultationPage = () => {
                                         </div>
                                       )}
                                       {(latestResult.results && latestResult.results._images && latestResult.results._images.length > 0) && (
-                                        <div className="mt-3 pt-3 border-t border-green-200">
+                                        <div className="mt-3 pt-3 border-t border-indigo-200">
                                           <p className="text-sm font-medium text-gray-700 mb-2">Attached Images:</p>
                                           <div className="grid grid-cols-3 gap-2">
                                             {latestResult.results._images.map((img, idx) => (
@@ -4669,7 +4690,7 @@ const PatientConsultationPage = () => {
                       <>
                         {hasResults && (
                           <div>
-                            <h4 className="font-medium mb-3 text-green-600" style={{ color: '#059669' }}>📊 Completed Results</h4>
+                            <h4 className="font-medium mb-3 text-indigo-600" style={{ color: '#059669' }}>📊 Completed Results</h4>
                             <div className="space-y-3">
                               {radBatchOrders
                                 .filter(order => order.radiologyResults?.length > 0)
@@ -4804,7 +4825,7 @@ const PatientConsultationPage = () => {
                           </div>
                           <div className="text-right">
                             <span
-                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${assignment.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${assignment.status === 'COMPLETED' ? 'bg-green-100 text-indigo-800' : 'bg-yellow-100 text-yellow-800'}`}
                             >
                               {assignment.status === 'COMPLETED' ? 'Completed' : 'Pending'}
                             </span>
@@ -5340,21 +5361,21 @@ const RadiologyResultCard = ({ batchOrder, printRadiologyOrders, getImageUrl, op
   const resultCount = batchOrder.radiologyResults?.length || 0;
   const batchAttachments = batchOrder.attachments || [];
   return (
-    <div className="p-4 border rounded-lg border-green-200 bg-green-50 shadow-sm">
+    <div className="p-4 border rounded-lg border-indigo-200 bg-green-50 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <p className="font-bold text-green-800">Order #{batchOrder.id}</p>
-          <span className="px-2 py-0.5 text-xs font-medium text-green-800 bg-green-200 rounded-full">{resultCount} result{resultCount > 1 ? 's' : ''}</span>
+          <p className="font-bold text-indigo-800">Order #{batchOrder.id}</p>
+          <span className="px-2 py-0.5 text-xs font-medium text-indigo-800 bg-indigo-200 rounded-full">{resultCount} result{resultCount > 1 ? 's' : ''}</span>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => printRadiologyOrders(batchOrder)}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-800 bg-green-100 hover:bg-green-200 rounded transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-indigo-800 bg-green-100 hover:bg-indigo-200 rounded transition-colors"
           >
             <Printer className="h-4 w-4" />
             Print
           </button>
-          <span className="px-2 py-1 text-xs font-medium text-green-800 bg-green-200 rounded-full">COMPLETED</span>
+          <span className="px-2 py-1 text-xs font-medium text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
         </div>
       </div>
       <div className="space-y-3">
@@ -5411,7 +5432,7 @@ const RadiologyResultCard = ({ batchOrder, printRadiologyOrders, getImageUrl, op
                     <div
                       key={aIdx}
                       onClick={() => openImageViewer(images, aIdx)}
-                      className="relative group cursor-pointer rounded-lg overflow-hidden border border-green-200 hover:border-blue-400 transition-all"
+                      className="relative group cursor-pointer rounded-lg overflow-hidden border border-indigo-200 hover:border-blue-400 transition-all"
                     >
                       <img
                         src={getImageUrl(att.fileUrl || att.path)}
