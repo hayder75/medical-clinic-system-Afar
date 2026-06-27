@@ -1906,11 +1906,11 @@ const PatientConsultationPage = () => {
                   })}
                 </div>
               </div>
-              ))})
-            }()}
-            </div>
+            ));
+          })()}
           </div>
         </div>
+      </div>
 
         {/* Content Area */}
         <div className="border p-4" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
