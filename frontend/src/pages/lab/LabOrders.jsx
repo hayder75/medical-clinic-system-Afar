@@ -1576,46 +1576,46 @@ const LabOrders = () => {
           {getFilteredOrders().map((order) => (
             <div
               key={`${order.__kind}-${order.id}`}
-              className={`bg-white rounded-lg shadow-md border p-6 cursor-pointer hover:shadow-lg transition-shadow duration-200 ${order.status === 'QUEUED' ? 'border-yellow-200' :
+              className={`bg-white rounded-lg shadow-md border p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow duration-200 ${order.status === 'QUEUED' ? 'border-yellow-200' :
                 order.status === 'COMPLETED' ? 'border-green-200' : 'border-gray-200'
                 }`}
               onClick={() => handleOrderClick(order)}
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  {getStatusIcon(order.status)}
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h3 className="text-2xl font-bold text-gray-900">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+                <div className="flex items-start space-x-3 min-w-0">
+                  <div className="flex-shrink-0 mt-1">{getStatusIcon(order.status)}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <h3 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
                         {order.patient.name}
                       </h3>
-                      <span className="text-sm text-gray-500 font-normal">
+                      <span className="text-xs sm:text-sm text-gray-500 font-normal flex-shrink-0">
                         ({formatDisplayOrderId(order)})
                       </span>
                       {order.__kind === 'labtest_group' && (
-                        <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-800 text-sm rounded">
+                        <span className="px-1.5 sm:px-2 py-0.5 bg-purple-100 text-purple-800 text-xs sm:text-sm rounded flex-shrink-0">
                           {order.orders?.length || 0} Tests
                         </span>
                       )}
                     </div>
-                    <p className="text-base text-gray-700 font-medium">
+                    <p className="text-xs sm:text-base text-gray-700 font-medium mt-1">
                       {order.orders && order.orders.length > 0
                         ? order.orders.map(o => o.labTest?.name).filter(name => name).join(', ') || 'Loading...'
                         : order.services && order.services.length > 0
                           ? order.services.map(service => service.service?.name).filter(name => name).join(', ')
                           : order.type?.name || 'Lab Test'}
-                      {order.isWalkIn && <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-sm rounded">WALK-IN</span>}
+                      {order.isWalkIn && <span className="ml-1.5 px-1.5 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">WALK-IN</span>}
                       {order.__kind === 'labtest' && (!order.orders || order.orders.length === 0) && (
-                        <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-sm rounded">Loading tests...</span>
+                        <span className="ml-1.5 px-1.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded">Loading tests...</span>
                       )}
                     </p>
                     {order.doctor?.fullname && (
-                      <p className="text-base text-indigo-700 font-semibold mt-1">Requested By: Dr. {order.doctor.fullname}</p>
+                      <p className="text-xs sm:text-base text-indigo-700 font-semibold mt-1">Requested By: Dr. {order.doctor.fullname}</p>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`px-3 py-1 rounded-full text-base font-semibold ${getStatusColor(order.status)}`}>
+                <div className="flex items-center flex-shrink-0 self-start sm:self-auto">
+                  <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-base font-semibold ${getStatusColor(order.status)}`}>
                     {order.status}
                   </span>
                 </div>
@@ -1639,9 +1639,9 @@ const LabOrders = () => {
               </div>
 
               {(order.status === 'QUEUED' || order.status === 'COMPLETED') && (
-                <div className={`mt-4 p-3 rounded-lg ${order.status === 'QUEUED' ? 'bg-yellow-50' : 'bg-green-50'
+                <div className={`mt-3 sm:mt-4 p-2 sm:p-3 rounded-lg ${order.status === 'QUEUED' ? 'bg-yellow-50' : 'bg-green-50'
                   }`}>
-                  <p className={`text-base font-semibold ${order.status === 'QUEUED' ? 'text-yellow-800' : 'text-green-800'
+                  <p className={`text-xs sm:text-base font-semibold ${order.status === 'QUEUED' ? 'text-yellow-800' : 'text-green-800'
                     }`}>
                     {order.status === 'QUEUED' ? 'Click to process tests' : 'Click to view results'}
                   </p>
@@ -1649,8 +1649,8 @@ const LabOrders = () => {
               )}
 
               {order.instructions && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-base text-gray-700">
+                <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs sm:text-base text-gray-700">
                     <strong>Instructions:</strong> {order.instructions}
                   </p>
                 </div>
