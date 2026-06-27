@@ -1,0 +1,42 @@
+Server running on http://127.0.0.1:3001
+Node environment: development
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+[0mGET /api/doctors/recent-activity?limit=4 [36m304[0m 40.981 ms - -[0m
+[0mGET /api/doctors/dashboard-stats [36m304[0m 70.378 ms - -[0m
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+[0mGET /api/doctors/recent-activity?limit=4 [36m304[0m 20.606 ms - -[0m
+[0mGET /api/doctors/dashboard-stats [36m304[0m 25.971 ms - -[0m
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+[0mGET /api/doctors/recent-activity?limit=4 [36m304[0m 20.247 ms - -[0m
+[0mGET /api/doctors/dashboard-stats [36m304[0m 29.811 ms - -[0m
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+✅ [Auth] User found in database: Dr.Asrat Mojo (093cba71-ff80-4568-8969-f93c80ec0cf9), Role: DOCTOR
+✅ [Auth] Request authenticated - User: Dr.Asrat Mojo, Role: DOCTOR, ID: 093cba71-ff80-4568-8969-f93c80ec0cf9
+[0mGET /api/doctors/recent-activity?limit=4 [36m304[0m 33.609 ms - -[0m
+[0mGET /api/doctors/dashboard-stats [36m304[0m 65.008 ms - -[0m

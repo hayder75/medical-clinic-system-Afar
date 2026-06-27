@@ -1,0 +1,12 @@
+{(result.results && result.results._images && result.results._images.length > 0) && (
+                            <div className="mt-3 pt-3 border-t" style={{ borderColor: '#E5E7EB' }}>
+                              <p style={{ color: '#6B7280' }} className="text-sm font-semibold">Attached Images:</p>
+                              <div className="grid grid-cols-3 gap-2 mt-2">
+                                {result.results._images.map((img, idx) => (
+                                  <div key={idx} className="relative">
+                                    <img src={img.data} alt={`Lab result ${idx + 1}`} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.data, "_blank")} />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}

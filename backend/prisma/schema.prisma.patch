@@ -1,0 +1,59 @@
+--- prisma/schema.prisma
++++ prisma/schema.prisma
+@@ -102,6 +102,7 @@
+   materialNeedsOrders     MaterialNeedsOrder[]
+   nurseServiceAssignments NurseServiceAssignment[]
+   nurseWalkInOrders       NurseWalkInOrder[]
++  doctorWalkInOrders      DoctorWalkInOrder[]
+   admissionServices       AdmissionService[]
+ }
+ 
+@@ -182,6 +183,7 @@
+   history                    MedicalHistory[]            @relation("PatientHistory")
+   orders                     MedicationOrder[]
+   nurseWalkInOrders          NurseWalkInOrder[]
++  doctorWalkInOrders         DoctorWalkInOrder[]
+   insurance                  Insurance?                  @relation(fields: [insuranceId], references: [id])
+   patientAccount             PatientAccount?
+   attachedImages             PatientAttachedImage[]
+@@ -248,6 +250,7 @@
+   referrals                  Referral[]
+   internationalMedicalCertificates InternationalMedicalCertificate[]
+   nurseWalkInOrders              NurseWalkInOrder[]
++  doctorWalkInOrders             DoctorWalkInOrder[]
+ 
+   @@index([status])
+   @@index([patientId])
+@@ -574,6 +577,31 @@
+   @@index([createdAt])
+ }
+ 
++model DoctorWalkInOrder {
++  id           Int         @id @default(autoincrement())
++  patientId    String
++  serviceId    String
++  doctorId     String?
++  instructions String?
++  notes        String?
++  status       OrderStatus @default(UNPAID)
++  billingId    String?
++  completedAt  DateTime?
++  createdAt    DateTime    @default(now())
++  updatedAt    DateTime    @updatedAt
++  doctor       User?       @relation("DoctorWalkInOrders", fields: [doctorId], references: [id])
++  patient      Patient     @relation(fields: [patientId], references: [id])
++  service      Service     @relation(fields: [serviceId], references: [id])
++  visit        Visit?      @relation(fields: [visitId], references: [id])
++  visitId      Int?
++
++  @@index([patientId])
++  @@index([serviceId])
++  @@index([doctorId])
++  @@index([status])
++  @@index([billingId])
++  @@index([createdAt])
++}
++
+ model EmergencyDrugOrder {
+   id              Int         @id @default(autoincrement())
+   visitId         Int?
