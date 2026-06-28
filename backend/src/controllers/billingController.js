@@ -1272,6 +1272,14 @@ exports.processPayment = async (req, res) => {
         data: { status: 'PAID' }
       });
 
+      // Notify doctors that a billing was paid (queue may have new patients)
+      try {
+        const io = getIO();
+        io.to('role:DOCTOR').emit('queue:visit-update', { billingId: billing.id, visitId: billing.visitId });
+      } catch (wsErr) {
+        console.error('[WS] Failed to emit queue:visit-update:', wsErr.message);
+      }
+
       // Auto-process any transfer linked to this billing
       const pendingTransfer = await prisma.patientTransfer.findFirst({
         where: { billingId },
@@ -1419,6 +1427,13 @@ exports.processPayment = async (req, res) => {
                 data: { status: 'WAITING_FOR_DOCTOR' },
               });
               console.log(`✅ Visit ${billing.visitId} transitioned AWAITING_CARD_BILLING → WAITING_FOR_DOCTOR after card payment`);
+              try {
+                const io = getIO();
+                io.to('role:DOCTOR').emit('queue:new-visit', { visitId: billing.visitId });
+                console.log(`[WS] Emitted queue:new-visit for visit ${billing.visitId} to all doctors`);
+              } catch (wsErr) {
+                console.error('[WS] Failed to emit queue:new-visit:', wsErr.message);
+              }
               await prisma.auditLog.create({
                 data: {
                   action: 'VISIT_ADVANCED',
