@@ -46,6 +46,7 @@ router.delete('/lab-test-groups/:id', roleGuard(['ADMIN']), adminController.dele
 router.post('/lab-tests', roleGuard(['ADMIN']), adminController.createLabTest);
 router.get('/lab-tests', roleGuard(['ADMIN']), adminController.getLabTests);
 router.get('/lab-tests/for-ordering', roleGuard(['ADMIN']), adminController.getLabTestsForOrdering);
+router.get('/lab-pricing', roleGuard(['ADMIN']), adminController.getLabPricing);
 router.get('/lab-tests/:id', roleGuard(['ADMIN']), adminController.getLabTest);
 router.put('/lab-tests/:id', roleGuard(['ADMIN']), adminController.updateLabTest);
 router.delete('/lab-tests/:id', roleGuard(['ADMIN']), adminController.deleteLabTest);

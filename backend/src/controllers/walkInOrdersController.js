@@ -65,7 +65,8 @@ const createWalkInLabOrder = async (req, res) => {
         isActive: true
       },
       include: {
-        service: true
+        service: true,
+        group: { select: { id: true, price: true } }
       }
     });
     
@@ -75,8 +76,19 @@ const createWalkInLabOrder = async (req, res) => {
       });
     }
     
-    // Calculate total amount
-    const totalAmount = labTests.reduce((sum, test) => sum + test.price, 0);
+    // Calculate total amount using panel-dedup pricing
+    const panelPricing = {};
+    let totalAmount = 0;
+    for (const test of labTests) {
+      if (test.groupId) {
+        if (!panelPricing[test.groupId]) {
+          panelPricing[test.groupId] = test.group?.price || 0;
+        }
+      } else {
+        totalAmount += test.price;
+      }
+    }
+    Object.values(panelPricing).forEach(p => totalAmount += p);
     
     // Create billing record
     const billing = await prisma.billing.create({
@@ -89,8 +101,8 @@ const createWalkInLabOrder = async (req, res) => {
           create: labTests.map(test => ({
             serviceId: test.serviceId,
             quantity: 1,
-            unitPrice: test.price,
-            totalPrice: test.price
+            unitPrice: test.groupId ? 0 : test.price,
+            totalPrice: test.groupId ? 0 : test.price
           }))
         }
       },

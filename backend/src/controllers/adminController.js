@@ -403,6 +403,7 @@ const createLabTestGroupSchema = z.object({
   description: z.string().optional(),
   displayOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
+  price: z.number().nonnegative().optional(),
 });
 
 const createLabTestSchema = z.object({
@@ -5241,6 +5242,70 @@ exports.getLabTestsForOrdering = async (req, res) => {
     res.json({ organized: result });
   } catch (error) {
     console.error('❌ [getLabTestsForOrdering] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Lab Pricing (for admin ServiceCatalog price editing)
+exports.getLabPricing = async (req, res) => {
+  try {
+    const [groups, standaloneTests] = await Promise.all([
+      prisma.labTestGroup.findMany({
+        where: { isActive: true },
+        include: {
+          tests: {
+            where: { isActive: true },
+            orderBy: { displayOrder: 'asc' },
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              category: true,
+              price: true,
+              description: true,
+              displayOrder: true
+            }
+          }
+        },
+        orderBy: [{ category: 'asc' }, { displayOrder: 'asc' }]
+      }),
+      prisma.labTest.findMany({
+        where: {
+          AND: [
+            { isActive: true },
+            { groupId: null },
+            { OR: [{ serviceId: null }, { service: { isActive: true } }] }
+          ]
+        },
+        orderBy: [{ category: 'asc' }, { displayOrder: 'asc' }, { name: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          category: true,
+          price: true,
+          description: true,
+          displayOrder: true
+        }
+      })
+    ]);
+
+    const panels = groups
+      .filter(g => g.tests && g.tests.length > 0)
+      .map(g => ({
+      id: g.id,
+      name: g.name,
+      category: g.category,
+      price: g.price,
+      description: g.description,
+      displayOrder: g.displayOrder,
+      color: g.color,
+      tests: g.tests
+    }));
+
+    res.json({ panels, standalone: standaloneTests });
+  } catch (error) {
+    console.error('❌ [getLabPricing] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 };

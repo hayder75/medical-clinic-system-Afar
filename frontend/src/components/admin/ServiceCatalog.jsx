@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2, Search, Filter } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Filter, ChevronRight } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -22,7 +22,11 @@ const ServiceCatalog = () => {
     minPrice: '',
     maxPrice: ''
   });
-  const [codeGenerated, setCodeGenerated] = useState(false); // Track if code was auto-generated
+  const [codeGenerated, setCodeGenerated] = useState(false);
+  const [labPricing, setLabPricing] = useState({ panels: [], standalone: [] });
+  const [labPricingLoading, setLabPricingLoading] = useState(false);
+  const [expandedPanels, setExpandedPanels] = useState(new Set());
+  const [editingPrice, setEditingPrice] = useState(null); // { type: 'panel'|'test', id, currentValue }
 
   const categories = [
     { value: 'ENTRY', label: 'Entry Fee' },
@@ -129,6 +133,63 @@ const ServiceCatalog = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchLabPricing = async () => {
+    try {
+      setLabPricingLoading(true);
+      const response = await api.get('/admin/lab-pricing');
+      setLabPricing(response.data);
+    } catch (error) {
+      toast.error('Failed to fetch lab pricing');
+      console.error('Error fetching lab pricing:', error);
+    } finally {
+      setLabPricingLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (categoryFilter === 'LAB') {
+      fetchLabPricing();
+    }
+  }, [categoryFilter]);
+
+  const handleSavePanelPrice = async (panelId, newPrice) => {
+    try {
+      await api.put(`/admin/lab-test-groups/${panelId}`, { price: parseFloat(newPrice) });
+      setLabPricing(prev => ({
+        ...prev,
+        panels: prev.panels.map(p => p.id === panelId ? { ...p, price: parseFloat(newPrice) } : p)
+      }));
+      toast.success('Panel price updated');
+    } catch (error) {
+      toast.error('Failed to update panel price');
+    }
+  };
+
+  const handleSaveTestPrice = async (testId, newPrice) => {
+    try {
+      await api.put(`/admin/lab-tests/${testId}`, { price: parseFloat(newPrice) });
+      setLabPricing(prev => ({
+        ...prev,
+        panels: prev.panels.map(p => ({
+          ...p,
+          tests: p.tests.map(t => t.id === testId ? { ...t, price: parseFloat(newPrice) } : t)
+        })),
+        standalone: prev.standalone.map(t => t.id === testId ? { ...t, price: parseFloat(newPrice) } : t)
+      }));
+      toast.success('Test price updated');
+    } catch (error) {
+      toast.error('Failed to update test price');
+    }
+  };
+
+  const togglePanel = (panelId) => {
+    setExpandedPanels(prev => {
+      const next = new Set(prev);
+      next.has(panelId) ? next.delete(panelId) : next.add(panelId);
+      return next;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -292,74 +353,193 @@ const ServiceCatalog = () => {
         </div>
       </div>
 
-      {/* Services Table */}
-      <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-        <table className="table w-full" style={{ tableLayout: 'fixed', width: '100%' }}>
-          <thead>
-            <tr>
-              <th className="text-base" style={{ width: '20%' }}>Name</th>
-              <th className="text-base" style={{ width: '8%' }}>Code</th>
-              <th className="text-base" style={{ width: '12%' }}>Category</th>
-              <th className="text-base" style={{ width: '10%' }}>Price</th>
-              <th className="text-base" style={{ width: '10%' }}>Unit</th>
-              <th className="text-base" style={{ width: '18%' }}>Description</th>
-              <th className="text-base" style={{ width: '10%' }}>Status</th>
-              <th className="text-base" style={{ width: '12%' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredServices.map((service) => (
-              <tr key={service.id}>
-                <td className="font-medium text-base break-words">{service.name}</td>
-                <td className="font-mono text-base">{service.code}</td>
-                <td>
-                  <span className="badge badge-info text-sm">
-                    {categories.find(c => c.value === service.category)?.label || service.category}
-                  </span>
-                </td>
-                <td className="font-medium text-base">
-                  {service.isVariablePrice ? (
-                    <span className="text-indigo-600 font-semibold">
-                      {service.minPrice?.toLocaleString()} - {service.maxPrice?.toLocaleString()}
-                    </span>
-                  ) : (
-                    service.price.toLocaleString()
-                  )}
-                </td>
-                <td className="text-base text-sm">
-                  {unitOptions.find(u => u.value === (service.unit || 'UNIT'))?.label || service.unit || 'Unit'}
-                </td>
-                <td className="text-base break-words">{service.description || 'N/A'}</td>
-                <td>
-                  <span className={`badge text-sm ${service.isActive ? 'badge-success' : 'badge-gray'}`}>
-                    {service.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td>
-                  <div className="flex items-center gap-1 flex-nowrap">
-                    <button
-                      onClick={() => handleEdit(service)}
-                      className="px-2 py-1 rounded text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center gap-1 whitespace-nowrap"
-                      title="Edit"
-                    >
-                      <Edit className="h-3 w-3" />
-                      <span>Edit</span>
-                    </button>
-                    <button
-                      onClick={() => handleDelete(service.id)}
-                      className="px-2 py-1 rounded text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 flex items-center gap-1 whitespace-nowrap"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      <span>Delete</span>
-                    </button>
+      {/* Services Table / Lab Pricing */}
+      {categoryFilter === 'LAB' ? (
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+          {labPricingLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+          ) : labPricing.panels.length === 0 && labPricing.standalone.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 text-lg">No lab tests found</div>
+          ) : (
+            <>
+              {labPricing.panels.map(panel => (
+                <div key={panel.id} className="border border-blue-100 rounded-lg mb-2 overflow-hidden">
+                  <div
+                    className="flex items-center px-4 py-3 bg-blue-50 hover:bg-blue-100 cursor-pointer select-none"
+                    onClick={() => togglePanel(panel.id)}
+                  >
+                    <ChevronRight className={`h-5 w-5 text-blue-500 transition-transform flex-shrink-0 ${expandedPanels.has(panel.id) ? 'rotate-90' : ''}`} />
+                    <div className="flex-1 grid grid-cols-12 gap-4 items-center ml-2">
+                      <div className="col-span-4 font-semibold text-blue-900">{panel.name}</div>
+                      <div className="col-span-3 text-sm text-gray-600">{panel.category}</div>
+                      <div className="col-span-2">
+                        {editingPrice?.type === 'panel' && editingPrice?.id === panel.id ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="w-24 input text-sm py-1"
+                            value={editingPrice.currentValue}
+                            onChange={e => setEditingPrice({ ...editingPrice, currentValue: e.target.value })}
+                            onBlur={() => { handleSavePanelPrice(panel.id, editingPrice.currentValue); setEditingPrice(null); }}
+                            onKeyDown={e => { if (e.key === 'Enter') { handleSavePanelPrice(panel.id, editingPrice.currentValue); setEditingPrice(null); } }}
+                            autoFocus
+                            onClick={e => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span
+                            className="font-medium cursor-pointer hover:bg-blue-200 px-2 py-1 rounded inline-block"
+                            onClick={e => { e.stopPropagation(); setEditingPrice({ type: 'panel', id: panel.id, currentValue: panel.price.toString() }); }}
+                          >
+                            {panel.price.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="col-span-2 text-sm text-gray-500">{panel.tests.length} test{panel.tests.length !== 1 ? 's' : ''}</div>
+                    </div>
                   </div>
-                </td>
+                  {expandedPanels.has(panel.id) && (
+                    <div className="border-t border-blue-100">
+                      {panel.tests.map((test, idx) => (
+                        <div
+                          key={test.id}
+                          className={`flex items-center px-4 py-2 pl-16 bg-white hover:bg-gray-50 ${idx < panel.tests.length - 1 ? 'border-b border-gray-100' : ''}`}
+                        >
+                          <div className="flex-1 grid grid-cols-12 gap-4 items-center">
+                            <div className="col-span-4 text-sm font-medium text-gray-700">{test.name}</div>
+                            <div className="col-span-3 text-sm text-gray-500 font-mono">{test.code || '—'}</div>
+                            <div className="col-span-2 text-sm text-gray-400">
+                              {test.price > 0 ? test.price.toLocaleString() : '—'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {labPricing.standalone.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-3">Standalone Tests</h3>
+                  <table className="table w-full">
+                    <thead>
+                      <tr>
+                        <th className="text-base" style={{ width: '30%' }}>Name</th>
+                        <th className="text-base" style={{ width: '15%' }}>Code</th>
+                        <th className="text-base" style={{ width: '25%' }}>Category</th>
+                        <th className="text-base" style={{ width: '15%' }}>Price</th>
+                        <th className="text-base" style={{ width: '15%' }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {labPricing.standalone.map(test => (
+                        <tr key={test.id}>
+                          <td className="font-medium text-base">{test.name}</td>
+                          <td className="font-mono text-base">{test.code || '—'}</td>
+                          <td className="text-base">{test.category}</td>
+                          <td className="font-medium text-base">
+                            {editingPrice?.type === 'test' && editingPrice?.id === test.id ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="w-24 input text-sm py-1"
+                                value={editingPrice.currentValue}
+                                onChange={e => setEditingPrice({ ...editingPrice, currentValue: e.target.value })}
+                                onBlur={() => { handleSaveTestPrice(test.id, editingPrice.currentValue); setEditingPrice(null); }}
+                                onKeyDown={e => { if (e.key === 'Enter') { handleSaveTestPrice(test.id, editingPrice.currentValue); setEditingPrice(null); } }}
+                                autoFocus
+                              />
+                            ) : (
+                              <span
+                                className="cursor-pointer hover:bg-gray-200 px-2 py-1 rounded inline-block"
+                                onClick={() => setEditingPrice({ type: 'test', id: test.id, currentValue: test.price.toString() })}
+                              >
+                                {test.price.toLocaleString()}
+                              </span>
+                            )}
+                          </td>
+                          <td />
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+          <table className="table w-full" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <thead>
+              <tr>
+                <th className="text-base" style={{ width: '20%' }}>Name</th>
+                <th className="text-base" style={{ width: '8%' }}>Code</th>
+                <th className="text-base" style={{ width: '12%' }}>Category</th>
+                <th className="text-base" style={{ width: '10%' }}>Price</th>
+                <th className="text-base" style={{ width: '10%' }}>Unit</th>
+                <th className="text-base" style={{ width: '18%' }}>Description</th>
+                <th className="text-base" style={{ width: '10%' }}>Status</th>
+                <th className="text-base" style={{ width: '12%' }}>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {filteredServices.map((service) => (
+                <tr key={service.id}>
+                  <td className="font-medium text-base break-words">{service.name}</td>
+                  <td className="font-mono text-base">{service.code}</td>
+                  <td>
+                    <span className="badge badge-info text-sm">
+                      {categories.find(c => c.value === service.category)?.label || service.category}
+                    </span>
+                  </td>
+                  <td className="font-medium text-base">
+                    {service.isVariablePrice ? (
+                      <span className="text-indigo-600 font-semibold">
+                        {service.minPrice?.toLocaleString()} - {service.maxPrice?.toLocaleString()}
+                      </span>
+                    ) : (
+                      service.price.toLocaleString()
+                    )}
+                  </td>
+                  <td className="text-base text-sm">
+                    {unitOptions.find(u => u.value === (service.unit || 'UNIT'))?.label || service.unit || 'Unit'}
+                  </td>
+                  <td className="text-base break-words">{service.description || 'N/A'}</td>
+                  <td>
+                    <span className={`badge text-sm ${service.isActive ? 'badge-success' : 'badge-gray'}`}>
+                      {service.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="flex items-center gap-1 flex-nowrap">
+                      <button
+                        onClick={() => handleEdit(service)}
+                        className="px-2 py-1 rounded text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center gap-1 whitespace-nowrap"
+                        title="Edit"
+                      >
+                        <Edit className="h-3 w-3" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(service.id)}
+                        className="px-2 py-1 rounded text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 flex items-center gap-1 whitespace-nowrap"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showModal && (

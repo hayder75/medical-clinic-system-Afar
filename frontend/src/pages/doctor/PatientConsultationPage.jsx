@@ -4641,7 +4641,7 @@ const PatientConsultationPage = () => {
                         onOrdersPlaced={handleOrdersPlaced}
                         existingOrders={[
                           ...(visit?.batchOrders?.filter(order => order.type === 'LAB') || []),
-                          ...(visit?.labTestOrders || [])
+                          ...(visit?.labTestOrders?.filter(order => order.billingId != null) || [])
                         ]}
                       />
                     </div>

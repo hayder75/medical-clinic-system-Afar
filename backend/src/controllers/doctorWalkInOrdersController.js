@@ -168,7 +168,8 @@ const createWalkInLabOrder = async (req, res) => {
         isActive: true
       },
       include: {
-        service: true
+        service: true,
+        group: { select: { id: true, price: true } }
       }
     });
 
@@ -181,9 +182,6 @@ const createWalkInLabOrder = async (req, res) => {
     // Filter to only tests that have a linked Service for billing
     const billableTests = labTests.filter(test => test.serviceId);
 
-    // Calculate total amount from billable tests only
-    const totalAmount = billableTests.reduce((sum, test) => sum + test.price, 0);
-
     if (billableTests.length === 0) {
       return res.status(400).json({
         message: 'None of the selected lab tests have a billing service configured. Please contact an administrator to set up services.'
@@ -193,6 +191,20 @@ const createWalkInLabOrder = async (req, res) => {
     if (billableTests.length < labTests.length) {
       console.warn(`Walk-in lab billing: ${labTests.length - billableTests.length} test(s) skipped due to missing serviceId`);
     }
+
+    // Calculate total amount using panel-dedup pricing
+    const panelPricing = {};
+    let totalAmount = 0;
+    for (const test of billableTests) {
+      if (test.groupId) {
+        if (!panelPricing[test.groupId]) {
+          panelPricing[test.groupId] = test.group?.price || 0;
+        }
+      } else {
+        totalAmount += test.price;
+      }
+    }
+    Object.values(panelPricing).forEach(p => totalAmount += p);
 
     // Create billing record (only for tests with a linked Service)
     const billing = await prisma.billing.create({
@@ -205,8 +217,8 @@ const createWalkInLabOrder = async (req, res) => {
           create: billableTests.map(test => ({
             serviceId: test.serviceId,
             quantity: 1,
-            unitPrice: test.price,
-            totalPrice: test.price
+            unitPrice: test.groupId ? 0 : test.price,
+            totalPrice: test.groupId ? 0 : test.price
           }))
         }
       },
