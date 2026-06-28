@@ -1602,7 +1602,19 @@ const LabOrders = () => {
                     </div>
                     <p className="text-xs sm:text-base text-gray-700 font-medium mt-1">
                       {order.orders && order.orders.length > 0
-                        ? order.orders.map(o => o.labTest?.name).filter(name => name).join(', ') || 'Loading...'
+                        ? (() => {
+                            const panels = {}, singles = [];
+                            order.orders.forEach(o => {
+                              const t = o.labTest;
+                              if (!t) return;
+                              if (t.group) {
+                                if (!panels[t.group.id]) panels[t.group.id] = { name: t.group.name, count: 0 };
+                                panels[t.group.id].count++;
+                              } else singles.push(t.name);
+                            });
+                            const parts = Object.values(panels).map(p => p.name + (p.count > 1 ? '' : ''));
+                            return [...parts, ...singles].filter(Boolean).join(', ') || 'Loading...';
+                          })()
                         : order.services && order.services.length > 0
                           ? order.services.map(service => service.service?.name).filter(name => name).join(', ')
                           : order.type?.name || 'Lab Test'}
