@@ -3,6 +3,9 @@ import { Activity, CheckCircle, Clock, Plus, Trash2, ShieldCheck, AlertCircle, C
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
+const CATEGORIES = ['GYNECOLOGY', 'SURGERY', 'ORTHOPEDIC'];
+const CATEGORY_LABELS = { GYNECOLOGY: 'Gynecology', SURGERY: 'Surgery', ORTHOPEDIC: 'Orthopedic' };
+
 const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
     const [services, setServices] = useState([]);
     const [selectedServices, setSelectedServices] = useState([]);
@@ -18,7 +21,7 @@ const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
     const [creditInfo, setCreditInfo] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [procedureGroups, setProcedureGroups] = useState({});
-    const [activeGroup, setActiveGroup] = useState(null);
+    const [activeGroup, setActiveGroup] = useState('GYNECOLOGY');
     const [sidebarLoading, setSidebarLoading] = useState(false);
 
     useEffect(() => {
@@ -57,9 +60,9 @@ const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
             const response = await api.get('/doctors/procedures');
             const groups = response.data?.groups || {};
             setProcedureGroups(groups);
-            const groupKeys = Object.keys(groups);
-            if (groupKeys.length > 0) setActiveGroup(groupKeys[0]);
-            const all = Object.values(groups).flat();
+            const firstCategory = CATEGORIES.find(c => (groups[c] || []).length > 0) || CATEGORIES[0];
+            setActiveGroup(firstCategory);
+            const all = CATEGORIES.flatMap(c => groups[c] || []);
             setServices(all);
         } catch (error) {
             console.error('Error fetching procedures:', error);
@@ -388,8 +391,8 @@ const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
                         <div className="w-full md:w-44 flex-shrink-0 border-b md:border-b-0 md:border-r border-gray-200 bg-gray-50">
                             <div className="p-3 space-y-1">
                                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 mb-2">Categories</div>
-                                {Object.keys(procedureGroups).map(group => {
-                                    const grpLabel = group === 'GYNECOLOGY' ? 'Gynecology' : group === 'SURGERY' ? 'Surgery' : group === 'ORTHOPEDIC' ? 'Orthopedic' : group;
+                                {CATEGORIES.map(group => {
+                                    const grpLabel = CATEGORY_LABELS[group] || group;
                                     const count = (procedureGroups[group] || []).length;
                                     const isActive = activeGroup === group;
                                     return (
@@ -585,13 +588,14 @@ const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
                             ) : (
                                 <>
                                     <ShieldCheck className="h-4 w-4" />
-                                    Confirm & Send to Billing
+                                    Confirm &amp; Send to Billing
                                 </>
                             )}
                         </button>
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 };

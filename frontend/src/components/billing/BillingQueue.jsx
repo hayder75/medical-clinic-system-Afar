@@ -1178,7 +1178,7 @@ const BillingQueue = () => {
                 )}
 
                 {/* Show convert to debt option for non-deferred bills too */}
-                {!selectedBilling.isDeferred && !paymentForm.convertToDebt && (
+                {/* {!selectedBilling.isDeferred && !paymentForm.convertToDebt && (
                   <div className="border-t pt-3">
                     <label className="flex items-center space-x-2 cursor-pointer text-sm text-gray-600 hover:text-orange-700">
                       <input
@@ -1198,7 +1198,7 @@ const BillingQueue = () => {
                       </span>
                     </label>
                   </div>
-                )}
+                )} */}
 
                 {/* Bank Transfer Fields */}
                 {paymentForm.type === "BANK" && (
