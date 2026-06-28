@@ -28,11 +28,14 @@ const LabDashboard = () => {
       const walkInOrders = response.data.walkInOrders || [];
       const labTestOrders = response.data.labTestOrders || [];
       
-      // Combine all orders for counting
+      // Count batch orders and walk-ins as 1 order each
+      // For lab tests, only count orphans without a parent batchOrder (they are standalone orders)
+      // Lab tests linked to a batchOrder are sub-items, not separate orders
+      const orphanTests = labTestOrders.filter(o => !o.batchOrderId);
       const allOrders = [
         ...batchOrders,
         ...walkInOrders,
-        ...labTestOrders
+        ...orphanTests
       ];
       
       const stats = {
