@@ -231,7 +231,7 @@ const LoginPage = () => {
                       {showUserDropdown && (
                         <>
                           <div className="fixed inset-0 z-10" onClick={() => setShowUserDropdown(false)} />
-                          <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                          <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-[70vh] overflow-y-auto">
                             <div className="sticky top-0 bg-white border-b border-slate-100 px-3 py-2">
                               <input
                                 type="text"
