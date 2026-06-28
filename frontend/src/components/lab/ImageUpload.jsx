@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Image, X, Upload } from 'lucide-react';
+import { Image, X, Upload, Camera } from 'lucide-react';
 
 const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   const [images, setImages] = useState(existingImages);
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
@@ -38,15 +39,32 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm"
+        >
+          <Camera size={16} />
+          Take Photo
+        </button>
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm"
         >
           <Upload size={16} />
-          Add Image
+          Upload from Gallery
         </button>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          onChange={handleFileChange}
+          className="hidden"
+        />
         <input
           ref={fileInputRef}
           type="file"

@@ -961,7 +961,7 @@ const Reports = ({ revenueTypeOverride }) => {
       )}
 
       {/* Financial Overview */}
-      <div className={`grid ${revenueType === 'billing' ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-6`}>
+      <div className={`grid ${revenueType === 'billing' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-6`}>
         <div className="card">
           <div className="flex items-center">
             <div className="p-3 rounded-lg bg-green-100">
@@ -1640,7 +1640,7 @@ const Reports = ({ revenueTypeOverride }) => {
                 </div>
 
                 {revenueType === 'medical' ? (
-                  <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto">
                     {Object.entries(popupDayData.dayData.medical.categoryBreakdown || {}).map(([key, value]) => (
                       <div key={`medical-day-${key}`} className="p-2 bg-blue-50 rounded-lg">
                         <p className="text-sm font-semibold text-gray-800 mb-1 leading-tight">{formatBucketLabel(key)}</p>
@@ -1649,7 +1649,7 @@ const Reports = ({ revenueTypeOverride }) => {
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="p-3 bg-blue-50 rounded-lg">
                       <p className="text-xs text-gray-600 mb-1">Medical</p>
                       <p className="text-lg font-semibold text-blue-600">

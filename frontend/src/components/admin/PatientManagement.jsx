@@ -152,12 +152,12 @@ const PatientManagement = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Patient Management</h2>
-          <p className="text-gray-600 mt-1">Manage, edit and delete patients from the system</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Patient Management</h2>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Manage, edit and delete patients from the system</p>
         </div>
-        <div className="text-sm text-gray-500">
+        <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
           Total: {pagination.total} patients
         </div>
       </div>
@@ -188,7 +188,7 @@ const PatientManagement = () => {
       {/* Patient Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-[800px] divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left w-12 text-center">
@@ -271,40 +271,40 @@ const PatientManagement = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end gap-2">
-                        {patient.activeVisit && (
-                          <button
-                            onClick={async () => {
-                              if (!confirm(`Complete active visit (${patient.activeVisit.visitUid}) for ${patient.name}?`)) return;
-                              try {
-                                await api.post(`/admin/patients/${patient.id}/complete-visit`);
-                                toast.success('Visit completed');
-                                fetchPatients();
-                              } catch (err) {
-                                toast.error(err.response?.data?.error || 'Failed to complete visit');
-                              }
-                            }}
-                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1.5" />
-                            Complete
-                          </button>
-                        )}
+                    <div className="flex justify-end gap-1.5 flex-wrap">
+                      {patient.activeVisit && (
                         <button
-                          onClick={() => handleEditClick(patient)}
-                          className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                          onClick={async () => {
+                            if (!confirm(`Complete active visit (${patient.activeVisit.visitUid}) for ${patient.name}?`)) return;
+                            try {
+                              await api.post(`/admin/patients/${patient.id}/complete-visit`);
+                              toast.success('Visit completed');
+                              fetchPatients();
+                            } catch (err) {
+                              toast.error(err.response?.data?.error || 'Failed to complete visit');
+                            }
+                          }}
+                          className="inline-flex items-center px-2 py-1.5 sm:px-3 sm:py-2 border border-transparent text-xs sm:text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 whitespace-nowrap"
                         >
-                          <Edit2 className="h-4 w-4 mr-2" />
-                          Edit
+                          <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          Complete
                         </button>
-                        <button
-                          onClick={() => setShowDeleteModal(patient)}
-                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </button>
-                      </div>
+                      )}
+                      <button
+                        onClick={() => handleEditClick(patient)}
+                        className="inline-flex items-center px-2 py-1.5 sm:px-3 sm:py-2 border border-gray-300 text-xs sm:text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 whitespace-nowrap"
+                      >
+                        <Edit2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteModal(patient)}
+                        className="inline-flex items-center px-2 py-1.5 sm:px-3 sm:py-2 border border-transparent text-xs sm:text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 whitespace-nowrap"
+                      >
+                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        Delete
+                      </button>
+                    </div>
                     </td>
                   </tr>
                 ))
