@@ -1200,8 +1200,10 @@ const LabOrders = () => {
       const result = testResults[selectedService];
       const hasResults = Object.values(result.results || {}).some(value => value && value.toString().trim() !== '') ||
         (result.additionalNotes && result.additionalNotes.trim() !== '');
+      const hasImages = (labImages[selectedService] && labImages[selectedService].length > 0) ||
+        (result.orderId && labImages[result.orderId] && labImages[result.orderId].length > 0);
 
-      if (hasResults) {
+      if (hasResults || hasImages) {
         try {
           // Check if this is new lab test order system
           const isNewSystem = result.labTestId && result.orderId;
@@ -2381,7 +2383,6 @@ const LabOrders = () => {
                                   }`}
                                 rows={3}
                                 placeholder="Enter details..."
-                                required={field.isRequired}
                               />
                               {field.fieldName === 'remark' && testResults[selectedService]?.labTest?.code === 'GRAM001' &&
                                 testResults[selectedService]?.results?.gram_reaction === 'Mixed organisms' && (
@@ -2418,7 +2419,6 @@ const LabOrders = () => {
                               }}
                               className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${isCompleted ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                               placeholder="Enter value..."
-                              required={field.isRequired}
                             />
                           )}
                         </div>

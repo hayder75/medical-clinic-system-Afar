@@ -242,17 +242,17 @@ const PatientAccounts = () => {
                   </td>
                   <td>{account.totalUsed.toFixed(2)} ETB</td>
                   <td>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-1.5">
                       <button
                         onClick={() => handleOpenModal(account, 'view')}
-                        className="px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded text-sm font-medium"
+                        className="px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded text-sm font-medium whitespace-nowrap"
                       >
                         Details
                       </button>
                       {['ADVANCE', 'BOTH'].includes(account.accountType) && (
                         <button
                           onClick={() => handleOpenModal(account, 'deposit')}
-                          className="px-2 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded text-sm"
+                          className="px-2 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded text-sm whitespace-nowrap"
                         >
                           Add Deposit
                         </button>
@@ -261,14 +261,14 @@ const PatientAccounts = () => {
                         <>
                           <button
                             onClick={() => handleOpenModal(account, 'add-credit')}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded text-sm"
+                            className="px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded text-sm whitespace-nowrap"
                           >
                             Add Credit
                           </button>
                           {(account.debtOwed || 0) > 0 && (
                             <button
                               onClick={() => handleOpenModal(account, 'return-money')}
-                              className="px-2 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-sm"
+                              className="px-2 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-sm whitespace-nowrap"
                             >
                               Return Money
                             </button>
@@ -278,7 +278,7 @@ const PatientAccounts = () => {
                       {user?.role === 'ADMIN' && ['ADVANCE', 'BOTH'].includes(account.accountType) && (
                         <button
                           onClick={() => handleOpenModal(account, 'adjust')}
-                          className="px-2 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded text-sm"
+                          className="px-2 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded text-sm whitespace-nowrap"
                         >
                           Edit Money
                         </button>
@@ -286,7 +286,7 @@ const PatientAccounts = () => {
                       {user?.role === 'ADMIN' && (
                         <button
                           onClick={() => handleDeleteAccount(account)}
-                          className="px-2 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-sm"
+                          className="px-2 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-sm whitespace-nowrap"
                         >
                           Delete Account
                         </button>
@@ -1414,8 +1414,8 @@ const AccountDetailedView = ({ account, onClose }) => {
                           </div>
 
                           {/* All Services Table */}
-                          <div className="bg-white rounded-lg border overflow-hidden">
-                            <table className="w-full text-sm">
+                          <div className="bg-white rounded-lg border overflow-hidden overflow-x-auto">
+                            <table className="w-full text-sm min-w-[500px]">
                               <thead>
                                 <tr className="bg-gray-50 border-b text-[11px] uppercase text-gray-500 tracking-wider">
                                   <th className="px-4 py-2 text-left">Service</th>
@@ -1472,8 +1472,8 @@ const AccountDetailedView = ({ account, onClose }) => {
                           {group.billings.flatMap(b => b.payments || []).length > 0 && (
                             <div>
                               <h5 className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2">Payment History</h5>
-                              <div className="bg-white rounded-lg border overflow-hidden">
-                                <table className="w-full text-sm">
+                              <div className="bg-white rounded-lg border overflow-hidden overflow-x-auto">
+                                <table className="w-full text-sm min-w-[400px]">
                                   <thead>
                                     <tr className="bg-gray-50 border-b text-[11px] uppercase text-gray-500 tracking-wider">
                                       <th className="px-4 py-2 text-left">Date</th>

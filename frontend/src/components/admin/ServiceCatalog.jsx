@@ -299,10 +299,10 @@ const ServiceCatalog = () => {
   return (
     <div className="space-y-3 w-full">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Service Catalog</h2>
-          <p className="text-lg text-gray-600">Manage medical services and pricing</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Service Catalog</h2>
+          <p className="text-base sm:text-lg text-gray-600">Manage medical services and pricing</p>
         </div>
         <button
           onClick={() => {
@@ -324,14 +324,13 @@ const ServiceCatalog = () => {
             });
             setShowModal(true);
             setCodeGenerated(true);
-            // Small delay to let modal open, then generate code
             setTimeout(() => {
               generateCodeForService();
             }, 100);
           }}
-          className="btn btn-primary flex items-center text-lg px-6 py-3"
+          className="btn btn-primary flex items-center text-base sm:text-lg px-4 sm:px-6 py-2 sm:py-3 w-full sm:w-auto justify-center"
         >
-          <Plus className="h-6 w-6 mr-2" />
+          <Plus className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
           Add Service
         </button>
       </div>
@@ -438,6 +437,7 @@ const ServiceCatalog = () => {
               {labPricing.standalone.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-lg font-semibold text-gray-700 mb-3">Standalone Tests</h3>
+                  <div className="overflow-x-auto">
                   <table className="table w-full">
                     <thead>
                       <tr>
@@ -481,24 +481,25 @@ const ServiceCatalog = () => {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
             </>
           )}
         </div>
       ) : (
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-          <table className="table w-full" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+          <table className="table w-full min-w-[800px]" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr>
-                <th className="text-base" style={{ width: '20%' }}>Name</th>
-                <th className="text-base" style={{ width: '8%' }}>Code</th>
-                <th className="text-base" style={{ width: '12%' }}>Category</th>
-                <th className="text-base" style={{ width: '10%' }}>Price</th>
-                <th className="text-base" style={{ width: '10%' }}>Unit</th>
-                <th className="text-base" style={{ width: '18%' }}>Description</th>
-                <th className="text-base" style={{ width: '10%' }}>Status</th>
-                <th className="text-base" style={{ width: '12%' }}>Actions</th>
+                <th className="text-sm sm:text-base" style={{ width: '20%' }}>Name</th>
+                <th className="text-sm sm:text-base" style={{ width: '8%' }}>Code</th>
+                <th className="text-sm sm:text-base" style={{ width: '12%' }}>Category</th>
+                <th className="text-sm sm:text-base" style={{ width: '10%' }}>Price</th>
+                <th className="text-sm sm:text-base" style={{ width: '10%' }}>Unit</th>
+                <th className="text-sm sm:text-base" style={{ width: '18%' }}>Description</th>
+                <th className="text-sm sm:text-base" style={{ width: '10%' }}>Status</th>
+                <th className="text-sm sm:text-base" style={{ width: '12%' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -565,12 +566,12 @@ const ServiceCatalog = () => {
                 {editingService ? 'Edit Service' : 'Add New Service'}
               </h3>
               <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="label text-lg">Service Name *</label>
+                    <label className="label text-base sm:text-lg">Service Name *</label>
                     <input
                       type="text"
-                      className="input text-lg"
+                      className="input text-base sm:text-lg w-full"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
@@ -578,7 +579,7 @@ const ServiceCatalog = () => {
                   </div>
 
                   <div>
-                    <label className="label text-lg">
+                    <label className="label text-base sm:text-lg">
                       Service Code *
                       {!editingService && (
                         <span className="text-sm text-gray-500 ml-2">(Auto-generated)</span>
@@ -587,7 +588,7 @@ const ServiceCatalog = () => {
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
-                        className="input text-lg flex-1"
+                        className="input text-base sm:text-lg flex-1 min-w-0 w-full"
                         value={formData.code}
                         onChange={(e) => {
                           setFormData({ ...formData, code: e.target.value });
@@ -600,7 +601,7 @@ const ServiceCatalog = () => {
                         <button
                           type="button"
                           onClick={generateCodeForService}
-                          className="px-3 py-2 text-base bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300"
+                          className="px-3 py-2 text-base bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300 flex-shrink-0"
                           title="Regenerate code"
                         >
                           🔄
@@ -610,9 +611,9 @@ const ServiceCatalog = () => {
                   </div>
 
                   <div>
-                    <label className="label text-lg">Category *</label>
+                    <label className="label text-base sm:text-lg">Category *</label>
                     <select
-                      className="input text-lg"
+                      className="input text-base sm:text-lg w-full"
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       required
@@ -626,9 +627,9 @@ const ServiceCatalog = () => {
                   </div>
 
                   <div>
-                    <label className="label text-lg">Unit *</label>
+                    <label className="label text-base sm:text-lg">Unit *</label>
                     <select
-                      className="input text-lg"
+                      className="input text-base sm:text-lg w-full"
                       value={formData.unit}
                       onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                       required
@@ -643,9 +644,9 @@ const ServiceCatalog = () => {
 
                   {formData.category === 'PROCEDURE' && (
                     <div>
-                      <label className="label text-lg">Procedure Group</label>
+                      <label className="label text-base sm:text-lg">Procedure Group</label>
                       <select
-                        className="input text-lg"
+                        className="input text-base sm:text-lg w-full"
                         value={formData.procedureGroup}
                         onChange={(e) => setFormData({ ...formData, procedureGroup: e.target.value })}
                       >
@@ -659,9 +660,9 @@ const ServiceCatalog = () => {
                   )}
                   {formData.category === 'LAB' && (
                     <div>
-                      <label className="label text-lg">Lab Group</label>
+                      <label className="label text-base sm:text-lg">Lab Group</label>
                       <select
-                        className="input text-lg"
+                        className="input text-base sm:text-lg w-full"
                         value={formData.labGroup}
                         onChange={(e) => setFormData({ ...formData, labGroup: e.target.value })}
                       >
@@ -678,9 +679,9 @@ const ServiceCatalog = () => {
                   )}
                   {formData.category === 'RADIOLOGY' && (
                     <div>
-                      <label className="label text-lg">Radiology Group</label>
+                      <label className="label text-base sm:text-lg">Radiology Group</label>
                       <select
-                        className="input text-lg"
+                        className="input text-base sm:text-lg w-full"
                         value={formData.radiologyGroup}
                         onChange={(e) => setFormData({ ...formData, radiologyGroup: e.target.value })}
                       >
@@ -696,27 +697,27 @@ const ServiceCatalog = () => {
                     </div>
                   )}
 
-                  <div className="col-span-2">
-                    <label className="flex items-center gap-2 cursor-pointer bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-4 mt-4">
+                  <div className="col-span-1 md:col-span-3">
+                    <label className="flex items-center gap-2 cursor-pointer bg-indigo-50 p-3 sm:p-4 rounded-lg border border-indigo-100 mb-4 mt-4">
                       <input
                         type="checkbox"
-                        className="h-6 w-6 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded flex-shrink-0"
                         checked={formData.isVariablePrice}
                         onChange={(e) => setFormData({ ...formData, isVariablePrice: e.target.checked })}
                       />
-                      <span className="text-xl font-bold text-indigo-800">Has Variable Price Range</span>
-                      <span className="text-sm text-indigo-500 ml-2">(Price will be determined at point of service)</span>
+                      <span className="text-base sm:text-xl font-bold text-indigo-800">Has Variable Price Range</span>
+                      <span className="text-xs sm:text-sm text-indigo-500 ml-0 sm:ml-2">(Price determined at point of service)</span>
                     </label>
                   </div>
 
                   {!formData.isVariablePrice ? (
                     <div>
-                      <label className="label text-lg font-bold text-gray-700">Service Price (ETB) *</label>
+                      <label className="label text-base sm:text-lg font-bold text-gray-700">Service Price (ETB) *</label>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
-                        className="input text-xl font-bold border-indigo-200 focus:ring-indigo-500"
+                        className="input text-lg sm:text-xl font-bold border-indigo-200 focus:ring-indigo-500 w-full"
                         value={formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         required={!formData.isVariablePrice}
@@ -726,12 +727,12 @@ const ServiceCatalog = () => {
                   ) : (
                     <>
                       <div>
-                        <label className="label text-lg font-bold text-indigo-700">Minimum Price (ETB) *</label>
+                        <label className="label text-base sm:text-lg font-bold text-indigo-700">Minimum Price (ETB) *</label>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
-                          className="input text-xl font-bold border-indigo-300 focus:ring-indigo-500 bg-white"
+                          className="input text-lg sm:text-xl font-bold border-indigo-300 focus:ring-indigo-500 bg-white w-full"
                           value={formData.minPrice}
                           onChange={(e) => setFormData({ ...formData, minPrice: e.target.value })}
                           required={formData.isVariablePrice}
@@ -739,12 +740,12 @@ const ServiceCatalog = () => {
                         />
                       </div>
                       <div>
-                        <label className="label text-lg font-bold text-indigo-700">Maximum Price (ETB) *</label>
+                        <label className="label text-base sm:text-lg font-bold text-indigo-700">Maximum Price (ETB) *</label>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
-                          className="input text-xl font-bold border-indigo-300 focus:ring-indigo-500 bg-white"
+                          className="input text-lg sm:text-xl font-bold border-indigo-300 focus:ring-indigo-500 bg-white w-full"
                           value={formData.maxPrice}
                           onChange={(e) => setFormData({ ...formData, maxPrice: e.target.value })}
                           required={formData.isVariablePrice}
@@ -754,7 +755,7 @@ const ServiceCatalog = () => {
                     </>
                   )}
 
-                  <div className="flex items-center pt-8">
+                  <div className="flex items-center pt-4 md:pt-8">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -763,13 +764,13 @@ const ServiceCatalog = () => {
                         checked={formData.isActive}
                         onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                       />
-                      <span className="text-lg text-gray-900">Active Service</span>
+                      <span className="text-base sm:text-lg text-gray-900">Active Service</span>
                     </label>
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <label className="label text-lg">Description</label>
+                  <label className="label text-base sm:text-lg">Description</label>
                   <textarea
                     className="input text-lg"
                     rows="3"

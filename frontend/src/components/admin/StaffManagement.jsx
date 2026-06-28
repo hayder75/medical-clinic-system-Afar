@@ -268,16 +268,16 @@ const StaffManagement = () => {
   return (
     <div className="space-y-3 w-full">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Staff Management</h2>
-          <p className="text-lg text-gray-600">Manage hospital staff members and their roles</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Staff Management</h2>
+          <p className="text-base sm:text-lg text-gray-600">Manage hospital staff members and their roles</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="btn btn-primary flex items-center text-lg px-6 py-3"
+          className="btn btn-primary flex items-center text-base sm:text-lg px-4 sm:px-6 py-2 sm:py-3 w-full sm:w-auto justify-center"
         >
-          <Plus className="h-6 w-6 mr-2" />
+          <Plus className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
           Add Staff Member
         </button>
       </div>
@@ -290,7 +290,7 @@ const StaffManagement = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search staff members..."
+                placeholder="Search staff..."
                 className="input pl-12 text-lg py-3"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -329,18 +329,18 @@ const StaffManagement = () => {
       </div>
 
       {/* Staff Table */}
-      <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-        <table className="table w-full" style={{ tableLayout: 'fixed', width: '100%' }}>
+      <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+        <table className="table w-full min-w-[800px]" style={{ tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th className="text-base" style={{ width: '15%' }}>Name</th>
-              <th className="text-base" style={{ width: '12%' }}>Username</th>
-              <th className="text-base" style={{ width: '12%' }}>Role</th>
-              <th className="text-base" style={{ width: '15%' }}>Qualifications</th>
-              <th className="text-base" style={{ width: '8%' }}>Fee</th>
-              <th className="text-base" style={{ width: '15%' }}>Email</th>
-              <th className="text-base" style={{ width: '11%' }}>Phone</th>
-              <th className="text-base" style={{ width: '12%' }}>Actions</th>
+              <th className="text-sm sm:text-base" style={{ width: '15%' }}>Name</th>
+              <th className="text-sm sm:text-base" style={{ width: '12%' }}>Username</th>
+              <th className="text-sm sm:text-base" style={{ width: '12%' }}>Role</th>
+              <th className="text-sm sm:text-base" style={{ width: '15%' }}>Qualifications</th>
+              <th className="text-sm sm:text-base" style={{ width: '8%' }}>Fee</th>
+              <th className="text-sm sm:text-base" style={{ width: '15%' }}>Email</th>
+              <th className="text-sm sm:text-base" style={{ width: '11%' }}>Phone</th>
+              <th className="text-sm sm:text-base" style={{ width: '12%' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -477,12 +477,12 @@ const StaffManagement = () => {
                 {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
               </h3>
               <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="label text-lg">Username *</label>
+                    <label className="label text-base sm:text-lg">Username *</label>
                     <input
                       type="text"
-                      className="input text-lg"
+                      className="input text-base sm:text-lg w-full"
                       value={formData.username}
                       onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                       required
@@ -490,10 +490,10 @@ const StaffManagement = () => {
                   </div>
 
                   <div>
-                    <label className="label text-lg">Password {!editingStaff && '*'}</label>
+                    <label className="label text-base sm:text-lg">Password {!editingStaff && '*'}</label>
                     <input
                       type="password"
-                      className="input text-lg"
+                      className="input text-base sm:text-lg w-full"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       minLength={4}
@@ -505,19 +505,19 @@ const StaffManagement = () => {
                   </div>
 
                   <div>
-                    <label className="label text-lg">Full Name</label>
+                    <label className="label text-base sm:text-lg">Full Name</label>
                     <input
                       type="text"
-                      className="input text-lg"
+                      className="input text-base sm:text-lg w-full"
                       value={formData.fullname}
                       onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
                     />
                   </div>
 
                   <div>
-                    <label className="label text-lg">Role *</label>
+                    <label className="label text-base sm:text-lg">Role *</label>
                     <select
-                      className="input text-lg"
+                      className="input text-base sm:text-lg w-full"
                       value={formData.role}
                       onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                       required
@@ -531,20 +531,20 @@ const StaffManagement = () => {
                   </div>
 
                   <div>
-                    <label className="label text-lg">Email (optional)</label>
+                    <label className="label text-base sm:text-lg">Email (optional)</label>
                     <input
                       type="email"
-                      className="input text-lg"
+                      className="input text-base sm:text-lg w-full"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
                   </div>
 
                   <div>
-                    <label className="label text-lg">Phone</label>
+                    <label className="label text-base sm:text-lg">Phone</label>
                     <input
                       type="tel"
-                      className="input text-lg"
+                      className="input text-base sm:text-lg w-full"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
@@ -553,12 +553,12 @@ const StaffManagement = () => {
 
                 {/* Doctor-specific fields */}
                 {formData.role === 'DOCTOR' && (
-                  <div className="mt-4 grid grid-cols-3 gap-4">
-                    <div className="col-span-3">
-                      <label className="label text-lg">Workspace Profile</label>
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="col-span-1 md:col-span-3">
+                      <label className="label text-base sm:text-lg">Workspace Profile</label>
                       <p className="text-sm text-gray-500 mb-1">Controls which features appear in this doctor's panel. Auto-detected from qualifications if left empty.</p>
                       <select
-                        className="input text-lg"
+                        className="input text-base sm:text-lg w-full"
                         value={formData.specialty}
                         onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
                       >
@@ -569,10 +569,10 @@ const StaffManagement = () => {
                       </select>
                     </div>
 
-                    <div className="col-span-3">
-                      <label className="label text-lg">Qualifications</label>
+                    <div className="col-span-1 md:col-span-3">
+                      <label className="label text-base sm:text-lg">Qualifications</label>
                       <p className="text-sm text-gray-500 mb-1">Medical credentials — controls display title (Dr./Mr.) and triage filtering. Workspace Profile above is auto-detected from these.</p>
-                      <div className="grid grid-cols-4 gap-2 mt-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
                         {qualifications.map((qualification) => (
                           <label key={qualification.value} className="flex items-center gap-2">
                             <input
@@ -581,19 +581,19 @@ const StaffManagement = () => {
                               onChange={() => handleQualificationChange(qualification.value)}
                               className="rounded border-gray-300 h-5 w-5"
                             />
-                            <span className="text-base">{qualification.label}</span>
+                            <span className="text-sm sm:text-base">{qualification.label}</span>
                           </label>
                         ))}
                       </div>
                     </div>
 
                     <div>
-                      <label className="label text-lg">Consultation Fee ($)</label>
+                      <label className="label text-base sm:text-lg">Consultation Fee ($)</label>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
-                        className="input text-lg"
+                        className="input text-base sm:text-lg w-full"
                         value={formData.consultationFee}
                         onChange={(e) => setFormData({ ...formData, consultationFee: e.target.value })}
                         placeholder="0.00"
@@ -606,10 +606,10 @@ const StaffManagement = () => {
                     </div>
 
                     <div>
-                      <label className="label text-lg">License Number</label>
+                      <label className="label text-base sm:text-lg">License Number</label>
                       <input
                         type="text"
-                        className="input text-lg"
+                        className="input text-base sm:text-lg w-full"
                         value={formData.licenseNumber}
                         onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
                         placeholder="Medical license number"
@@ -617,9 +617,9 @@ const StaffManagement = () => {
                     </div>
 
                     <div>
-                      <label className="label text-lg">Required Card Type</label>
+                      <label className="label text-base sm:text-lg">Required Card Type</label>
                       <select
-                        className="input text-lg"
+                        className="input text-base sm:text-lg w-full"
                         value={formData.requiredCardType}
                         onChange={(e) => setFormData({ ...formData, requiredCardType: e.target.value })}
                       >
@@ -632,7 +632,7 @@ const StaffManagement = () => {
                       </p>
                     </div>
 
-                    <div className="flex items-center pt-8">
+                    <div className="flex items-center pt-4 md:pt-8">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
@@ -640,7 +640,7 @@ const StaffManagement = () => {
                           onChange={(e) => setFormData({ ...formData, waiveConsultationFee: e.target.checked })}
                           className="rounded border-gray-300 h-5 w-5"
                         />
-                        <span className="text-lg font-medium text-gray-700">
+                        <span className="text-base sm:text-lg font-medium text-gray-700">
                           Waive Consultation Fee
                         </span>
                       </label>
