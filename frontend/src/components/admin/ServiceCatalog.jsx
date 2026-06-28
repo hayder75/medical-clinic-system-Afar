@@ -20,7 +20,8 @@ const ServiceCatalog = () => {
     isActive: true,
     isVariablePrice: false,
     minPrice: '',
-    maxPrice: ''
+    maxPrice: '',
+    procedureGroup: ''
   });
   const [codeGenerated, setCodeGenerated] = useState(false);
   const [labPricing, setLabPricing] = useState({ panels: [], standalone: [] });
@@ -200,6 +201,7 @@ const ServiceCatalog = () => {
         price: formData.isVariablePrice ? parseFloat(formData.minPrice) || 0 : parseFloat(formData.price),
         minPrice: formData.isVariablePrice ? parseFloat(formData.minPrice) : null,
         maxPrice: formData.isVariablePrice ? parseFloat(formData.maxPrice) : null,
+        procedureGroup: formData.procedureGroup || null,
       };
 
       if (editingService) {
@@ -242,8 +244,9 @@ const ServiceCatalog = () => {
       description: service.description || '',
       isActive: service.isActive,
       isVariablePrice: service.isVariablePrice || false,
-      minPrice: service.minPrice?.toString() || '',
-      maxPrice: service.maxPrice?.toString() || ''
+                    minPrice: service.minPrice?.toString() || '',
+                    maxPrice: service.maxPrice?.toString() || '',
+                    procedureGroup: service.procedureGroup || ''
     });
     setShowModal(true);
   };
@@ -305,7 +308,8 @@ const ServiceCatalog = () => {
               isActive: true,
               isVariablePrice: false,
               minPrice: '',
-              maxPrice: ''
+              maxPrice: '',
+              procedureGroup: ''
             });
             setShowModal(true);
             setCodeGenerated(true);
@@ -626,6 +630,22 @@ const ServiceCatalog = () => {
                     </select>
                   </div>
 
+                  {formData.category === 'PROCEDURE' && (
+                    <div>
+                      <label className="label text-lg">Procedure Group</label>
+                      <select
+                        className="input text-lg"
+                        value={formData.procedureGroup}
+                        onChange={(e) => setFormData({ ...formData, procedureGroup: e.target.value })}
+                      >
+                        <option value="">Select group...</option>
+                        <option value="GYNECOLOGY">Gynecology</option>
+                        <option value="SURGERY">Surgery</option>
+                        <option value="ORTHOPEDIC">Orthopedic</option>
+                      </select>
+                    </div>
+                  )}
+
                   <div className="col-span-2">
                     <label className="flex items-center gap-2 cursor-pointer bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-4 mt-4">
                       <input
@@ -725,7 +745,8 @@ const ServiceCatalog = () => {
                         isActive: true,
                         isVariablePrice: false,
                         minPrice: '',
-                        maxPrice: ''
+                        maxPrice: '',
+                        procedureGroup: ''
                       });
                     }}
                     className="btn btn-secondary text-lg px-6 py-2"

@@ -208,6 +208,7 @@ router.get('/order-status/:visitId', doctorController.getVisitOrderStatus);
 router.post('/visits/:visitId/external-diagnostic-orders', auth, roleGuard(DOCTOR_ROLES), doctorController.createExternalDiagnosticOrder);
 router.get('/investigation-types', doctorController.getInvestigationTypes);
 router.get('/services', doctorController.getAllServices);
+router.get('/procedures', doctorController.getProcedureGroups);
 router.get('/lab-tests/for-ordering', auth, roleGuard(['DOCTOR', 'LAB_TECHNICIAN', 'ADMIN', 'HEALTH_OFFICER', 'DERMATOLOGY']), adminController.getLabTestsForOrdering);
 router.post('/select', doctorController.selectVisit);
 router.put('/visits/:visitId', doctorController.updateVisit);

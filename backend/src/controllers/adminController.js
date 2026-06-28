@@ -381,6 +381,7 @@ const createServiceSchema = z.object({
   isVariablePrice: z.boolean().optional(),
   minPrice: z.number().nonnegative().optional().nullable(),
   maxPrice: z.number().nonnegative().optional().nullable(),
+  procedureGroup: z.string().optional().nullable(),
 });
 
 const createInsuranceSchema = z.object({
@@ -921,6 +922,7 @@ exports.getServices = async (req, res) => {
         isVariablePrice: true,
         minPrice: true,
         maxPrice: true,
+        procedureGroup: true,
         createdAt: true,
         updatedAt: true
       }

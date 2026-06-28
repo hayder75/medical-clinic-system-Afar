@@ -7757,3 +7757,39 @@ exports.bulkCompleteActiveVisits = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+exports.getProcedureGroups = async (req, res) => {
+  try {
+    const services = await prisma.service.findMany({
+      where: {
+        category: 'PROCEDURE',
+        isActive: true
+      },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        price: true,
+        description: true,
+        unit: true,
+        isVariablePrice: true,
+        minPrice: true,
+        maxPrice: true,
+        procedureGroup: true
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    const groups = {};
+    for (const s of services) {
+      const group = s.procedureGroup || 'OTHER';
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(s);
+    }
+
+    res.json({ groups });
+  } catch (error) {
+    console.error('Error fetching procedure groups:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
