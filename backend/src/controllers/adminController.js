@@ -382,6 +382,8 @@ const createServiceSchema = z.object({
   minPrice: z.number().nonnegative().optional().nullable(),
   maxPrice: z.number().nonnegative().optional().nullable(),
   procedureGroup: z.string().optional().nullable(),
+  labGroup: z.string().optional().nullable(),
+  radiologyGroup: z.string().optional().nullable(),
 });
 
 const createInsuranceSchema = z.object({
@@ -795,7 +797,30 @@ exports.createService = async (req, res) => {
         });
 
         if (!existingInvestigationType) {
-          // Create InvestigationType for RADIOLOGY service
+          const radiologyGroupMap = {
+            'XRAY': 'X-Ray',
+            'ULTRASOUND': 'Ultrasound',
+            'CT_SCAN': 'CT Scan',
+            'MRI': 'MRI',
+            'MAMMOGRAPHY': 'Mammography',
+            'FLUOROSCOPY': 'Fluoroscopy',
+            'OTHER': 'Other'
+          };
+
+          let radiologyCategoryId = null;
+          if (data.radiologyGroup) {
+            const catName = radiologyGroupMap[data.radiologyGroup] || data.radiologyGroup;
+            let radCat = await prisma.radiologyCategory.findFirst({
+              where: { name: catName }
+            });
+            if (!radCat) {
+              radCat = await prisma.radiologyCategory.create({
+                data: { name: catName, displayOrder: 999, isActive: true }
+              });
+            }
+            radiologyCategoryId = radCat.id;
+          }
+
           await prisma.investigationType.create({
             data: {
               name: service.name,
@@ -803,11 +828,12 @@ exports.createService = async (req, res) => {
               price: service.price,
               service: {
                 connect: { id: service.id }
-              }
+              },
+              ...(radiologyCategoryId ? { radiologyCategoryId } : {})
             }
           });
           autoCreated.investigationType = true;
-          console.log(`✅ Auto-created InvestigationType for RADIOLOGY service: ${service.name}`);
+          console.log(`✅ Auto-created InvestigationType for RADIOLOGY service: ${service.name}${radiologyCategoryId ? ` (category: ${radiologyGroupMap[data.radiologyGroup] || data.radiologyGroup})` : ''}`);
         }
       } else if (data.category === 'LAB') {
         // Check if LabTest already exists for this service
@@ -826,7 +852,7 @@ exports.createService = async (req, res) => {
             data: {
               code: labTestCode,
               name: service.name,
-              category: 'Laboratory', // Default category, admin can change later
+              category: data.labGroup || 'OTHER',
               description: service.description || `Lab test: ${service.name}`,
               price: service.price,
               unit: service.unit || 'UNIT',
@@ -923,6 +949,8 @@ exports.getServices = async (req, res) => {
         minPrice: true,
         maxPrice: true,
         procedureGroup: true,
+        labGroup: true,
+        radiologyGroup: true,
         createdAt: true,
         updatedAt: true
       }
@@ -979,23 +1007,55 @@ exports.updateService = async (req, res) => {
         });
 
         if (!existingInvestigationType) {
+          const radiologyGroupMap = {
+            XRAY: 'X-Ray', ULTRASOUND: 'Ultrasound',
+            CT_SCAN: 'CT Scan', MRI: 'MRI',
+            MAMMOGRAPHY: 'Mammography', FLUOROSCOPY: 'Fluoroscopy',
+            OTHER: 'Other'
+          };
+          let radId = null;
+          const rg = service.radiologyGroup;
+          if (rg) {
+            const cName = radiologyGroupMap[rg] || rg;
+            let rc = await prisma.radiologyCategory.findFirst({ where: { name: cName } });
+            if (!rc) {
+              rc = await prisma.radiologyCategory.create({ data: { name: cName, displayOrder: 999, isActive: true } });
+            }
+            radId = rc.id;
+          }
           await prisma.investigationType.create({
             data: {
               name: service.name,
               category: 'RADIOLOGY',
               price: service.price,
-              service: { connect: { id: service.id } }
+              service: { connect: { id: service.id } },
+              ...(radId ? { radiologyCategoryId: radId } : {})
             }
           });
           console.log(`✅ Auto-created InvestigationType for updated RADIOLOGY service: ${service.name}`);
         } else {
-          // Update existing InvestigationType if service name or price changed
+          // Update existing InvestigationType
+          const updateData = { name: service.name, price: service.price };
+          const rg = service.radiologyGroup;
+          if (rg) {
+            const radiologyGroupMap = {
+              XRAY: 'X-Ray', ULTRASOUND: 'Ultrasound',
+              CT_SCAN: 'CT Scan', MRI: 'MRI',
+              MAMMOGRAPHY: 'Mammography', FLUOROSCOPY: 'Fluoroscopy',
+              OTHER: 'Other'
+            };
+            const cName = radiologyGroupMap[rg] || rg;
+            let rc = await prisma.radiologyCategory.findFirst({ where: { name: cName } });
+            if (!rc) {
+              rc = await prisma.radiologyCategory.create({ data: { name: cName, displayOrder: 999, isActive: true } });
+            }
+            updateData.radiologyCategoryId = rc.id;
+          } else {
+            updateData.radiologyCategoryId = null;
+          }
           await prisma.investigationType.updateMany({
             where: { serviceId: service.id },
-            data: {
-              name: service.name,
-              price: service.price
-            }
+            data: updateData
           });
         }
       } catch (error) {
@@ -1016,7 +1076,7 @@ exports.updateService = async (req, res) => {
             data: {
               code: labTestCode,
               name: service.name,
-              category: 'Laboratory',
+              category: service.labGroup || 'OTHER',
               description: service.description || `Lab test: ${service.name}`,
               price: service.price,
               unit: service.unit || 'UNIT',
@@ -1055,14 +1115,16 @@ exports.updateService = async (req, res) => {
           });
           console.log(`✅ Auto-created LabTest for updated LAB service: ${service.name}`);
         } else {
-          // Update existing LabTest if service name or price changed
+          // Update existing LabTest
+          const updateData = {
+            name: service.name,
+            price: service.price,
+            description: service.description,
+            category: service.labGroup || 'OTHER'
+          };
           await prisma.labTest.updateMany({
             where: { serviceId: service.id },
-            data: {
-              name: service.name,
-              price: service.price,
-              description: service.description
-            }
+            data: updateData
           });
         }
       } catch (error) {
@@ -5232,6 +5294,26 @@ exports.getLabTestsForOrdering = async (req, res) => {
         if (test.code === 'BGRH001') test.name = 'Blood typing';
       }
 
+      result[cat] = data;
+    }
+
+    // Also include non-standard categories (e.g., 'OTHER')
+    for (const cat of Object.keys(organized)) {
+      if (result[cat]) continue;
+      const data = organized[cat];
+      if (!data) continue;
+      const hasPanels = data.panels.length > 0;
+      const hasStandalone = data.standalone.length > 0;
+      if (!hasPanels && !hasStandalone) continue;
+      for (const panel of data.panels) {
+        for (const test of panel.tests) {
+          if (test.code === 'PICT001') test.name = 'Malarial smear';
+        }
+      }
+      for (const test of data.standalone) {
+        if (test.code === 'PICT001') test.name = 'Malarial smear';
+        if (test.code === 'BGRH001') test.name = 'Blood typing';
+      }
       result[cat] = data;
     }
 
