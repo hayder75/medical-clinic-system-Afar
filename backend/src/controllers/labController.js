@@ -720,7 +720,51 @@ const saveLabTestResult = async (req, res) => {
   }
 };
 
+const getLabStats = async (req, res) => {
+  try {
+    const { date } = req.query;
+    const dateFilter = date ? {
+      createdAt: {
+        gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
+        lte: new Date(new Date(date).setHours(23, 59, 59, 999))
+      }
+    } : {};
+
+    const pendingStatuses = ['UNPAID', 'PAID', 'QUEUED'];
+    const inProgressStatuses = ['IN_PROGRESS'];
+    const completedStatuses = ['COMPLETED', 'VERIFIED'];
+
+    const [
+      batchPending, batchInProgress, batchCompleted,
+      walkInPending, walkInInProgress, walkInCompleted,
+      testPending, testInProgress, testCompleted
+    ] = await Promise.all([
+      prisma.batchOrder.count({ where: { type: 'LAB', status: { in: pendingStatuses }, ...dateFilter } }),
+      prisma.batchOrder.count({ where: { type: 'LAB', status: { in: inProgressStatuses }, ...dateFilter } }),
+      prisma.batchOrder.count({ where: { type: 'LAB', status: { in: completedStatuses }, ...dateFilter } }),
+      prisma.labOrder.count({ where: { isWalkIn: true, status: { in: pendingStatuses }, ...dateFilter } }),
+      prisma.labOrder.count({ where: { isWalkIn: true, status: { in: inProgressStatuses }, ...dateFilter } }),
+      prisma.labOrder.count({ where: { isWalkIn: true, status: { in: completedStatuses }, ...dateFilter } }),
+      prisma.labTestOrder.count({ where: { batchOrderId: null, status: { in: pendingStatuses }, ...dateFilter } }),
+      prisma.labTestOrder.count({ where: { batchOrderId: null, status: { in: inProgressStatuses }, ...dateFilter } }),
+      prisma.labTestOrder.count({ where: { batchOrderId: null, status: { in: completedStatuses }, ...dateFilter } }),
+    ]);
+
+    res.json({
+      total: batchPending + batchInProgress + batchCompleted
+           + walkInPending + walkInInProgress + walkInCompleted
+           + testPending + testInProgress + testCompleted,
+      pending: batchPending + walkInPending + testPending,
+      inProgress: batchInProgress + walkInInProgress + testInProgress,
+      completed: batchCompleted + walkInCompleted + testCompleted
+    });
+  } catch (error) {
+    console.error('Error fetching lab stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getTemplates, getOrders, saveIndividualLabResult, getDetailedResults,
-  sendToDoctor, updateLabOrderStatus, generateLabResultsPDF, getLabReports, saveLabTestResult
+  sendToDoctor, updateLabOrderStatus, generateLabResultsPDF, getLabReports, saveLabTestResult, getLabStats
 };

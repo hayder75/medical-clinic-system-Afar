@@ -7,36 +7,44 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   const cameraInputRef = useRef(null);
 
   const compressImage = (file, maxDimension = 1024, quality = 0.7) => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let { width, height } = img;
-          if (width > maxDimension || height > maxDimension) {
-            if (width > height) {
-              height = (maxDimension / width) * height;
-              width = maxDimension;
-            } else {
-              width = (maxDimension / height) * width;
-              height = maxDimension;
+          try {
+            const canvas = document.createElement('canvas');
+            let { width, height } = img;
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = (maxDimension / width) * height;
+                width = maxDimension;
+              } else {
+                width = (maxDimension / height) * width;
+                height = maxDimension;
+              }
             }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const compressedReader = new FileReader();
+                compressedReader.onloadend = () => resolve(compressedReader.result);
+                compressedReader.readAsDataURL(blob);
+              } else {
+                resolve(e.target.result);
+              }
+            }, file.type || 'image/jpeg', quality);
+          } catch {
+            resolve(e.target.result);
           }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => {
-            const compressedReader = new FileReader();
-            compressedReader.onloadend = () => resolve(compressedReader.result);
-            compressedReader.readAsDataURL(blob);
-          }, 'image/jpeg', quality);
         };
-        img.onerror = reject;
+        img.onerror = () => resolve(e.target.result);
         img.src = e.target.result;
       };
-      reader.onerror = reject;
+      reader.onerror = () => resolve(null);
       reader.readAsDataURL(file);
     });
   };
@@ -47,19 +55,22 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
     Promise.all(files.map(async (file) => {
       if (file && file.type.startsWith('image/')) {
         const data = await compressImage(file);
+        if (!data) return null;
         return {
           id: Date.now() + Math.random(),
           data,
           name: file.name,
-          type: 'image/jpeg'
+          type: file.type || 'image/jpeg'
         };
       }
       return null;
     })).then(newImages => {
       const valid = newImages.filter(Boolean);
-      const updatedImages = [...images, ...valid];
-      setImages(updatedImages);
-      onImagesChange(updatedImages);
+      if (valid.length > 0) {
+        const updatedImages = [...images, ...valid];
+        setImages(updatedImages);
+        onImagesChange(updatedImages);
+      }
     });
 
     // Reset input

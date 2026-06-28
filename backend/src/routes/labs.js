@@ -16,6 +16,9 @@ router.get('/templates', authMiddleware, roleGuard(['LAB_TECHNICIAN', 'ADMIN']),
 // Get detailed lab results for a specific order (must come before /orders)
 router.get('/orders/:orderId/detailed-results', authMiddleware, roleGuard([...DOCTOR_ROLES, 'LAB_TECHNICIAN', 'ADMIN']), labController.getDetailedResults);
 
+// Get lab dashboard stats (fast COUNT queries)
+router.get('/stats', authMiddleware, roleGuard(['LAB_TECHNICIAN', 'ADMIN']), labController.getLabStats);
+
 // Get lab orders (batch orders)
 router.get('/orders', authMiddleware, roleGuard(['LAB_TECHNICIAN', 'ADMIN']), labController.getOrders);
 
