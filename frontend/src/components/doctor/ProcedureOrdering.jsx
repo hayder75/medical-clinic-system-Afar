@@ -17,6 +17,9 @@ const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
     const [completingId, setCompletingId] = useState(null);
     const [creditInfo, setCreditInfo] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [procedureGroups, setProcedureGroups] = useState({});
+    const [activeGroup, setActiveGroup] = useState(null);
+    const [sidebarLoading, setSidebarLoading] = useState(false);
 
     useEffect(() => {
         fetchServices();
@@ -50,16 +53,20 @@ const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
     const fetchServices = async () => {
         try {
             setFetchingData(true);
-            const response = await api.get('/doctors/services?category=PROCEDURE');
-            const procedures = (response.data.services || []).filter(
-                service => service.category === 'PROCEDURE' && service.isActive
-            );
-            setServices(procedures);
+            setSidebarLoading(true);
+            const response = await api.get('/doctors/procedures');
+            const groups = response.data?.groups || {};
+            setProcedureGroups(groups);
+            const groupKeys = Object.keys(groups);
+            if (groupKeys.length > 0) setActiveGroup(groupKeys[0]);
+            const all = Object.values(groups).flat();
+            setServices(all);
         } catch (error) {
             console.error('Error fetching procedures:', error);
             toast.error('Failed to fetch procedure list');
         } finally {
             setFetchingData(false);
+            setSidebarLoading(false);
         }
     };
 
@@ -365,76 +372,112 @@ const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
             )}
 
             {/* Selection Area */}
-            <div className="bg-white p-4 border border-gray-200 rounded-xl">
-                <div className="mb-4 flex items-center justify-between">
-                    <div>
-                        <h4 className="font-semibold text-gray-900">Available Procedures</h4>
-                        <p className="text-sm text-gray-500">Select procedures to send to billing</p>
-                    </div>
-                    <div className="relative flex-1 max-w-md">
-                        <input
-                            type="text"
-                            placeholder="Search procedures..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 text-base border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                        />
-                        <svg className="absolute left-3 top-3 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 7 0 0114 00 7 z" />
-                        </svg>
-                    </div>
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="p-4 border-b border-gray-100">
+                    <h4 className="font-semibold text-gray-900">Available Procedures</h4>
+                    <p className="text-sm text-gray-500">Select procedures to send to billing</p>
                 </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                    {(searchTerm ? services.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())) : services).length === 0 ? (
-                        <div className="col-span-full py-10 text-center bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                            <Activity className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                            <p className="text-gray-500 text-sm">No procedures available.</p>
+                {services.length === 0 ? (
+                    <div className="p-10 text-center bg-gray-50">
+                        <Activity className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-500 text-sm">No procedures available.</p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col md:flex-row gap-0">
+                        {/* Left sidebar: procedure groups */}
+                        <div className="w-full md:w-44 flex-shrink-0 border-b md:border-b-0 md:border-r border-gray-200 bg-gray-50">
+                            <div className="p-3 space-y-1">
+                                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 mb-2">Categories</div>
+                                {Object.keys(procedureGroups).map(group => {
+                                    const grpLabel = group === 'GYNECOLOGY' ? 'Gynecology' : group === 'SURGERY' ? 'Surgery' : group === 'ORTHOPEDIC' ? 'Orthopedic' : group;
+                                    const count = (procedureGroups[group] || []).length;
+                                    const isActive = activeGroup === group;
+                                    return (
+                                        <button
+                                            key={group}
+                                            type="button"
+                                            onClick={() => { setActiveGroup(group); setSearchTerm(''); }}
+                                            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-indigo-600 text-white font-semibold shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
+                                        >
+                                            <div className="flex items-center justify-between gap-1">
+                                                <span className="truncate">{grpLabel}</span>
+                                                <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${isActive ? 'bg-indigo-500 text-white' : 'bg-gray-200 text-gray-600'}`}>{count}</span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
-                    ) : (
-                        (searchTerm ? services.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())) : services).map((service) => {
-                            const isSelected = selectedServices.some(s => s.id === service.id);
-                            return (
-                                <div
-                                    key={service.id}
-                                    onClick={() => toggleService(service)}
-                                    className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 flex flex-col justify-between active:scale-95 ${isSelected
-                                        ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-100'
-                                        : 'border-gray-200 bg-white hover:border-indigo-300 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    <div className="mb-2">
-                                        <div className={`text-[10px] uppercase mb-0.5 tracking-wider ${isSelected ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                            {service.code || 'PROC'}
-                                        </div>
-                                        <h5 className={`font-medium text-sm leading-tight ${isSelected ? 'text-indigo-800' : 'text-gray-700'}`}>
-                                            {service.name}
-                                        </h5>
-                                    </div>
-
-                                    <div className="flex justify-between items-center pt-2 border-t border-gray-100 mt-auto">
-                                        <span className={`text-xs font-medium ${isSelected ? 'text-indigo-600' : 'text-gray-500'}`}>
-                                            {service.isVariablePrice ? (
-                                                <span className="flex flex-col">
-                                                    <span>{service.minPrice} - {service.maxPrice}</span>
-                                                    <span className="text-[9px] font-bold text-indigo-500 uppercase">Variable</span>
-                                                </span>
-                                            ) : (
-                                                `${service.price?.toFixed(2)} ETB`
-                                            )}
-                                        </span>
-                                        {isSelected ? (
-                                            <CheckCircle className="h-4 w-4 text-indigo-600" />
-                                        ) : (
-                                            <Plus className="h-4 w-4 text-gray-300 group-hover:text-indigo-500" />
-                                        )}
-                                    </div>
+                        {/* Center: services */}
+                        <div className="flex-1 p-4">
+                            <div className="mb-4 flex items-center justify-between">
+                                <div className="relative flex-1 max-w-md">
+                                    <input
+                                        type="text"
+                                        placeholder="Search procedures..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                    />
+                                    <svg className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 7 0 0114 00 7 z" />
+                                    </svg>
                                 </div>
-                            );
-                        })
-                    )}
-                </div>
-            </div>
+                                <span className="text-xs text-gray-500 ml-2">{services.filter(s => !activeGroup || s.procedureGroup === activeGroup).length} items</span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {services
+                                    .filter(s => !activeGroup || s.procedureGroup === activeGroup)
+                                    .filter(s => !searchTerm || s.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                                    .map((service) => {
+                                        const isSelected = selectedServices.some(s => s.id === service.id);
+                                        return (
+                                            <div
+                                                key={service.id}
+                                                onClick={() => toggleService(service)}
+                                                className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 flex flex-col justify-between active:scale-95 ${isSelected
+                                                    ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-100'
+                                                    : 'border-gray-200 bg-white hover:border-indigo-300 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                <div className="mb-2">
+                                                    <div className={`text-[10px] uppercase mb-0.5 tracking-wider ${isSelected ? 'text-indigo-600' : 'text-gray-400'}`}>
+                                                        {service.code || 'PROC'}
+                                                    </div>
+                                                    <h5 className={`font-medium text-sm leading-tight ${isSelected ? 'text-indigo-800' : 'text-gray-700'}`}>
+                                                        {service.name}
+                                                    </h5>
+                                                </div>
+                                                <div className="flex justify-between items-center pt-2 border-t border-gray-100 mt-auto">
+                                                    <span className={`text-xs font-medium ${isSelected ? 'text-indigo-600' : 'text-gray-500'}`}>
+                                                        {service.isVariablePrice ? (
+                                                            <span className="flex flex-col">
+                                                                <span>{service.minPrice} - {service.maxPrice}</span>
+                                                                <span className="text-[9px] font-bold text-indigo-500 uppercase">Variable</span>
+                                                            </span>
+                                                        ) : (
+                                                            `${service.price?.toFixed(2)} ETB`
+                                                        )}
+                                                    </span>
+                                                    {isSelected ? (
+                                                        <CheckCircle className="h-4 w-4 text-indigo-600" />
+                                                    ) : (
+                                                        <Plus className="h-4 w-4 text-gray-300 group-hover:text-indigo-500" />
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                {services.filter(s => !activeGroup || s.procedureGroup === activeGroup).filter(s => !searchTerm || s.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                                    <div className="col-span-full py-8 text-center bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                        <Activity className="h-6 w-6 text-gray-300 mx-auto mb-1" />
+                                        <p className="text-gray-500 text-sm">No procedures in this category.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
             {/* Selected List - Clean confirmation */}
             {selectedServices.length > 0 && (

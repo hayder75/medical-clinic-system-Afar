@@ -1938,7 +1938,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-01-04T10:11:24.698Z",
-      "updatedAt": "2026-01-04T10:11:24.698Z"
+      "updatedAt": "2026-01-04T10:11:24.698Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "9440874e-c28e-40ca-88d8-1b23e481507c",
@@ -1953,7 +1954,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-01-04T10:11:24.702Z",
-      "updatedAt": "2026-01-04T10:11:24.702Z"
+      "updatedAt": "2026-01-04T10:11:24.702Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "7f7bbccf-2ce7-4e19-9387-9888368dec69",
@@ -2148,7 +2150,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-01-04T14:53:00.051Z",
-      "updatedAt": "2026-01-04T14:53:00.051Z"
+      "updatedAt": "2026-01-04T14:53:00.051Z",
+      "procedureGroup": "GYNECOLOGY"
     },
     {
       "id": "03b55355-5dfd-40c7-865a-040e683a2f63",
@@ -2163,7 +2166,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-01-04T14:53:40.204Z",
-      "updatedAt": "2026-01-04T14:53:40.204Z"
+      "updatedAt": "2026-01-04T14:53:40.204Z",
+      "procedureGroup": "GYNECOLOGY"
     },
     {
       "id": "65d021dd-afc0-41eb-b84c-55060b441e0b",
@@ -2178,7 +2182,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-01-04T14:54:09.680Z",
-      "updatedAt": "2026-01-04T14:54:09.680Z"
+      "updatedAt": "2026-01-04T14:54:09.680Z",
+      "procedureGroup": "GYNECOLOGY"
     },
     {
       "id": "91345ec8-5b95-4d92-8082-d202a229dffc",
@@ -2193,7 +2198,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-01-04T14:55:11.532Z",
-      "updatedAt": "2026-01-04T14:55:11.532Z"
+      "updatedAt": "2026-01-04T14:55:11.532Z",
+      "procedureGroup": "GYNECOLOGY"
     },
     {
       "id": "b3b97cd8-a96c-4f8f-afa9-93f7bd64388c",
@@ -2313,7 +2319,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-01-04T10:11:24.691Z",
-      "updatedAt": "2026-01-13T17:14:23.422Z"
+      "updatedAt": "2026-01-13T17:14:23.422Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "709ea608-8b82-4a48-8e18-faf83bcaf787",
@@ -2388,7 +2395,8 @@
       "minPrice": 200,
       "maxPrice": 1200,
       "createdAt": "2026-01-04T10:11:24.696Z",
-      "updatedAt": "2026-03-09T08:58:23.475Z"
+      "updatedAt": "2026-03-09T08:58:23.475Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "3e5a4280-4b80-4054-a478-5b90d296606c",
@@ -2433,7 +2441,8 @@
       "minPrice": 400,
       "maxPrice": 800,
       "createdAt": "2026-01-04T10:11:24.700Z",
-      "updatedAt": "2026-03-09T08:55:35.880Z"
+      "updatedAt": "2026-03-09T08:55:35.880Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "ae6742ad-bbd5-4af5-b73e-c91852f476b7",
@@ -2613,7 +2622,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-01-13T17:15:52.457Z",
-      "updatedAt": "2026-01-13T17:15:52.457Z"
+      "updatedAt": "2026-01-13T17:15:52.457Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "7999d55e-285c-493c-9367-ee25456a9ce2",
@@ -3087,7 +3097,7 @@
       "category": "LAB",
       "price": 150,
       "unit": "UNIT",
-      "description": "PICT – Malaria test",
+      "description": "PICT \u2013 Malaria test",
       "isActive": true,
       "isVariablePrice": false,
       "minPrice": null,
@@ -3453,7 +3463,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-03-08T13:09:51.079Z",
-      "updatedAt": "2026-03-08T13:09:51.079Z"
+      "updatedAt": "2026-03-08T13:09:51.079Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "ff5e9154-aa0c-485b-8600-56c6720ffb21",
@@ -3468,7 +3479,8 @@
       "minPrice": 500,
       "maxPrice": 1000,
       "createdAt": "2026-03-08T13:13:05.124Z",
-      "updatedAt": "2026-03-08T13:13:05.124Z"
+      "updatedAt": "2026-03-08T13:13:05.124Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "94e24ae7-e0ec-422a-b0bb-b030c2a85356",
@@ -3483,7 +3495,8 @@
       "minPrice": 500,
       "maxPrice": 1200,
       "createdAt": "2026-03-08T13:14:44.116Z",
-      "updatedAt": "2026-03-08T13:14:44.116Z"
+      "updatedAt": "2026-03-08T13:14:44.116Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "278ca010-ac6c-47dc-875f-95b4388cc850",
@@ -3618,7 +3631,8 @@
       "minPrice": 400,
       "maxPrice": 800,
       "createdAt": "2026-03-08T13:15:28.382Z",
-      "updatedAt": "2026-03-09T08:27:40.753Z"
+      "updatedAt": "2026-03-09T08:27:40.753Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "1085e5c8-4d75-463e-a9aa-4df8143a769f",
@@ -3648,7 +3662,8 @@
       "minPrice": 500,
       "maxPrice": 1500,
       "createdAt": "2026-03-08T13:16:15.450Z",
-      "updatedAt": "2026-03-09T08:53:34.664Z"
+      "updatedAt": "2026-03-09T08:53:34.664Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "ccf90c64-6da4-4829-9bc1-e23372a57935",
@@ -3728,7 +3743,7 @@
     {
       "id": "3e9e842d-bb68-41ac-9847-a636ad0478dc",
       "code": "AFB001",
-      "name": "AFB Sputum (Spot–Morning–Spot)",
+      "name": "AFB Sputum (Spot\u2013Morning\u2013Spot)",
       "category": "LAB",
       "price": 350,
       "unit": "UNIT",
@@ -3783,7 +3798,8 @@
       "minPrice": 500,
       "maxPrice": 1500,
       "createdAt": "2026-03-09T14:39:18.467Z",
-      "updatedAt": "2026-03-09T14:39:18.467Z"
+      "updatedAt": "2026-03-09T14:39:18.467Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "f2df68b0-a495-4522-8cfb-8380d35a35e8",
@@ -3858,7 +3874,8 @@
       "minPrice": 1000,
       "maxPrice": 5000,
       "createdAt": "2026-03-09T14:41:28.363Z",
-      "updatedAt": "2026-03-09T14:41:28.363Z"
+      "updatedAt": "2026-03-09T14:41:28.363Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "c8f3c3c1-2db6-4fe1-81c3-37be17b28a2e",
@@ -3873,7 +3890,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-03-09T14:42:39.604Z",
-      "updatedAt": "2026-03-09T14:42:39.604Z"
+      "updatedAt": "2026-03-09T14:42:39.604Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "47943387-97ef-430a-b95f-b9f9b91c4bc8",
@@ -3888,7 +3906,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-03-09T14:43:39.805Z",
-      "updatedAt": "2026-03-09T14:43:39.805Z"
+      "updatedAt": "2026-03-09T14:43:39.805Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "22f3992a-7bfb-414b-895f-87948433383c",
@@ -3903,7 +3922,8 @@
       "minPrice": 1500,
       "maxPrice": 5000,
       "createdAt": "2026-03-09T14:44:52.476Z",
-      "updatedAt": "2026-03-09T14:44:52.476Z"
+      "updatedAt": "2026-03-09T14:44:52.476Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "62d04e85-cc11-4f22-a64a-08b58935accd",
@@ -3918,7 +3938,8 @@
       "minPrice": 3500,
       "maxPrice": 8000,
       "createdAt": "2026-03-09T14:47:12.229Z",
-      "updatedAt": "2026-03-09T14:58:57.436Z"
+      "updatedAt": "2026-03-09T14:58:57.436Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "2a4a9bfd-0e32-4a9b-87d3-f9832c44e0d0",
@@ -3933,7 +3954,8 @@
       "minPrice": 2500,
       "maxPrice": 5000,
       "createdAt": "2026-03-09T14:45:54.822Z",
-      "updatedAt": "2026-03-09T14:59:27.084Z"
+      "updatedAt": "2026-03-09T14:59:27.084Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "2cbe8420-8b97-480e-bfd2-d440024d1d3b",
@@ -3993,7 +4015,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-05-16T07:02:56.193Z",
-      "updatedAt": "2026-05-16T07:02:56.193Z"
+      "updatedAt": "2026-05-16T07:02:56.193Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "d6b22240-5eb4-497f-82f8-7978c910d3c0",
@@ -4128,7 +4151,8 @@
       "minPrice": null,
       "maxPrice": null,
       "createdAt": "2026-03-11T12:51:47.016Z",
-      "updatedAt": "2026-03-11T12:51:47.016Z"
+      "updatedAt": "2026-03-11T12:51:47.016Z",
+      "procedureGroup": "SURGERY"
     },
     {
       "id": "cecb76e3-134c-47fc-a026-f8faae267c13",
@@ -168217,7 +168241,7 @@
       "isDeferred": false,
       "status": "PENDING",
       "billingType": "REGULAR",
-      "notes": "Dental services: Dental Bridge (×1) + Dental services: Dental Bridge (×1) + Dental services: Dental Cleaning (×1)",
+      "notes": "Dental services: Dental Bridge (\u00d71) + Dental services: Dental Bridge (\u00d71) + Dental services: Dental Cleaning (\u00d71)",
       "createdAt": "2026-05-17T19:25:17.514Z",
       "updatedAt": "2026-05-17T19:36:19.897Z"
     },
@@ -168232,7 +168256,7 @@
       "isDeferred": false,
       "status": "PENDING",
       "billingType": "REGULAR",
-      "notes": "Dental services: Dental Cleaning (×1), Dental Bridge (×1)",
+      "notes": "Dental services: Dental Cleaning (\u00d71), Dental Bridge (\u00d71)",
       "createdAt": "2026-05-17T20:26:57.565Z",
       "updatedAt": "2026-05-17T20:26:57.565Z"
     }
@@ -325889,7 +325913,7 @@
       "action": "PUT /api/admin/clinic-settings",
       "entity": "admin",
       "entityId": 0,
-      "details": "{\"name\":\"🚀 ZEMA MEDICAL CENTER\",\"tagline\":\"Your Health, Our Priority\"}",
+      "details": "{\"name\":\"\ud83d\ude80 ZEMA MEDICAL CENTER\",\"tagline\":\"Your Health, Our Priority\"}",
       "ip": "127.0.0.1",
       "userAgent": "curl/7.81.0",
       "createdAt": "2026-05-17T22:24:15.645Z"
@@ -329167,7 +329191,7 @@
       "action": "PUT /api/admin/clinic-settings",
       "entity": "admin",
       "entityId": 0,
-      "details": "{\"name\":\"🚀ZEMA MEDICAL CENTER\",\"tagline\":\"Your Health, Our Priority\"}",
+      "details": "{\"name\":\"\ud83d\ude80ZEMA MEDICAL CENTER\",\"tagline\":\"Your Health, Our Priority\"}",
       "ip": "127.0.0.1",
       "userAgent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:148.0) Gecko/20100101 Firefox/148.0",
       "createdAt": "2026-05-17T22:26:14.258Z"
@@ -330663,7 +330687,7 @@
       "action": "PUT /api/admin/clinic-settings",
       "entity": "admin",
       "entityId": 0,
-      "details": "{\"name\":\"🚀ZEMA MEDICAL CENTER\",\"tagline\":\"Your Health, Our Priority\"}",
+      "details": "{\"name\":\"\ud83d\ude80ZEMA MEDICAL CENTER\",\"tagline\":\"Your Health, Our Priority\"}",
       "ip": "127.0.0.1",
       "userAgent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:148.0) Gecko/20100101 Firefox/148.0",
       "createdAt": "2026-05-17T22:26:03.364Z"
@@ -338455,7 +338479,7 @@
     },
     {
       "id": "71c0f60a-fb2e-47dd-bbd0-938064f34093",
-      "name": "AFB Sputum (Spot–Morning–Spot)",
+      "name": "AFB Sputum (Spot\u2013Morning\u2013Spot)",
       "code": "AFB001",
       "category": "Microbiology",
       "description": "Acid-Fast Bacilli Sputum Examination - Three samples (Spot-Morning-Spot)",
@@ -338679,7 +338703,7 @@
       "name": "Blood Film (BF)",
       "code": "PICT001",
       "category": "Hematology",
-      "description": "PICT – Malaria test",
+      "description": "PICT \u2013 Malaria test",
       "price": 150,
       "unit": "UNIT",
       "groupId": null,
@@ -339397,7 +339421,7 @@
       "label": "MCV (fL)",
       "fieldType": "number",
       "unit": "fL",
-      "normalRange": "80–100",
+      "normalRange": "80\u2013100",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339411,7 +339435,7 @@
       "label": "MCH (pg)",
       "fieldType": "number",
       "unit": "pg",
-      "normalRange": "27–31",
+      "normalRange": "27\u201331",
       "options": null,
       "isRequired": true,
       "displayOrder": 2,
@@ -339425,7 +339449,7 @@
       "label": "MCHC (g/dL)",
       "fieldType": "number",
       "unit": "g/dL",
-      "normalRange": "32–36",
+      "normalRange": "32\u201336",
       "options": null,
       "isRequired": true,
       "displayOrder": 3,
@@ -339439,7 +339463,7 @@
       "label": "Reticulocyte Count (%)",
       "fieldType": "number",
       "unit": "%",
-      "normalRange": "0.5–2.5",
+      "normalRange": "0.5\u20132.5",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339453,7 +339477,7 @@
       "label": "Clotting Time (minutes)",
       "fieldType": "number",
       "unit": "min",
-      "normalRange": "2–8",
+      "normalRange": "2\u20138",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339467,7 +339491,7 @@
       "label": "Bleeding Time (minutes)",
       "fieldType": "number",
       "unit": "min",
-      "normalRange": "2–9",
+      "normalRange": "2\u20139",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339562,10 +339586,10 @@
       "id": "4978b214-d392-4026-9dc3-e7471b4a0139",
       "testId": "ec0979c0-90a0-4065-afc0-7720567ba00c",
       "fieldName": "value",
-      "label": "WBC Count (/µL)",
+      "label": "WBC Count (/\u00b5L)",
       "fieldType": "number",
-      "unit": "/µL",
-      "normalRange": "4,000–11,000",
+      "unit": "/\u00b5L",
+      "normalRange": "4,000\u201311,000",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339576,10 +339600,10 @@
       "id": "7d812945-8f03-483c-a961-28d8a3bf30b3",
       "testId": "246218b6-ce36-4afb-acae-889cc68fcfd0",
       "fieldName": "value",
-      "label": "Platelet Count (/µL)",
+      "label": "Platelet Count (/\u00b5L)",
       "fieldType": "number",
-      "unit": "/µL",
-      "normalRange": "150,000–450,000",
+      "unit": "/\u00b5L",
+      "normalRange": "150,000\u2013450,000",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339593,7 +339617,7 @@
       "label": "Neutrophils (%)",
       "fieldType": "number",
       "unit": "%",
-      "normalRange": "40–70",
+      "normalRange": "40\u201370",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339607,7 +339631,7 @@
       "label": "Lymphocytes (%)",
       "fieldType": "number",
       "unit": "%",
-      "normalRange": "20–40",
+      "normalRange": "20\u201340",
       "options": null,
       "isRequired": true,
       "displayOrder": 2,
@@ -339621,7 +339645,7 @@
       "label": "Monocytes (%)",
       "fieldType": "number",
       "unit": "%",
-      "normalRange": "2–8",
+      "normalRange": "2\u20138",
       "options": null,
       "isRequired": true,
       "displayOrder": 3,
@@ -339635,7 +339659,7 @@
       "label": "Eosinophils (%)",
       "fieldType": "number",
       "unit": "%",
-      "normalRange": "1–4",
+      "normalRange": "1\u20134",
       "options": null,
       "isRequired": true,
       "displayOrder": 4,
@@ -339649,7 +339673,7 @@
       "label": "Basophils (%)",
       "fieldType": "number",
       "unit": "%",
-      "normalRange": "0.5–1",
+      "normalRange": "0.5\u20131",
       "options": null,
       "isRequired": true,
       "displayOrder": 5,
@@ -339663,7 +339687,7 @@
       "label": "Hemoglobin (g/dL)",
       "fieldType": "number",
       "unit": "g/dL",
-      "normalRange": "M: 13.5–17.5, F: 12.0–15.5",
+      "normalRange": "M: 13.5\u201317.5, F: 12.0\u201315.5",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339674,10 +339698,10 @@
       "id": "a460779c-b3f6-460a-aa7a-89f5a6723d33",
       "testId": "79041707-e133-44da-ad4a-999aed280c02",
       "fieldName": "value",
-      "label": "RBC Count (million/µL)",
+      "label": "RBC Count (million/\u00b5L)",
       "fieldType": "number",
-      "unit": "million/µL",
-      "normalRange": "M: 4.5–5.9, F: 4.1–5.1",
+      "unit": "million/\u00b5L",
+      "normalRange": "M: 4.5\u20135.9, F: 4.1\u20135.1",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339708,7 +339732,7 @@
       "label": "Direct Bilirubin (mg/dL)",
       "fieldType": "number",
       "unit": "mg/dL",
-      "normalRange": "0.0–0.3",
+      "normalRange": "0.0\u20130.3",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339722,7 +339746,7 @@
       "label": "Total Bilirubin (mg/dL)",
       "fieldType": "number",
       "unit": "mg/dL",
-      "normalRange": "0.1–1.2",
+      "normalRange": "0.1\u20131.2",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339772,7 +339796,7 @@
       "label": "BUN (mg/dL)",
       "fieldType": "number",
       "unit": "mg/dL",
-      "normalRange": "7–20",
+      "normalRange": "7\u201320",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -339859,7 +339883,7 @@
       "label": "Total Protein (g/dL)",
       "fieldType": "number",
       "unit": "g/dL",
-      "normalRange": "6.0–8.3",
+      "normalRange": "6.0\u20138.3",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -340032,7 +340056,7 @@
       "label": "ALT (U/L)",
       "fieldType": "number",
       "unit": "U/L",
-      "normalRange": "7–56",
+      "normalRange": "7\u201356",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -340046,7 +340070,7 @@
       "label": "Creatinine (mg/dL)",
       "fieldType": "number",
       "unit": "mg/dL",
-      "normalRange": "M: 0.7–1.3, F: 0.6–1.1",
+      "normalRange": "M: 0.7\u20131.3, F: 0.6\u20131.1",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -340060,7 +340084,7 @@
       "label": "AST (U/L)",
       "fieldType": "number",
       "unit": "U/L",
-      "normalRange": "10–40",
+      "normalRange": "10\u201340",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -340636,7 +340660,7 @@
       "label": "Fasting Blood Glucose (mg/dL)",
       "fieldType": "number",
       "unit": "mg/dL",
-      "normalRange": "70–99",
+      "normalRange": "70\u201399",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -340807,7 +340831,7 @@
       "id": "082e2e4e-6929-4a7d-9652-1b664bca2369",
       "testId": "2ac46b62-4484-45db-ad1f-4587f0892bb2",
       "fieldName": "afb_day1",
-      "label": "AFB – Day 1",
+      "label": "AFB \u2013 Day 1",
       "fieldType": "select",
       "unit": null,
       "normalRange": null,
@@ -340827,7 +340851,7 @@
       "id": "de19ecea-026c-402e-96ba-c405fa72c790",
       "testId": "2ac46b62-4484-45db-ad1f-4587f0892bb2",
       "fieldName": "afb_day2",
-      "label": "AFB – Day 2",
+      "label": "AFB \u2013 Day 2",
       "fieldType": "select",
       "unit": null,
       "normalRange": null,
@@ -340847,7 +340871,7 @@
       "id": "d707cc67-865e-4f39-949e-b6cc02f1c316",
       "testId": "2ac46b62-4484-45db-ad1f-4587f0892bb2",
       "fieldName": "afb_day3",
-      "label": "AFB – Day 3",
+      "label": "AFB \u2013 Day 3",
       "fieldType": "select",
       "unit": null,
       "normalRange": null,
@@ -340901,7 +340925,7 @@
       "label": "Albumin (g/dL)",
       "fieldType": "number",
       "unit": "g/dL",
-      "normalRange": "3.5–5.0",
+      "normalRange": "3.5\u20135.0",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -341437,7 +341461,7 @@
       "label": "ALP (U/L)",
       "fieldType": "number",
       "unit": "U/L",
-      "normalRange": "44–147",
+      "normalRange": "44\u2013147",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,
@@ -341465,7 +341489,7 @@
       "label": "Uric Acid (mg/dL)",
       "fieldType": "number",
       "unit": "mg/dL",
-      "normalRange": "M: 3.4–7.0, F: 2.4–6.0",
+      "normalRange": "M: 3.4\u20137.0, F: 2.4\u20136.0",
       "options": null,
       "isRequired": true,
       "displayOrder": 1,

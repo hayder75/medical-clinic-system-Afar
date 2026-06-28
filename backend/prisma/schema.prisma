@@ -102,6 +102,7 @@ model Service {
   isVariablePrice         Boolean                  @default(false)
   minPrice                Float?
   maxPrice                Float?
+  procedureGroup          String?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   batchOrderServices      BatchOrderService[]
