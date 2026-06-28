@@ -514,14 +514,20 @@ exports.getQueue = async (req, res) => {
     });
 
     const filteredQueue = queue.filter(visit => {
-      // Check if visit already qualifies (paid consultation or IN_DOCTOR_QUEUE)
+      // Never show patients who haven't paid for card registration
+      if (visit.status === 'AWAITING_CARD_BILLING') {
+        console.log(`🔍 Visit ${visit.id} (status: AWAITING_CARD_BILLING) EXCLUDED - card not paid`);
+        return false;
+      }
+
+      const isInDoctorQueue = visit.status === 'IN_DOCTOR_QUEUE';
+
+      // Check if consultation is paid
       const hasPaidConsultation = visit.bills && visit.bills.some(bill =>
         bill.status === 'PAID' &&
         bill.services &&
         bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
       );
-
-      const isInDoctorQueue = visit.status === 'IN_DOCTOR_QUEUE';
 
       // Check if doctor has waived consultation fee
       const doctorHasWaiver = visit.assignment?.doctor?.waiveConsultationFee || false;
@@ -1023,6 +1029,9 @@ exports.getDashboardStats = async (req, res) => {
 
     // Filter using same logic as unified queue
     const waitingPatients = visitsWithAssignments.filter(visit => {
+      // Never show patients who haven't paid for card registration
+      if (visit.status === 'AWAITING_CARD_BILLING') return false;
+
       // Emergency patients always included
       if (visit.isEmergency) return true;
 
@@ -1703,6 +1712,12 @@ exports.getUnifiedQueue = async (req, res) => {
         if (queueFilter === 'sent' && sentStatuses.includes(visit.status)) {
           console.log(`🔍 Visit ${visit.id} included - is in sent queue (status: ${visit.status})`);
           return true;
+        }
+
+        // Never show patients who haven't paid for card registration
+        if (visit.status === 'AWAITING_CARD_BILLING') {
+          console.log(`🔍 Visit ${visit.id} EXCLUDED - AWAITING_CARD_BILLING (card not paid)`);
+          return false;
         }
 
         // Emergency patients always included
@@ -2456,6 +2471,8 @@ exports.getUnifiedQueue = async (req, res) => {
 
     // Filter by payment/waiver (same logic as unified queue)
     const qualifyingVisits = allQualifyingVisitsWithAssignments.filter(visit => {
+      // Never show patients who haven't paid for card registration
+      if (visit.status === 'AWAITING_CARD_BILLING') return false;
       if (visit.isEmergency) return true;
       if (visit.status === 'IN_DOCTOR_QUEUE') return true;
       const hasPaidConsultation = visit.bills && visit.bills.some(bill =>
