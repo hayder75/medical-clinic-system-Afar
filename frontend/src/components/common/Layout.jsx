@@ -398,11 +398,11 @@ const Layout = ({ children, title, subtitle }) => {
           <div className="flex items-center justify-between h-16 px-4 border-b flex-shrink-0" style={{ borderColor: 'var(--secondary)' }}>
             <div className="flex items-center">
               <img
-                src={window.__CS__?.logoUrl || '/clinic-logo.jpg'}
-                alt={`${window.__CS__?.name || 'Clinic'} Logo`}
+                src='/logo.jpg'
+                alt='Tena Lesew HMS Logo'
                 className="h-10 w-10 rounded-full object-cover border-2 border-white"
               />
-              <span className="ml-3 text-xl font-bold text-white hidden lg:inline">{window.__CS__?.name || 'Clinic'}</span>
+              <span className="ml-3 text-xl font-bold text-white hidden lg:inline">Tena Lesew HMS</span>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
