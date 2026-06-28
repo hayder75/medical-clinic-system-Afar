@@ -15,6 +15,8 @@ const LoginPage = () => {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -47,6 +49,15 @@ const LoginPage = () => {
       ...formData,
       username: user.username
     });
+  };
+
+  const formatUserLabel = (user) => {
+    if (user.role === 'DOCTOR') {
+      const prefix = user.fullname?.startsWith('Dr.') ? '' : 'Dr. ';
+      return `${prefix}${user.fullname || user.username}${user.specialty ? ` - ${user.specialty}` : ''}`;
+    }
+    if (user.role === 'ADMIN') return `${user.fullname || user.username} - 🔑 Admin`;
+    return `${user.fullname || user.username} - ${user.role}`;
   };
 
   const handleSubmit = async (e) => {
@@ -204,27 +215,57 @@ const LoginPage = () => {
                       Loading users...
                     </div>
                   ) : users.length > 0 ? (
-                    <select
-                      value={selectedUser?.id || ''}
-                      onChange={(e) => {
-                        const user = users.find(u => u.id === e.target.value);
-                        if (user) {
-                          handleSelectUser(user);
-                        } else {
-                          setSelectedUser(null);
-                          setFormData({ ...formData, username: '' });
-                        }
-                      }}
-                      className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-200 appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20strokeWidth%3D%222%22%20strokeLinecap%3D%22round%22%20strokeLinejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:20px] bg-[right_12px_center] bg-no-repeat"
-                      required
-                    >
-                      <option value="">-- Select your account --</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.fullname || user.username} {user.role === 'ADMIN' ? '- 🔑 Admin' : `- ${user.role}`}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowUserDropdown(!showUserDropdown)}
+                        className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-200 text-left flex items-center justify-between"
+                      >
+                        <span className={selectedUser ? 'text-sm text-slate-700' : 'text-sm text-slate-400'}>
+                          {selectedUser ? formatUserLabel(selectedUser) : '-- Select your account --'}
+                        </span>
+                        <svg className={`w-4 h-4 text-slate-400 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {showUserDropdown && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setShowUserDropdown(false)} />
+                          <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                            <div className="sticky top-0 bg-white border-b border-slate-100 px-3 py-2">
+                              <input
+                                type="text"
+                                placeholder="Search users..."
+                                value={userSearch}
+                                onChange={(e) => setUserSearch(e.target.value)}
+                                className="w-full px-3 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 outline-none focus:border-blue-400"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            {users
+                              .filter(u => !userSearch || (u.fullname || u.username).toLowerCase().includes(userSearch.toLowerCase()))
+                              .map((user) => (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  onClick={() => {
+                                    handleSelectUser(user);
+                                    setShowUserDropdown(false);
+                                    setUserSearch('');
+                                  }}
+                                  className={`w-full text-left px-4 py-2.5 text-xs hover:bg-blue-50 flex items-center justify-between transition-colors ${selectedUser?.id === user.id ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}
+                                >
+                                  <span className="font-medium">{formatUserLabel(user)}</span>
+                                  <span className="text-[10px] uppercase tracking-wider text-slate-400">{user.role === 'ADMIN' ? '🔑' : user.role === 'DOCTOR' ? '⚕' : user.role === 'NURSE' ? '💉' : user.role === 'LAB_TECHNICIAN' ? '🔬' : ''}</span>
+                                </button>
+                              ))}
+                            {users.filter(u => !userSearch || (u.fullname || u.username).toLowerCase().includes(userSearch.toLowerCase())).length === 0 && (
+                              <div className="px-4 py-3 text-xs text-slate-400 text-center">No users found</div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   ) : (
                     <input
                       name="username"
@@ -247,9 +288,9 @@ const LoginPage = () => {
                       </div>
                       <div>
                         <div className="text-sm font-medium text-slate-700">
-                          {selectedUser.fullname || selectedUser.username}
+                          {formatUserLabel(selectedUser)}
                         </div>
-                        <div className="text-xs text-blue-500/70">{selectedUser.role}</div>
+                        <div className="text-xs text-blue-500/70">{selectedUser.role === 'DOCTOR' ? (selectedUser.specialty || 'Doctor') : selectedUser.role}</div>
                       </div>
                     </div>
                   </div>
