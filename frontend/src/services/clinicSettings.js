@@ -8,7 +8,7 @@ const API_BASE = window.location.hostname === 'localhost' || window.location.hos
   : `${window.location.protocol}//${window.location.hostname}`;
 
 const DEFAULTS = {
-  name: 'Dawa Medical and Surgical Center',
+  name: 'Tena Lesew HMS',
   tagline: 'Quality Healthcare You Can Trust',
   logoUrl: '/clinic-logo.jpg'
 };
