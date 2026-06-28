@@ -272,8 +272,8 @@ const Layout = ({ children, title, subtitle }) => {
         return filterByRole([
           ...baseItems,
           { name: 'Patient Registration', href: '/nurse/register', icon: UserPlus, key: 'patientRegistration' },
-          { name: 'Patient Management', href: '/nurse/patients', icon: Users, key: 'patientManagement' },
           { name: 'Triage Queue', href: '/nurse/queue', icon: Stethoscope, key: 'triageQueue' },
+          { name: 'Patient Management', href: '/nurse/patients', icon: Users, key: 'patientManagement' },
           { name: 'Bed & Admissions', href: '/nurse/admissions', icon: Bed, key: 'admissions' },
           { name: 'Daily Tasks', href: '/nurse/tasks', icon: Calendar, key: 'dailyTasks' },
           { name: 'Walk-in Services', href: '/nurse/walk-in-services', icon: UserPlus, key: 'walkInServices' },

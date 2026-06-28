@@ -51,8 +51,8 @@ const ROLE_SIDEBAR_ITEMS = {
   NURSE: [
     { key: 'dashboard', label: 'Dashboard', href: '/' },
     { key: 'patientRegistration', label: 'Patient Registration', href: '/nurse/register' },
-    { key: 'patientManagement', label: 'Patient Management', href: '/nurse/patients' },
     { key: 'triageQueue', label: 'Triage Queue', href: '/nurse/queue' },
+    { key: 'patientManagement', label: 'Patient Management', href: '/nurse/patients' },
     { key: 'admissions', label: 'Bed & Admissions', href: '/nurse/admissions' },
     { key: 'dailyTasks', label: 'Daily Tasks', href: '/nurse/tasks' },
     { key: 'walkInServices', label: 'Walk-in Services', href: '/nurse/walk-in-services' },
