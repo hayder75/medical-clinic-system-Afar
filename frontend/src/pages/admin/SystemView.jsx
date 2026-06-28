@@ -50,6 +50,8 @@ const ROLE_SIDEBAR_ITEMS = {
   ],
   NURSE: [
     { key: 'dashboard', label: 'Dashboard', href: '/' },
+    { key: 'patientRegistration', label: 'Patient Registration', href: '/nurse/register' },
+    { key: 'patientManagement', label: 'Patient Management', href: '/nurse/patients' },
     { key: 'triageQueue', label: 'Triage Queue', href: '/nurse/queue' },
     { key: 'admissions', label: 'Bed & Admissions', href: '/nurse/admissions' },
     { key: 'dailyTasks', label: 'Daily Tasks', href: '/nurse/tasks' },
@@ -60,8 +62,6 @@ const ROLE_SIDEBAR_ITEMS = {
     { key: 'gallery', label: 'Patient Gallery', href: '/nurse/gallery' },
     { key: 'appointments', label: 'Appointments', href: '/nurse/appointments' },
     { key: 'loans', label: 'Loans', href: '/loans' },
-    { key: 'patientRegistration', label: 'Patient Registration', href: '/nurse/register' },
-    { key: 'patientManagement', label: 'Patient Management', href: '/nurse/patients' },
   ],
   RECEPTIONIST: [
     { key: 'dashboard', label: 'Dashboard', href: '/' },

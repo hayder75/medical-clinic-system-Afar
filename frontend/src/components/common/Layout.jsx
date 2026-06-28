@@ -271,6 +271,8 @@ const Layout = ({ children, title, subtitle }) => {
       case 'NURSE':
         return filterByRole([
           ...baseItems,
+          { name: 'Patient Registration', href: '/nurse/register', icon: UserPlus, key: 'patientRegistration' },
+          { name: 'Patient Management', href: '/nurse/patients', icon: Users, key: 'patientManagement' },
           { name: 'Triage Queue', href: '/nurse/queue', icon: Stethoscope, key: 'triageQueue' },
           { name: 'Bed & Admissions', href: '/nurse/admissions', icon: Bed, key: 'admissions' },
           { name: 'Daily Tasks', href: '/nurse/tasks', icon: Calendar, key: 'dailyTasks' },
@@ -280,16 +282,6 @@ const Layout = ({ children, title, subtitle }) => {
           { name: 'Family Planning', href: '/nurse/family-planning', icon: Users, key: 'familyPlanning' },
           { name: 'Patient Gallery', href: '/nurse/gallery', icon: Image, key: 'gallery' },
           { name: 'Appointments', href: '/nurse/appointments', icon: Clock, key: 'appointments' },
-          {
-            name: 'Patient Management',
-            icon: Users,
-            group: 'nurse_patient_mgmt',
-            key: 'patientManagement',
-            children: [
-              { name: 'Patient Registration', href: '/nurse/register', icon: UserPlus, key: 'patientRegistration' },
-              { name: 'Patient Management', href: '/nurse/patients', icon: Users, key: 'patientManagement' },
-            ]
-          },
           { name: 'Loans', href: '/loans', icon: DollarSign, key: 'loans' },
         ]);
 
