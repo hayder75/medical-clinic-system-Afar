@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ShoppingCart, CreditCard, Package, Search, User, Phone, Mail, Eye, Printer } from 'lucide-react';
+import { Plus, ShoppingCart, CreditCard, Package, Search, User, Phone, Mail, Eye, Printer, Calendar } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -13,6 +13,7 @@ const WalkInSales = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [medicineSearchTerm, setMedicineSearchTerm] = useState('');
 
   const [saleData, setSaleData] = useState({
@@ -76,7 +77,7 @@ const WalkInSales = () => {
 
   useEffect(() => {
     fetchSales();
-  }, [statusFilter, debouncedSearchTerm]);
+  }, [statusFilter, debouncedSearchTerm, selectedDate]);
 
   const fetchSales = async () => {
     try {
@@ -88,6 +89,10 @@ const WalkInSales = () => {
       }
       if (debouncedSearchTerm) {
         params.append('search', debouncedSearchTerm);
+      }
+      if (selectedDate) {
+        params.append('dateFrom', `${selectedDate}T00:00:00.000Z`);
+        params.append('dateTo', `${selectedDate}T23:59:59.999Z`);
       }
       const response = await api.get(`/pharmacy-billing/invoices?${params.toString()}`);
       const allInvoices = response.data.invoices || [];
@@ -153,10 +158,6 @@ const WalkInSales = () => {
 
   const handleCreateSale = async () => {
     try {
-      if (!saleData.customerName.trim()) {
-        toast.error('Please enter customer name');
-        return;
-      }
       if (saleData.pharmacyInvoiceItems.length === 0) {
         toast.error('Please add at least one item');
         return;
@@ -165,7 +166,7 @@ const WalkInSales = () => {
       setLoading(true);
       await api.post('/pharmacy-billing/invoices', {
         type: 'WALK_IN_SALE',
-        customerName: saleData.customerName,
+        customerName: saleData.customerName || 'Walk-in Customer',
         customerPhone: saleData.customerPhone,
         items: saleData.pharmacyInvoiceItems.map(item => ({
           medicationCatalogId: item.medicationCatalogId,
@@ -302,23 +303,25 @@ const WalkInSales = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Walk-in Sales</h2>
-          <p className="text-gray-600">Manage over-the-counter and external prescription sales</p>
+      <div className="sticky top-0 z-10 bg-gray-100 pb-2">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Walk-in Sales</h2>
+            <p className="text-gray-600">Manage over-the-counter and external prescription sales</p>
+          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn btn-primary"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            New Sale
+          </button>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="btn btn-primary"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          New Sale
-        </button>
       </div>
 
       {/* Filters */}
-      <div className="card">
-        <div className="flex space-x-4">
+      <div className="card sticky top-16 z-10">
+        <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -330,6 +333,15 @@ const WalkInSales = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-gray-400 shrink-0" />
+            <input
+              type="date"
+              className="input"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
           </div>
           <select
             className="input"
@@ -410,34 +422,6 @@ const WalkInSales = () => {
           <div className="modal-box max-w-4xl">
             <h3 className="text-lg font-bold mb-4">Create Walk-in Sale</h3>
             
-            {/* Customer Information */}
-            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="label">
-                  <span className="label-text">Customer Name *</span>
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  value={saleData.customerName}
-                  onChange={(e) => setSaleData(prev => ({ ...prev, customerName: e.target.value }))}
-                  placeholder="Enter customer name"
-                />
-              </div>
-              <div>
-                <label className="label">
-                  <span className="label-text">Phone (Optional)</span>
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  value={saleData.customerPhone}
-                  onChange={(e) => setSaleData(prev => ({ ...prev, customerPhone: e.target.value }))}
-                  placeholder="Phone number"
-                />
-              </div>
-            </div>
-
             {/* Add Item Form */}
             <div className="border rounded-lg p-4 mb-4">
               <h4 className="font-medium mb-3">Add Medication</h4>
@@ -638,7 +622,7 @@ const WalkInSales = () => {
               <button
                 onClick={handleCreateSale}
                 className="btn btn-primary"
-                disabled={loading || saleData.pharmacyInvoiceItems.length === 0 || !saleData.customerName.trim()}
+                disabled={loading || saleData.pharmacyInvoiceItems.length === 0}
               >
                 {loading ? 'Processing...' : 'Create Sale & Process Payment'}
               </button>
