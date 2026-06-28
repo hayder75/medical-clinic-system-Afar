@@ -6,25 +6,60 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
 
+  const compressImage = (file, maxDimension = 1024, quality = 0.7) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let { width, height } = img;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = (maxDimension / width) * height;
+              width = maxDimension;
+            } else {
+              width = (maxDimension / height) * width;
+              height = maxDimension;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            const compressedReader = new FileReader();
+            compressedReader.onloadend = () => resolve(compressedReader.result);
+            compressedReader.readAsDataURL(blob);
+          }, 'image/jpeg', quality);
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     
-    files.forEach(file => {
+    Promise.all(files.map(async (file) => {
       if (file && file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const newImage = {
-            id: Date.now() + Math.random(),
-            data: reader.result, // base64
-            name: file.name,
-            type: file.type
-          };
-          const updatedImages = [...images, newImage];
-          setImages(updatedImages);
-          onImagesChange(updatedImages);
+        const data = await compressImage(file);
+        return {
+          id: Date.now() + Math.random(),
+          data,
+          name: file.name,
+          type: 'image/jpeg'
         };
-        reader.readAsDataURL(file);
       }
+      return null;
+    })).then(newImages => {
+      const valid = newImages.filter(Boolean);
+      const updatedImages = [...images, ...valid];
+      setImages(updatedImages);
+      onImagesChange(updatedImages);
     });
 
     // Reset input
