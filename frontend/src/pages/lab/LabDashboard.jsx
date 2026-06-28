@@ -21,15 +21,12 @@ const LabDashboard = () => {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/labs/orders');
+      const response = await api.get('/labs/orders', { params: { status: 'ALL' } });
       
       // Get all lab orders from different sources
       const batchOrders = response.data.batchOrders || [];
       const walkInOrders = response.data.walkInOrders || [];
-      const labTestOrderGroups = response.data.labTestOrders || [];
-      
-      // Extract individual orders from labTestOrderGroups (each group has an orders array)
-      const labTestOrders = labTestOrderGroups.flatMap(group => group.orders || []);
+      const labTestOrders = response.data.labTestOrders || [];
       
       // Combine all orders for counting
       const allOrders = [
