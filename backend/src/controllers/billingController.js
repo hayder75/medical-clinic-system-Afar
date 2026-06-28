@@ -1272,12 +1272,15 @@ exports.processPayment = async (req, res) => {
         data: { status: 'PAID' }
       });
 
-      // Notify doctors that a billing was paid (queue may have new patients)
-      try {
-        const io = getIO();
-        io.to('role:DOCTOR').emit('queue:visit-update', { billingId: billing.id, visitId: billing.visitId });
-      } catch (wsErr) {
-        console.error('[WS] Failed to emit queue:visit-update:', wsErr.message);
+      // Notify doctors if this billing has consultation services (patient becomes visible in queue)
+      const hasConsultation = billing.services?.some(bs => bs.service?.category === 'CONSULTATION');
+      if (hasConsultation) {
+        try {
+          const io = getIO();
+          io.to('role:DOCTOR').emit('queue:visit-update', { billingId: billing.id, visitId: billing.visitId });
+        } catch (wsErr) {
+          console.error('[WS] Failed to emit queue:visit-update:', wsErr.message);
+        }
       }
 
       // Auto-process any transfer linked to this billing
