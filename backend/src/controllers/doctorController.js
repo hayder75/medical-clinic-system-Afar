@@ -514,15 +514,30 @@ exports.getQueue = async (req, res) => {
     });
 
     const filteredQueue = queue.filter(visit => {
-      // Include if: doctor assigned (nurse assigned this patient) OR already in doctor's queue
-      const hasAssignment = !!visit.assignment;
+      // Check if visit already qualifies (paid consultation or IN_DOCTOR_QUEUE)
+      const hasPaidConsultation = visit.bills && visit.bills.some(bill =>
+        bill.status === 'PAID' &&
+        bill.services &&
+        bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
+      );
+
       const isInDoctorQueue = visit.status === 'IN_DOCTOR_QUEUE';
-      const shouldInclude = hasAssignment || isInDoctorQueue;
+
+      // Check if doctor has waived consultation fee
+      const doctorHasWaiver = visit.assignment?.doctor?.waiveConsultationFee || false;
+
+      // Include if: paid consultation OR in doctor queue OR doctor has waiver
+      const shouldInclude = hasPaidConsultation || isInDoctorQueue || doctorHasWaiver;
 
       if (!shouldInclude) {
-        console.log(`🔍 Visit ${visit.id} (status: ${visit.status}, assignmentId: ${visit.assignmentId}) EXCLUDED - no doctor assignment`);
+        console.log(`🔍 Visit ${visit.id} (status: ${visit.status}, assignmentId: ${visit.assignmentId}) EXCLUDED - no paid consultation (${hasPaidConsultation}), not IN_DOCTOR_QUEUE (${isInDoctorQueue}), and no waiver (${doctorHasWaiver})`);
+        if (visit.assignment) {
+          console.log(`   Assignment found: doctorId=${visit.assignment.doctorId}, waiver=${visit.assignment.doctor?.waiveConsultationFee}`);
+        } else {
+          console.log(`   No assignment found for visit ${visit.id}`);
+        }
       } else {
-        console.log(`✅ Visit ${visit.id} (status: ${visit.status}) INCLUDED - hasAssignment: ${hasAssignment}, IN_DOCTOR_QUEUE: ${isInDoctorQueue}`);
+        console.log(`✅ Visit ${visit.id} (status: ${visit.status}) INCLUDED - paid: ${hasPaidConsultation}, IN_DOCTOR_QUEUE: ${isInDoctorQueue}, waiver: ${doctorHasWaiver}`);
       }
 
       return shouldInclude;
@@ -1014,8 +1029,17 @@ exports.getDashboardStats = async (req, res) => {
       // IN_DOCTOR_QUEUE status always included
       if (visit.status === 'IN_DOCTOR_QUEUE') return true;
 
-      // Include if doctor is assigned (nurse assigned this patient)
-      return !!visit.assignment;
+      // Check if consultation is paid
+      const hasPaidConsultation = visit.bills && visit.bills.some(bill =>
+        bill.status === 'PAID' &&
+        bill.services &&
+        bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
+      );
+
+      // Check if doctor has waived consultation
+      const doctorHasWaiver = visit.assignment?.doctor?.waiveConsultationFee || false;
+
+      return hasPaidConsultation || doctorHasWaiver;
     }).length;
 
     // Completed Today - visits completed today by this doctor
@@ -1669,18 +1693,15 @@ exports.getUnifiedQueue = async (req, res) => {
       }
     }
 
-    // Filter visits: include any patient assigned to this doctor by the nurse
-    // (regardless of billing status). Sent/returned/completed are handled by queueFilter.
+    // Filter visits: emergency OR paid consultation OR doctor waived consultation
+    // Also include patients with WAITING_FOR_NURSE_SERVICE status if they have a waived doctor assigned
+    // IMPORTANT: For 'sent' filter, include ALL sent status visits (they're already sent, payment not required)
+    // For 'main' filter, we need to ensure they're not in sent statuses (already filtered) and have payment/waiver
     const filteredVisits = visitsWithAssignments.filter(visit => {
       try {
-        // For 'sent' queue, include ALL visits with sent statuses
+        // For 'sent' queue, include ALL visits with sent statuses (they're already sent)
         if (queueFilter === 'sent' && sentStatuses.includes(visit.status)) {
           console.log(`🔍 Visit ${visit.id} included - is in sent queue (status: ${visit.status})`);
-          return true;
-        }
-
-        // For 'returned' queue, include all returned statuses
-        if (queueFilter === 'returned' && returnedStatuses.includes(visit.status)) {
           return true;
         }
 
@@ -1690,24 +1711,45 @@ exports.getUnifiedQueue = async (req, res) => {
           return true;
         }
 
-        // IN_DOCTOR_QUEUE status means doctor is already working on patient - always include
-        if (visit.status === 'IN_DOCTOR_QUEUE') {
-          console.log(`🔍 Including visit ${visit.id} with IN_DOCTOR_QUEUE status`);
+        // Check if consultation is paid
+        const hasPaidConsultation = visit.bills && visit.bills.some(bill =>
+          bill.status === 'PAID' &&
+          bill.services &&
+          bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
+        );
+
+        // Check if doctor has waived consultation
+        // Handle case where assignment might be null
+        let doctorHasWaiver = false;
+        if (visit.assignment && visit.assignment.doctor) {
+          doctorHasWaiver = visit.assignment.doctor.waiveConsultationFee || false;
+        }
+
+        // If patient has WAITING_FOR_NURSE_SERVICE status and doctor has waiver, include them
+        // This handles the case where services were assigned first, then doctor was assigned
+        if (visit.status === 'WAITING_FOR_NURSE_SERVICE' && doctorHasWaiver) {
+          console.log(`🔍 Including visit ${visit.id} with WAITING_FOR_NURSE_SERVICE status - doctor has waiver`);
           return true;
         }
 
-        // Include if doctor is assigned (nurse assigned this patient to this doctor)
-        const hasAssignment = !!visit.assignment;
-        if (!hasAssignment) {
-          console.log(`🔍 Visit ${visit.id} (status: ${visit.status}) EXCLUDED - no doctor assignment`);
-        } else {
-          console.log(`🔍 Visit ${visit.id} (status: ${visit.status}) INCLUDED - doctor assigned`);
+        // IN_DOCTOR_QUEUE status means doctor is already working on patient - always include
+        // This ensures patients don't disappear from main queue when doctor is actively working
+        if (visit.status === 'IN_DOCTOR_QUEUE') {
+          console.log(`🔍 Including visit ${visit.id} with IN_DOCTOR_QUEUE status - doctor is working on patient`);
+          return true;
         }
 
-        return hasAssignment;
+        const included = hasPaidConsultation || doctorHasWaiver;
+        if (!included) {
+          console.log(`🔍 Visit ${visit.id} (status: ${visit.status}) EXCLUDED - no paid consultation (${hasPaidConsultation}) and no waiver (${doctorHasWaiver})`);
+        } else {
+          console.log(`🔍 Visit ${visit.id} (status: ${visit.status}) INCLUDED - hasPaidConsultation: ${hasPaidConsultation}, doctorHasWaiver: ${doctorHasWaiver}`);
+        }
+
+        return included;
       } catch (filterError) {
         console.error('Error filtering visit:', visit.id, filterError);
-        return false;
+        return false; // Exclude visits that cause errors
       }
     });
 
@@ -2412,11 +2454,17 @@ exports.getUnifiedQueue = async (req, res) => {
       };
     });
 
-    // Include all visits with a doctor assignment (regardless of billing status)
+    // Filter by payment/waiver (same logic as unified queue)
     const qualifyingVisits = allQualifyingVisitsWithAssignments.filter(visit => {
       if (visit.isEmergency) return true;
       if (visit.status === 'IN_DOCTOR_QUEUE') return true;
-      return !!visit.assignment;
+      const hasPaidConsultation = visit.bills && visit.bills.some(bill =>
+        bill.status === 'PAID' &&
+        bill.services &&
+        bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
+      );
+      const doctorHasWaiver = visit.assignment?.doctor?.waiveConsultationFee || false;
+      return hasPaidConsultation || doctorHasWaiver;
     });
 
     // Main queue: qualifying visits NOT in sent or returned statuses
