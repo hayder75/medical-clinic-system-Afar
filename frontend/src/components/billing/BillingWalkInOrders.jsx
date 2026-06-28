@@ -132,7 +132,7 @@ const BillingWalkInOrders = () => {
         const tests = [];
         Object.entries(organizedTests).forEach(([cat, data]) => {
             data.panels?.forEach(panel => {
-                panel.tests?.forEach(t => tests.push({ ...t, cat, groupName: panel.name }));
+                panel.tests?.forEach(t => tests.push({ ...t, cat, groupName: panel.name, panelPrice: panel.price }));
             });
             data.standalone?.forEach(t => tests.push({ ...t, cat }));
         });
@@ -207,9 +207,29 @@ const BillingWalkInOrders = () => {
     };
 
     const selectedTests = activeTab === 'lab' ? getSelectedLabTests() : getSelectedRadiologyTypes();
-    const totalPrice = selectedTests.reduce((sum, test) => sum + (test.price || 0), 0);
 
-    const renderTestCheckbox = (test) => {
+    const totalPrice = useMemo(() => {
+        if (activeTab !== 'lab') {
+            return selectedTests.reduce((sum, test) => sum + (test.price || 0), 0);
+        }
+        const panelPrices = {};
+        let total = 0;
+        Object.values(organizedTests).forEach(category => {
+            category.panels?.forEach(panel => {
+                const hasSelected = panel.tests?.some(t => selectedTestIds.has(t.id));
+                if (hasSelected && !panelPrices[panel.id]) {
+                    panelPrices[panel.id] = panel.price || 0;
+                }
+            });
+            category.standalone?.forEach(test => {
+                if (selectedTestIds.has(test.id)) total += (test.price || 0);
+            });
+        });
+        Object.values(panelPrices).forEach(p => total += p);
+        return total;
+    }, [activeTab, selectedTests, organizedTests, selectedTestIds]);
+
+    const renderTestCheckbox = (test, panelPrice) => {
         const sel = selectedTestIds.has(test.id);
         return (
             <label key={test.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors bg-white ${sel ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
@@ -217,7 +237,9 @@ const BillingWalkInOrders = () => {
                 <div className="flex-1 min-w-0 flex items-center gap-2">
                     <span className={`text-sm ${sel ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>{test.name}</span>
                 </div>
-                <span className="text-xs text-gray-500 flex-shrink-0">{test.price ? `${test.price.toLocaleString()} ETB` : '-'}</span>
+                <span className="text-xs text-gray-500 flex-shrink-0">
+                    {panelPrice ? `${panelPrice.toLocaleString()} ETB` : test.price ? `${test.price.toLocaleString()} ETB` : '-'}
+                </span>
             </label>
         );
     };
@@ -270,7 +292,7 @@ const BillingWalkInOrders = () => {
                     {(hasPanels || hasStandalone) ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 rounded-xl overflow-hidden">
                             {data.panels?.map(p =>
-                                p.tests?.map(t => renderTestCheckbox(t))
+                                p.tests?.map(t => renderTestCheckbox(t, p.price))
                             )}
                             {data.standalone?.map(t => renderTestCheckbox(t))}
                         </div>
@@ -288,7 +310,7 @@ const BillingWalkInOrders = () => {
                 <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
                     <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm font-semibold text-gray-700">Search Results ({filteredLabTests.length})</div>
                     <div className="p-2 max-h-[500px] overflow-y-auto">
-                        {filteredLabTests.length === 0 ? <div className="text-center py-8 text-gray-400 text-sm">No matches</div> : filteredLabTests.map(t => renderTestCheckbox(t))}
+                        {filteredLabTests.length === 0 ? <div className="text-center py-8 text-gray-400 text-sm">No matches</div> : filteredLabTests.map(t => renderTestCheckbox(t, t.panelPrice))}
                     </div>
                 </div>
             );
@@ -473,6 +495,9 @@ const BillingWalkInOrders = () => {
                                             <span>Total</span>
                                             <span>{totalPrice.toLocaleString()} ETB</span>
                                         </div>
+                                    )}
+                                    {activeTab === 'lab' && selectedTests.some(t => t.panelId) && (
+                                        <div className="text-xs text-blue-600 text-center">Panel price charged once per panel</div>
                                     )}
                                 </div>
                             </div>
