@@ -21,7 +21,9 @@ const ServiceCatalog = () => {
     isVariablePrice: false,
     minPrice: '',
     maxPrice: '',
-    procedureGroup: ''
+    procedureGroup: '',
+    labGroup: '',
+    radiologyGroup: ''
   });
   const [codeGenerated, setCodeGenerated] = useState(false);
   const [labPricing, setLabPricing] = useState({ panels: [], standalone: [] });
@@ -202,6 +204,8 @@ const ServiceCatalog = () => {
         minPrice: formData.isVariablePrice ? parseFloat(formData.minPrice) : null,
         maxPrice: formData.isVariablePrice ? parseFloat(formData.maxPrice) : null,
         procedureGroup: formData.procedureGroup || null,
+        labGroup: formData.labGroup || null,
+        radiologyGroup: formData.radiologyGroup || null,
       };
 
       if (editingService) {
@@ -224,7 +228,10 @@ const ServiceCatalog = () => {
         isActive: true,
         isVariablePrice: false,
         minPrice: '',
-        maxPrice: ''
+        maxPrice: '',
+        procedureGroup: '',
+        labGroup: '',
+        radiologyGroup: ''
       });
       fetchServices();
     } catch (error) {
@@ -246,7 +253,9 @@ const ServiceCatalog = () => {
       isVariablePrice: service.isVariablePrice || false,
                     minPrice: service.minPrice?.toString() || '',
                     maxPrice: service.maxPrice?.toString() || '',
-                    procedureGroup: service.procedureGroup || ''
+                    procedureGroup: service.procedureGroup || '',
+                    labGroup: service.labGroup || '',
+                    radiologyGroup: service.radiologyGroup || ''
     });
     setShowModal(true);
   };
@@ -309,7 +318,9 @@ const ServiceCatalog = () => {
               isVariablePrice: false,
               minPrice: '',
               maxPrice: '',
-              procedureGroup: ''
+              procedureGroup: '',
+              labGroup: '',
+              radiologyGroup: ''
             });
             setShowModal(true);
             setCodeGenerated(true);
@@ -642,6 +653,45 @@ const ServiceCatalog = () => {
                         <option value="GYNECOLOGY">Gynecology</option>
                         <option value="SURGERY">Surgery</option>
                         <option value="ORTHOPEDIC">Orthopedic</option>
+                        <option value="OTHER">Other</option>
+                      </select>
+                    </div>
+                  )}
+                  {formData.category === 'LAB' && (
+                    <div>
+                      <label className="label text-lg">Lab Group</label>
+                      <select
+                        className="input text-lg"
+                        value={formData.labGroup}
+                        onChange={(e) => setFormData({ ...formData, labGroup: e.target.value })}
+                      >
+                        <option value="">Select group...</option>
+                        <option value="HEMATOLOGY">Hematology</option>
+                        <option value="CHEMISTRY">Chemistry</option>
+                        <option value="SEROLOGY">Serology</option>
+                        <option value="MICROBIOLOGY">Microbiology</option>
+                        <option value="URINALYSIS">Urinalysis</option>
+                        <option value="PARASITOLOGY">Parasitology</option>
+                        <option value="OTHER">Other</option>
+                      </select>
+                    </div>
+                  )}
+                  {formData.category === 'RADIOLOGY' && (
+                    <div>
+                      <label className="label text-lg">Radiology Group</label>
+                      <select
+                        className="input text-lg"
+                        value={formData.radiologyGroup}
+                        onChange={(e) => setFormData({ ...formData, radiologyGroup: e.target.value })}
+                      >
+                        <option value="">Select group...</option>
+                        <option value="XRAY">X-Ray</option>
+                        <option value="ULTRASOUND">Ultrasound</option>
+                        <option value="CT_SCAN">CT Scan</option>
+                        <option value="MRI">MRI</option>
+                        <option value="MAMMOGRAPHY">Mammography</option>
+                        <option value="FLUOROSCOPY">Fluoroscopy</option>
+                        <option value="OTHER">Other</option>
                       </select>
                     </div>
                   )}
@@ -746,7 +796,9 @@ const ServiceCatalog = () => {
                         isVariablePrice: false,
                         minPrice: '',
                         maxPrice: '',
-                        procedureGroup: ''
+                        procedureGroup: '',
+                        labGroup: '',
+                        radiologyGroup: ''
                       });
                     }}
                     className="btn btn-secondary text-lg px-6 py-2"

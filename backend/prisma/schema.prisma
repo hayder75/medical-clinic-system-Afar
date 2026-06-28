@@ -103,6 +103,8 @@ model Service {
   minPrice                Float?
   maxPrice                Float?
   procedureGroup          String?
+  labGroup                String?
+  radiologyGroup          String?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   batchOrderServices      BatchOrderService[]

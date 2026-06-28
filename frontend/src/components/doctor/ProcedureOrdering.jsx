@@ -3,8 +3,8 @@ import { Activity, CheckCircle, Clock, Plus, Trash2, ShieldCheck, AlertCircle, C
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-const CATEGORIES = ['GYNECOLOGY', 'SURGERY', 'ORTHOPEDIC'];
-const CATEGORY_LABELS = { GYNECOLOGY: 'Gynecology', SURGERY: 'Surgery', ORTHOPEDIC: 'Orthopedic' };
+const CATEGORIES = ['GYNECOLOGY', 'SURGERY', 'ORTHOPEDIC', 'OTHER'];
+const CATEGORY_LABELS = { GYNECOLOGY: 'Gynecology', SURGERY: 'Surgery', ORTHOPEDIC: 'Orthopedic', OTHER: 'Other' };
 
 const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
     const [services, setServices] = useState([]);
@@ -426,11 +426,11 @@ const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 7 0 0114 00 7 z" />
                                     </svg>
                                 </div>
-                                <span className="text-xs text-gray-500 ml-2">{services.filter(s => !activeGroup || s.procedureGroup === activeGroup).length} items</span>
+                                <span className="text-xs text-gray-500 ml-2">{services.filter(s => !activeGroup || (s.procedureGroup || 'OTHER') === activeGroup).length} items</span>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                 {services
-                                    .filter(s => !activeGroup || s.procedureGroup === activeGroup)
+                                    .filter(s => !activeGroup || (s.procedureGroup || 'OTHER') === activeGroup)
                                     .filter(s => !searchTerm || s.name.toLowerCase().includes(searchTerm.toLowerCase()))
                                     .map((service) => {
                                         const isSelected = selectedServices.some(s => s.id === service.id);
@@ -471,7 +471,7 @@ const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
                                             </div>
                                         );
                                     })}
-                                {services.filter(s => !activeGroup || s.procedureGroup === activeGroup).filter(s => !searchTerm || s.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                                {services.filter(s => !activeGroup || (s.procedureGroup || 'OTHER') === activeGroup).filter(s => !searchTerm || s.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
                                     <div className="col-span-full py-8 text-center bg-gray-50 rounded-xl border border-dashed border-gray-200">
                                         <Activity className="h-6 w-6 text-gray-300 mx-auto mb-1" />
                                         <p className="text-gray-500 text-sm">No procedures in this category.</p>
