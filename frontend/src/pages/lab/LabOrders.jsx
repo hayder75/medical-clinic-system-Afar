@@ -659,6 +659,24 @@ const LabOrders = () => {
   const handleServiceClick = (serviceId, isPanel = false) => {
     if (isPanel) {
       setSelectedService('panel_' + serviceId);
+      const group = panelGroupData[serviceId];
+      if (group && !labImages['panel_' + serviceId]) {
+        const storedImages = [];
+        group.entries.forEach(oid => {
+          const r = testResults[oid];
+          if (r?.results?._images?.length) {
+            r.results._images.forEach(img => {
+              const key = img.data || img.url || img;
+              if (key && !storedImages.some(x => (x.data || x.url || x) === key)) {
+                storedImages.push(img);
+              }
+            });
+          }
+        });
+        if (storedImages.length > 0) {
+          setLabImages(prev => ({ ...prev, ['panel_' + serviceId]: storedImages }));
+        }
+      }
     } else {
       setSelectedService(serviceId);
     }
@@ -1370,11 +1388,12 @@ const LabOrders = () => {
           for (const [oid, r] of Object.entries(testResults)) {
             if (r.labTest?.group?.id === pid && r.orderId && r.labTestId) {
               skipOrderIds.add(oid);
-              try {
-                await api.post('/labs/results/lab-test', {
-                  orderId: r.orderId,
-                  labTestId: r.labTestId,
-                  results: { ...r.results, _images: panelImgs },
+                try {
+                  const storedImgs = r.results?._images || [];
+                  await api.post('/labs/results/lab-test', {
+                    orderId: r.orderId,
+                    labTestId: r.labTestId,
+                    results: { ...r.results, _images: panelImgs.length ? panelImgs : storedImgs },
                   additionalNotes: r.additionalNotes || '',
                   finalize: true
                 });
