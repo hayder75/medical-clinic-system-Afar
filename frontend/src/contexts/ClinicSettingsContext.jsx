@@ -10,7 +10,6 @@ export function ClinicSettingsProvider({ children }) {
   useEffect(() => {
     loadClinicSettings().then(s => {
       setSettings(s);
-      document.title = s?.name || 'Medical Clinic';
       setLoading(false);
     });
   }, []);
