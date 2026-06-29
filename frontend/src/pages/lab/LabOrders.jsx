@@ -223,12 +223,16 @@ const LabOrders = () => {
 
       if (response.data && response.data.detailedResults) {
         response.data.detailedResults.forEach(result => {
+          const storedImages = result.results?._images || [];
           existingResults[result.templateId] = {
-            results: { ...result.results, _images: labImages[result.orderId] || labImages[selectedService] || [] },
+            results: { ...result.results, _images: labImages[result.orderId] || labImages[selectedService] || storedImages },
             additionalNotes: result.additionalNotes || '',
             completed: true,
             resultId: result.id
           };
+          if (storedImages.length > 0 && !labImages[result.orderId]) {
+            setLabImages(prev => ({ ...prev, [result.orderId]: storedImages }));
+          }
         });
       }
 
@@ -1187,7 +1191,7 @@ const LabOrders = () => {
               await api.post('/labs/results/lab-test', {
                 orderId: r.orderId,
                 labTestId: r.labTestId,
-                results: { ...(r.results || {}), _images: panelImgs },
+                results: { ...(r.results || {}), _images: panelImgs.length ? panelImgs : (r.results?._images || []) },
                 additionalNotes: r.additionalNotes || '',
                 finalize: false
               });
@@ -1213,7 +1217,7 @@ const LabOrders = () => {
             await api.post('/labs/results/lab-test', {
               orderId: result.orderId,
               labTestId: result.labTestId,
-              results: { ...result.results, _images: labImages[result.orderId] || labImages[selectedService] || [] },
+              results: { ...result.results, _images: labImages[result.orderId] || labImages[selectedService] || result.results?._images || [] },
               additionalNotes: result.additionalNotes || '',
               finalize: false
             });
@@ -1233,7 +1237,7 @@ const LabOrders = () => {
               labOrderId: labOrderId,
               serviceId: serviceId,
               templateId: result.templateId || null,
-              results: { ...result.results, _images: labImages[result.orderId] || labImages[selectedService] || [] },
+              results: { ...result.results, _images: labImages[result.orderId] || labImages[selectedService] || result.results?._images || [] },
               additionalNotes: result.additionalNotes || ''
             });
 
@@ -1389,7 +1393,7 @@ const LabOrders = () => {
               await api.post('/labs/results/lab-test', {
                 orderId: result.orderId,
                 labTestId: result.labTestId,
-                results: { ...result.results, _images: labImages[result.orderId] || labImages[selectedService] || [] },
+                results: { ...result.results, _images: labImages[result.orderId] || labImages[selectedService] || result.results?._images || [] },
                 additionalNotes: result.additionalNotes || '',
                 finalize: true
               });
@@ -1430,7 +1434,7 @@ const LabOrders = () => {
             labOrderId: labOrderId,
             serviceId: serviceId,
             templateId: result.templateId || null,
-            results: { ...result.results, _images: labImages[result.orderId] || labImages[selectedService] || [] },
+            results: { ...result.results, _images: labImages[result.orderId] || labImages[selectedService] || result.results?._images || [] },
             additionalNotes: result.additionalNotes || ''
           };
         });
