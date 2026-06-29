@@ -764,7 +764,18 @@ const getLabStats = async (req, res) => {
   }
 };
 
+const uploadLabImage = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const url = '/uploads/lab-images/' + req.file.filename;
+    res.json({ url, filename: req.file.filename });
+  } catch (error) {
+    console.error('Error uploading lab image:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getTemplates, getOrders, saveIndividualLabResult, getDetailedResults,
-  sendToDoctor, updateLabOrderStatus, generateLabResultsPDF, getLabReports, saveLabTestResult, getLabStats
+  sendToDoctor, updateLabOrderStatus, generateLabResultsPDF, getLabReports, saveLabTestResult, getLabStats, uploadLabImage
 };

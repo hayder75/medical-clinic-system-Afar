@@ -1,21 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { Image, X, Upload, Camera } from 'lucide-react';
+import api from '../../services/api';
 
 const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   const [images, setImages] = useState(existingImages);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
 
-  const readFileAsDataURL = (file) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const compressImage = (file, maxDimension = 1024, quality = 0.7) => {
+  const compressToBlob = (file, maxDimension = 1024, quality = 0.7) => {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -37,54 +30,59 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            canvas.toBlob((blob) => {
-              if (blob) {
-                const reader2 = new FileReader();
-                reader2.onloadend = () => resolve(reader2.result);
-                reader2.readAsDataURL(blob);
-              } else {
-                resolve(e.target.result);
-              }
-            }, 'image/jpeg', quality);
-          } catch {
-            resolve(e.target.result);
-          }
+            canvas.toBlob((blob) => resolve(blob || file), 'image/jpeg', quality);
+          } catch { resolve(file); }
         };
-        img.onerror = () => resolve(e.target.result);
+        img.onerror = () => resolve(file);
         img.src = e.target.result;
       };
-      reader.onerror = () => resolve(null);
+      reader.onerror = () => resolve(file);
       reader.readAsDataURL(file);
     });
   };
 
-  const handleGalleryFiles = (e) => {
-    const files = Array.from(e.target.files);
-    Promise.all(files.map(async (file) => {
-      if (!file || !file.type.startsWith('image/')) return null;
-      const data = await compressImage(file);
-      if (!data) return null;
-      return { id: Date.now() + Math.random(), data, name: file.name, type: 'image/jpeg' };
-    })).then(newImages => {
-      const valid = newImages.filter(Boolean);
-      if (valid.length > 0) {
-        const updatedImages = [...images, ...valid];
-        setImages(updatedImages);
-        onImagesChange(updatedImages);
-      }
+  const uploadFile = async (file) => {
+    const formData = new FormData();
+    formData.append('image', file, file.name);
+    const response = await api.post('/labs/images/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return response.data.url;
+  };
+
+  const processFile = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return null;
+    const blob = await compressToBlob(file, file === fileInputRef.current?.files?.[0] ? 1024 : 1920, 0.85);
+    const uploadFile_obj = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+    const url = await uploadFile(uploadFile_obj);
+    return { id: Date.now() + Math.random(), url, name: file.name };
+  };
+
+  const handleGalleryFiles = async (e) => {
+    const files = Array.from(e.target.files);
+    setUploading(true);
+    const results = await Promise.all(files.map(f => processFile(f)));
+    const valid = results.filter(Boolean);
+    if (valid.length > 0) {
+      const updated = [...images, ...valid];
+      setImages(updated);
+      onImagesChange(updated);
+    }
+    setUploading(false);
     e.target.value = '';
   };
 
   const handleCameraFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
-    const data = await compressImage(file, 1920, 0.85);
-    if (!data) return;
-    const newImage = { id: Date.now() + Math.random(), data, name: file.name, type: 'image/jpeg' };
-    const updatedImages = [...images, newImage];
-    setImages(updatedImages);
-    onImagesChange(updatedImages);
+    setUploading(true);
+    const result = await processFile(file);
+    if (result) {
+      const updated = [...images, result];
+      setImages(updated);
+      onImagesChange(updated);
+    }
+    setUploading(false);
     e.target.value = '';
   };
 
@@ -139,7 +137,7 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
           {images.map(img => (
             <div key={img.id} className="relative group">
               <img 
-                src={img.data} 
+                src={img.url || img.data || img} 
                 alt={img.name} 
                 className="w-full h-20 object-cover rounded border"
               />
@@ -169,10 +167,10 @@ export const ImageGallery = ({ images = [] }) => {
         {images.map((img, idx) => (
           <div key={idx} className="relative">
             <img 
-              src={img.data || img} 
+              src={img.url || img.data || img} 
               alt={`Lab result ${idx + 1}`}
               className="w-full h-16 object-cover rounded border cursor-pointer hover:opacity-90"
-              onClick={() => window.open(img.data || img, '_blank')}
+              onClick={() => window.open(img.url || img.data || img, '_blank')}
             />
           </div>
         ))}
