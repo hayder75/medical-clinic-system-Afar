@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 const SOCKET_URL = process.env.REACT_APP_API_URL || (
   window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://127.0.0.1:3001'
-    : `${window.location.protocol}//${window.location.hostname}:3001`
+    : `${window.location.protocol}//${window.location.hostname}`
 );
 
 export default function useSocket(eventHandlers = {}) {

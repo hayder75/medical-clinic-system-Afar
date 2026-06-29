@@ -6,6 +6,15 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
 
+  const readFileAsDataURL = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const compressImage = (file, maxDimension = 1024, quality = 0.7) => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -30,13 +39,13 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
             ctx.drawImage(img, 0, 0, width, height);
             canvas.toBlob((blob) => {
               if (blob) {
-                const compressedReader = new FileReader();
-                compressedReader.onloadend = () => resolve(compressedReader.result);
-                compressedReader.readAsDataURL(blob);
+                const reader2 = new FileReader();
+                reader2.onloadend = () => resolve(reader2.result);
+                reader2.readAsDataURL(blob);
               } else {
                 resolve(e.target.result);
               }
-            }, file.type || 'image/jpeg', quality);
+            }, 'image/jpeg', quality);
           } catch {
             resolve(e.target.result);
           }
@@ -49,21 +58,13 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
     });
   };
 
-  const handleFileChange = (e) => {
+  const handleGalleryFiles = (e) => {
     const files = Array.from(e.target.files);
-    
     Promise.all(files.map(async (file) => {
-      if (file && file.type.startsWith('image/')) {
-        const data = await compressImage(file);
-        if (!data) return null;
-        return {
-          id: Date.now() + Math.random(),
-          data,
-          name: file.name,
-          type: file.type || 'image/jpeg'
-        };
-      }
-      return null;
+      if (!file || !file.type.startsWith('image/')) return null;
+      const data = await compressImage(file);
+      if (!data) return null;
+      return { id: Date.now() + Math.random(), data, name: file.name, type: 'image/jpeg' };
     })).then(newImages => {
       const valid = newImages.filter(Boolean);
       if (valid.length > 0) {
@@ -72,8 +73,18 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
         onImagesChange(updatedImages);
       }
     });
+    e.target.value = '';
+  };
 
-    // Reset input
+  const handleCameraFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const data = await readFileAsDataURL(file);
+    if (!data) return;
+    const newImage = { id: Date.now() + Math.random(), data, name: file.name, type: file.type };
+    const updatedImages = [...images, newImage];
+    setImages(updatedImages);
+    onImagesChange(updatedImages);
     e.target.value = '';
   };
 
@@ -107,8 +118,7 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
           type="file"
           accept="image/*"
           capture="environment"
-          multiple
-          onChange={handleFileChange}
+          onChange={handleCameraFile}
           className="hidden"
         />
         <input
@@ -116,7 +126,7 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
           type="file"
           accept="image/*"
           multiple
-          onChange={handleFileChange}
+          onChange={handleGalleryFiles}
           className="hidden"
         />
         {images.length > 0 && (
