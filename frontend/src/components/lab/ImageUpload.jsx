@@ -13,34 +13,46 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   const compressToBlob = (file, maxDimension = 1024, quality = 0.7) => {
     return new Promise((resolve) => {
       const timeout = setTimeout(() => { resolve(file); }, 8000);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            let { width, height } = img;
-            if (width > maxDimension || height > maxDimension) {
-              if (width > height) {
-                height = (maxDimension / width) * height;
-                width = maxDimension;
-              } else {
-                width = (maxDimension / height) * width;
-                height = maxDimension;
-              }
-            }
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            canvas.toBlob((blob) => { clearTimeout(timeout); resolve(blob || file); }, 'image/jpeg', quality);
-          } catch { clearTimeout(timeout); resolve(file); }
-        };
-        img.onerror = () => { clearTimeout(timeout); resolve(file); };
-        img.src = e.target.result;
-      };
-      reader.onerror = () => { clearTimeout(timeout); resolve(file); };
-      reader.readAsDataURL(file);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      (async () => {
+        try {
+          let bitmap;
+          try { bitmap = await createImageBitmap(file); } catch { bitmap = null; }
+          if (!bitmap) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const img = new Image();
+              img.onload = () => {
+                try {
+                  let { width, height } = img;
+                  if (width > maxDimension || height > maxDimension) {
+                    if (width > height) { height = (maxDimension / width) * height; width = maxDimension; }
+                    else { width = (maxDimension / height) * width; height = maxDimension; }
+                  }
+                  canvas.width = width; canvas.height = height;
+                  ctx.drawImage(img, 0, 0, width, height);
+                  canvas.toBlob((blob) => { clearTimeout(timeout); resolve(blob || file); }, 'image/jpeg', quality);
+                } catch { clearTimeout(timeout); resolve(file); }
+              };
+              img.onerror = () => { clearTimeout(timeout); resolve(file); };
+              img.src = e.target.result;
+            };
+            reader.onerror = () => { clearTimeout(timeout); resolve(file); };
+            reader.readAsDataURL(file);
+            return;
+          }
+          let { width, height } = bitmap;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) { height = (maxDimension / width) * height; width = maxDimension; }
+            else { width = (maxDimension / height) * width; height = maxDimension; }
+          }
+          canvas.width = width; canvas.height = height;
+          ctx.drawImage(bitmap, 0, 0, width, height);
+          bitmap.close();
+          canvas.toBlob((blob) => { clearTimeout(timeout); resolve(blob || file); }, 'image/jpeg', quality);
+        } catch { clearTimeout(timeout); resolve(file); }
+      })();
     });
   };
 
