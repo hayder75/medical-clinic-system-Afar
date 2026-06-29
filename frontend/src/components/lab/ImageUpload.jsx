@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Image, X, Upload, Camera } from 'lucide-react';
 import api from '../../services/api';
 import { getImageUrl } from '../../utils/imageUrl';
+import toast from 'react-hot-toast';
 
 const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   const [images, setImages] = useState(existingImages);
@@ -45,22 +46,27 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   const uploadFile = async (file) => {
     const formData = new FormData();
     formData.append('image', file, file.name);
-    const response = await api.post('/labs/images/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    const response = await api.post('/labs/images/upload', formData);
     return response.data.url;
   };
 
   const processFile = async (file) => {
     if (!file || !file.type.startsWith('image/')) return null;
-    const blob = await compressToBlob(file, file === fileInputRef.current?.files?.[0] ? 1024 : 1920, 0.85);
-    const uploadFile_obj = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
-    const url = await uploadFile(uploadFile_obj);
-    return { id: Date.now() + Math.random(), url, name: file.name };
+    try {
+      const blob = await compressToBlob(file, file === fileInputRef.current?.files?.[0] ? 1024 : 1920, 0.85);
+      const uploadFile_obj = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+      const url = await uploadFile(uploadFile_obj);
+      return { id: Date.now() + Math.random(), url, name: file.name };
+    } catch (err) {
+      console.error('Upload error:', err);
+      toast.error('Image upload failed: ' + (err.response?.data?.error || err.message));
+      return null;
+    }
   };
 
   const handleGalleryFiles = async (e) => {
     const files = Array.from(e.target.files);
+    if (files.length === 0) return;
     setUploading(true);
     const results = await Promise.all(files.map(f => processFile(f)));
     const valid = results.filter(Boolean);
@@ -77,11 +83,16 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
     setUploading(true);
-    const result = await processFile(file);
-    if (result) {
-      const updated = [...images, result];
-      setImages(updated);
-      onImagesChange(updated);
+    try {
+      const result = await processFile(file);
+      if (result) {
+        const updated = [...images, result];
+        setImages(updated);
+        onImagesChange(updated);
+      }
+    } catch (err) {
+      console.error('Camera upload error:', err);
+      toast.error('Failed to upload photo');
     }
     setUploading(false);
     e.target.value = '';
