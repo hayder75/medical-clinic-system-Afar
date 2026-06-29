@@ -79,9 +79,9 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   const handleCameraFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
-    const data = await readFileAsDataURL(file);
+    const data = await compressImage(file, 1920, 0.85);
     if (!data) return;
-    const newImage = { id: Date.now() + Math.random(), data, name: file.name, type: file.type };
+    const newImage = { id: Date.now() + Math.random(), data, name: file.name, type: 'image/jpeg' };
     const updatedImages = [...images, newImage];
     setImages(updatedImages);
     onImagesChange(updatedImages);
