@@ -2107,7 +2107,7 @@ const ComprehensivePatientHistory = () => {
                               <div className="grid grid-cols-3 gap-2 mt-2">
                                 {(result.results._images || (result.results[0] && result.results[0].results && result.results[0].results._images) || []).map((img, idx) => (
                                   <div key={idx} className="relative">
-                                    <img src={img.url || img.data || img} alt={"Lab result " + (idx + 1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.url || img.data || img, '_blank')} />
+                                    <img src={img.url ? getImageUrl(img.url) : (img.data || img)} alt={"Lab result " + (idx + 1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.url ? getImageUrl(img.url) : (img.data || img), '_blank')} />
                                   </div>
                                 ))}
                               </div>

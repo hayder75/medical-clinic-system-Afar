@@ -4378,7 +4378,7 @@ const PatientConsultationPage = () => {
                                           <p className="text-sm font-medium text-gray-700 mb-2">Attached Images:</p>
                                           <div className="grid grid-cols-3 gap-2">
                                             {panelImages.map((img, idx) => {
-                                              const u = img.data || img.url || img;
+                                              const u = img.url ? getImageUrl(img.url) : (img.data || img);
                                               return (<div key={idx} className="relative"><img src={u} alt={"Lab "+(idx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(u,"_blank")} /></div>);
                                             })}
                                           </div>
@@ -4427,7 +4427,7 @@ const PatientConsultationPage = () => {
                                           <p className="text-sm font-medium text-gray-700 mb-2">Attached Images:</p>
                                           <div className="grid grid-cols-3 gap-2">
                                             {latestResult.results._images.map((img, idx) => (
-                                              <div key={idx} className="relative"><img src={img.url || img.data || img} alt={"Lab "+(idx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.url || img.data || img,"_blank")} /></div>
+                                              <div key={idx} className="relative"><img src={img.url ? getImageUrl(img.url) : (img.data || img)} alt={"Lab "+(idx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.url ? getImageUrl(img.url) : (img.data || img),"_blank")} /></div>
                                             ))}
                                           </div>
                                         </div>

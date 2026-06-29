@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Image, X, Upload, Camera } from 'lucide-react';
 import api from '../../services/api';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   const [images, setImages] = useState(existingImages);
@@ -137,7 +138,7 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
           {images.map(img => (
             <div key={img.id} className="relative group">
               <img 
-                src={img.url || img.data || img} 
+                src={img.url ? getImageUrl(img.url) : (img.data || img)} 
                 alt={img.name} 
                 className="w-full h-20 object-cover rounded border"
               />
@@ -167,10 +168,10 @@ export const ImageGallery = ({ images = [] }) => {
         {images.map((img, idx) => (
           <div key={idx} className="relative">
             <img 
-              src={img.url || img.data || img} 
+              src={img.url ? getImageUrl(img.url) : (img.data || img)} 
               alt={`Lab result ${idx + 1}`}
               className="w-full h-16 object-cover rounded border cursor-pointer hover:opacity-90"
-              onClick={() => window.open(img.url || img.data || img, '_blank')}
+              onClick={() => window.open(img.url ? getImageUrl(img.url) : (img.data || img), '_blank')}
             />
           </div>
         ))}
