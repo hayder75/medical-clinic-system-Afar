@@ -4,6 +4,7 @@ const labController = require('../controllers/labController');
 const adminController = require('../controllers/adminController');
 const authMiddleware = require('../middleware/auth');
 const roleGuard = require('../middleware/roleGuard');
+const fileUpload = require('../middleware/fileUpload');
 
 const DOCTOR_ROLES = ['DOCTOR', 'HEALTH_OFFICER', 'DERMATOLOGY'];
 
@@ -15,6 +16,9 @@ router.get('/templates', authMiddleware, roleGuard(['LAB_TECHNICIAN', 'ADMIN']),
 
 // Get detailed lab results for a specific order (must come before /orders)
 router.get('/orders/:orderId/detailed-results', authMiddleware, roleGuard([...DOCTOR_ROLES, 'LAB_TECHNICIAN', 'ADMIN']), labController.getDetailedResults);
+
+// Upload lab image file (returns URL to use in results)
+router.post('/images/upload', authMiddleware, roleGuard(['LAB_TECHNICIAN', 'ADMIN']), fileUpload.labImageUpload.single('image'), labController.uploadLabImage);
 
 // Get lab dashboard stats (fast COUNT queries)
 router.get('/stats', authMiddleware, roleGuard(['LAB_TECHNICIAN', 'ADMIN']), labController.getLabStats);
