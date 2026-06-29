@@ -12,6 +12,7 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
 
   const compressToBlob = (file, maxDimension = 1024, quality = 0.7) => {
     return new Promise((resolve) => {
+      const timeout = setTimeout(() => { resolve(file); }, 8000);
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
@@ -32,13 +33,13 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            canvas.toBlob((blob) => resolve(blob || file), 'image/jpeg', quality);
-          } catch { resolve(file); }
+            canvas.toBlob((blob) => { clearTimeout(timeout); resolve(blob || file); }, 'image/jpeg', quality);
+          } catch { clearTimeout(timeout); resolve(file); }
         };
-        img.onerror = () => resolve(file);
+        img.onerror = () => { clearTimeout(timeout); resolve(file); };
         img.src = e.target.result;
       };
-      reader.onerror = () => resolve(file);
+      reader.onerror = () => { clearTimeout(timeout); resolve(file); };
       reader.readAsDataURL(file);
     });
   };
@@ -51,10 +52,16 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   };
 
   const processFile = async (file) => {
-    if (!file || !file.type.startsWith('image/')) return null;
+    if (!file) return null;
     try {
-      const blob = await compressToBlob(file, file === fileInputRef.current?.files?.[0] ? 1024 : 1920, 0.85);
+      const isGallery = file === fileInputRef.current?.files?.[0];
+      const maxDim = isGallery ? 1024 : 800;
+      const qualityVal = isGallery ? 0.7 : 0.7;
+      console.time('compress-' + file.name);
+      const blob = await compressToBlob(file, maxDim, qualityVal);
+      console.timeEnd('compress-' + file.name);
       const uploadFile_obj = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+      console.log('Uploading file size:', (uploadFile_obj.size / 1024).toFixed(1) + 'KB');
       const url = await uploadFile(uploadFile_obj);
       return { id: Date.now() + Math.random(), url, name: file.name };
     } catch (err) {
@@ -68,7 +75,7 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
     setUploading(true);
-    toast.success('Uploading ' + files.length + ' image(s)...');
+    toast.success('Compressing ' + files.length + ' image(s)...');
     const results = await Promise.all(files.map(f => processFile(f)));
     const valid = results.filter(Boolean);
     if (valid.length > 0) {
@@ -86,13 +93,15 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
     if (!file) return;
     setUploading(true);
     try {
-      toast.success('Processing photo...');
+      toast.success('Compressing photo...');
       const result = await processFile(file);
       if (result) {
         const updated = [...images, result];
         setImages(updated);
         onImagesChange(updated);
         toast.success('Photo uploaded successfully!');
+      } else {
+        toast.error('Photo upload failed');
       }
     } catch (err) {
       console.error('Camera upload error:', err);
