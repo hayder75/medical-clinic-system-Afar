@@ -68,12 +68,14 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
     setUploading(true);
+    toast.success('Uploading ' + files.length + ' image(s)...');
     const results = await Promise.all(files.map(f => processFile(f)));
     const valid = results.filter(Boolean);
     if (valid.length > 0) {
       const updated = [...images, ...valid];
       setImages(updated);
       onImagesChange(updated);
+      toast.success(valid.length + ' image(s) uploaded!');
     }
     setUploading(false);
     e.target.value = '';
@@ -81,14 +83,16 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
 
   const handleCameraFile = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
+    if (!file) return;
     setUploading(true);
     try {
+      toast.success('Processing photo...');
       const result = await processFile(file);
       if (result) {
         const updated = [...images, result];
         setImages(updated);
         onImagesChange(updated);
+        toast.success('Photo uploaded successfully!');
       }
     } catch (err) {
       console.error('Camera upload error:', err);
@@ -105,20 +109,30 @@ const ImageUpload = ({ onImagesChange, existingImages = [] }) => {
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 relative">
+      {uploading && (
+        <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-lg z-10">
+          <div className="flex flex-col items-center gap-2">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="text-sm text-blue-600 font-medium">Uploading image...</span>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-2 flex-wrap">
         <button
           type="button"
+          disabled={uploading}
           onClick={() => cameraInputRef.current?.click()}
-          className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm"
+          className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm disabled:opacity-50"
         >
           <Camera size={16} />
           Take Photo
         </button>
         <button
           type="button"
+          disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm"
+          className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm disabled:opacity-50"
         >
           <Upload size={16} />
           Upload from Gallery
