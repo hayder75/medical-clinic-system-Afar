@@ -1271,10 +1271,16 @@ exports.recordContinuousVitals = async (req, res) => {
   try {
     const data = continuousVitalsSchema.parse(req.body);
 
-    // Auto-calculate BMI if height and weight are provided
+    // Auto-calculate BMI, GCS, MEWS, qSOFA
     if (data.weight && data.height) {
       data.bmi = data.weight / (data.height ** 2);
     }
+    const gcsTotal = calculateGCS(data.gcsEyes, data.gcsVerbal, data.gcsMotor);
+    const mewsScore = calculateMEWS({ ...data, gcsTotal });
+    const qsofaScore = calculateQSOFA({ ...data, gcsTotal });
+    if (gcsTotal !== null) data.gcsTotal = gcsTotal;
+    if (mewsScore !== null) data.mewsScore = mewsScore;
+    if (qsofaScore !== null) data.qsofaScore = qsofaScore;
 
     // Verify patient exists
     const patient = await prisma.patient.findUnique({
@@ -1356,7 +1362,7 @@ exports.getPatientVitals = async (req, res) => {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    // Get all vitals for this patient (both visit-based and continuous)
+    // Get recent vitals for this patient (both visit-based and continuous)
     const vitals = await prisma.vitalSign.findMany({
       where: {
         patientId: patientId
@@ -1364,6 +1370,7 @@ exports.getPatientVitals = async (req, res) => {
       orderBy: {
         createdAt: 'desc'
       },
+      take: 20,
       include: {
         visit: {
           select: {
@@ -1399,6 +1406,9 @@ exports.getPatientVitals = async (req, res) => {
         gcsEyes: vital.gcsEyes,
         gcsVerbal: vital.gcsVerbal,
         gcsMotor: vital.gcsMotor,
+        gcsTotal: vital.gcsTotal,
+        mewsScore: vital.mewsScore,
+        qsofaScore: vital.qsofaScore,
         chiefComplaint: vital.chiefComplaint,
         historyOfPresentIllness: vital.historyOfPresentIllness,
         onsetOfSymptoms: vital.onsetOfSymptoms,

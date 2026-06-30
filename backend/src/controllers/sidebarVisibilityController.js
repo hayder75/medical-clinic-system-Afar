@@ -3,7 +3,7 @@ const prisma = require('../config/database');
 const SIDEBAR_VISIBILITY_KEY = 'sidebarVisibilityConfig';
 
 const createDefaultSidebarConfig = () => ({
-  ADMIN: ['dashboard', 'staffManagement', 'patientManagement', 'serviceManagement', 'reports', 'medicalClinic', 'doctorPerformance', 'billingReport', 'labReports', 'radiologyReports', 'nurseReport', 'pharmacyReport', 'diseaseReports', 'diseaseTally', 'ageGenderDisease', 'diseaseManagement', 'abortionCare', 'familyPlanning', 'centralRegister', 'patientAccounts', 'bedManagement', 'cardProducts', 'doctorCommissions', 'dailyExpenses', 'auditLogs', 'loanApproval', 'systemView', 'patientRegistration', 'admissions'],
+  ADMIN: ['dashboard', 'staffManagement', 'patientManagement', 'serviceManagement', 'reports', 'medicalClinic', 'doctorPerformance', 'billingReport', 'labReports', 'radiologyReports', 'nurseReport', 'pharmacyReport', 'diseaseReports', 'diseaseTally', 'ageGenderDisease', 'diseaseManagement', 'abortionCare', 'familyPlanning', 'centralRegister', 'patientAccounts', 'bedManagement', 'cardProducts', 'doctorCommissions', 'dailyExpenses', 'auditLogs', 'loanApproval', 'systemView', 'patientRegistration', 'admissions', 'institutions'],
   DOCTOR: ['dashboard', 'patientQueue', 'dailyWork', 'abortionCare', 'familyPlanning', 'admissions', 'patientHistory', 'medicalCertificate', 'internationalCertificate', 'pathology', 'referPatient', 'appointments', 'loans', 'patientRegistration'],
   NURSE: ['dashboard', 'patientRegistration', 'patientManagement', 'triageQueue', 'patientAssignments', 'familyPlanning', 'abortionCare', 'admissions', 'dailyTasks', 'walkInServices', 'walkInOrders', 'continuousVitals', 'gallery', 'appointments', 'loans'],
   RECEPTIONIST: ['dashboard', 'patientRegistration', 'patientManagement', 'patientAccounts', 'prints', 'appointments', 'preRegistration', 'doctorQueueManagement', 'gallery', 'loans'],
@@ -116,6 +116,7 @@ exports.getSidebarItems = async (req, res) => {
     doctorCommissions: { label: 'Doctor Commissions', category: 'Admin' },
     patientAccounts: { label: 'Patient Accounts', category: 'Admin' },
     bedManagement: { label: 'Bed Management', category: 'Admin' },
+    institutions: { label: 'Institution Accounts', category: 'Admin' },
     auditLogs: { label: 'Audit Logs', category: 'Admin' },
     loanApproval: { label: 'Loan Approval', category: 'Admin' },
     systemView: { label: 'System View', category: 'Admin' },

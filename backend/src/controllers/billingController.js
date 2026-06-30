@@ -821,7 +821,7 @@ exports.processPayment = async (req, res) => {
   try {
     console.log('Payment request body:', JSON.stringify(req.body, null, 2));
     // Remove Zod validation completely for testing
-    const { billingId, amount, type, bankName, transNumber, insuranceId, notes, paymentProofPath, isEmergency, waiveRegistrationForOldPatient } = req.body;
+    const { billingId, amount, type, bankName, transNumber, insuranceId, institutionId, notes, paymentProofPath, isEmergency, waiveRegistrationForOldPatient } = req.body;
 
     // Convert amount to number if it's a string
     let numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -1027,6 +1027,7 @@ exports.processPayment = async (req, res) => {
             bankName,
             transNumber: transNumber || null,
             insuranceId,
+            institutionId: institutionId || null,
             notes: mergedNotes || (convertToDebt ? 'Partial payment' : null),
             createdById: req.user.id
           }
@@ -1124,6 +1125,18 @@ exports.processPayment = async (req, res) => {
             createdById: req.user.id
           }
         });
+      }
+    }
+
+    // Update institution totalBilled if this is an institution payment
+    if (type === 'INSTITUTION' && institutionId) {
+      try {
+        await prisma.institution.update({
+          where: { id: institutionId },
+          data: { totalBilled: { increment: numericAmount } },
+        });
+      } catch (err) {
+        console.error('Error updating institution totalBilled:', err);
       }
     }
 
@@ -2845,6 +2858,22 @@ exports.deleteBilling = async (req, res) => {
       });
     }
 
+    // Check if this billing has admission extend info and revert it
+    if (billing.notes && billing.notes.includes('EXTEND|')) {
+      const extendMatch = billing.notes.match(/EXTEND\|([^|]+)\|([^|]+)\|([^|]+)/);
+      if (extendMatch) {
+        const admissionId = extendMatch[1];
+        const prevDate = extendMatch[2];
+        const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
+        if (admission && admission.status === 'ADMITTED') {
+          await prisma.admission.update({
+            where: { id: admissionId },
+            data: { expectedEndDate: new Date(prevDate) }
+          });
+        }
+      }
+    }
+
     // Use transaction to delete all related records
     await prisma.$transaction(async (tx) => {
       // Delete payments
@@ -2904,6 +2933,17 @@ exports.deleteBilling = async (req, res) => {
             status: 'UNPAID',
             billingId: null
           }
+        });
+      }
+
+      // Also clear admission billingId if this billing was the linked one
+      const linkedAdmission = await tx.admission.findFirst({
+        where: { billingId: billingId }
+      });
+      if (linkedAdmission) {
+        await tx.admission.update({
+          where: { id: linkedAdmission.id },
+          data: { billingId: null }
         });
       }
 

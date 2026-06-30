@@ -6111,6 +6111,16 @@ exports.completeVisit = async (req, res) => {
       return res.status(404).json({ error: 'Visit not found' });
     }
 
+    // Guard: check if patient has active admission
+    const activeAdmission = await prisma.admission.findFirst({
+      where: { patientId: visit.patientId, status: 'ADMITTED' },
+    });
+    if (activeAdmission) {
+      return res.status(400).json({
+        error: 'Cannot complete visit while patient has an active bed admission. Please discharge the patient from bed management first.',
+      });
+    }
+
     // Build notes with marker if needed
     let updatedNotes = visit.notes || '';
     if (finalNotes) {
@@ -6780,6 +6790,17 @@ exports.directCompleteVisit = async (req, res) => {
       return res.status(404).json({
         success: false,
         error: 'Visit not found'
+      });
+    }
+
+    // Guard: check if patient has active admission
+    const activeAdmission = await prisma.admission.findFirst({
+      where: { patientId: visit.patientId, status: 'ADMITTED' },
+    });
+    if (activeAdmission) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot complete visit while patient has an active bed admission. Please discharge the patient from bed management first.',
       });
     }
 
@@ -7808,5 +7829,50 @@ exports.getProcedureGroups = async (req, res) => {
   } catch (error) {
     console.error('Error fetching procedure groups:', error);
     res.status(500).json({ error: error.message });
+  }
+};
+
+exports.createExternalPrescription = async (req, res) => {
+  try {
+    const { visitId, patientId, name, strength, instructionText } = req.body;
+    const doctorId = req.user.id;
+
+    if (!visitId || !patientId || !name) {
+      return res.status(400).json({ error: 'visitId, patientId, and name are required' });
+    }
+
+    const order = await prisma.medicationOrder.create({
+      data: {
+        visitId: parseInt(visitId),
+        doctorId,
+        patientId: String(patientId),
+        name,
+        strength: strength || 'N/A',
+        dosageForm: 'N/A',
+        instructionText: instructionText || null,
+        instructions: instructionText || null,
+        type: 'EXTERNAL',
+        status: 'UNPAID'
+      }
+    });
+
+    res.json({ message: 'External prescription saved', order });
+  } catch (error) {
+    console.error('Error creating external prescription:', error);
+    res.status(500).json({ error: 'Failed to save external prescription' });
+  }
+};
+
+exports.getExternalPrescriptions = async (req, res) => {
+  try {
+    const { visitId } = req.params;
+    const orders = await prisma.medicationOrder.findMany({
+      where: { visitId: parseInt(visitId), type: 'EXTERNAL' },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ externalPrescriptions: orders });
+  } catch (error) {
+    console.error('Error fetching external prescriptions:', error);
+    res.status(500).json({ error: 'Failed to fetch external prescriptions' });
   }
 };

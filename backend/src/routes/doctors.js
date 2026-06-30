@@ -237,6 +237,10 @@ router.delete('/radiology-batch-order/:id', auth, roleGuard(DOCTOR_ROLES), batch
 router.patch('/external-diagnostic-orders/:id', auth, roleGuard(DOCTOR_ROLES), doctorController.updateExternalDiagnosticOrder);
 router.delete('/external-diagnostic-orders/:id', auth, roleGuard(DOCTOR_ROLES), doctorController.deleteExternalDiagnosticOrder);
 
+// External Prescription routes
+router.post('/external-prescriptions', auth, roleGuard(DOCTOR_ROLES), doctorController.createExternalPrescription);
+router.get('/external-prescriptions/:visitId', auth, roleGuard(DOCTOR_ROLES), doctorController.getExternalPrescriptions);
+
 // Transfer routes
 router.get('/available-doctors', auth, roleGuard(DOCTOR_ROLES), transferController.getAvailableDoctors);
 router.post('/transfer', auth, roleGuard(DOCTOR_ROLES), transferController.transferPatient);

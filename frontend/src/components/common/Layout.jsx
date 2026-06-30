@@ -244,7 +244,8 @@ const Layout = ({ children, title, subtitle }) => {
           { name: 'Patient Accounts', href: '/admin/patient-accounts', icon: CreditCard, key: 'patientAccounts' },
           { name: 'Bed Management', href: '/admin/beds', icon: Bed, key: 'bedManagement' },
           { name: 'Card Products', href: '/admin/card-products', icon: CreditCard, key: 'cardProducts' },
-          { name: 'Doctor Commissions', href: '/admin/doctor-commissions', icon: Percent, key: 'doctorCommissions' },
+          { name: 'Institution Accounts', href: '/admin/institutions', icon: Building2, key: 'institutions' },
+          { name: 'Commission Management', href: '/admin/doctor-commissions', icon: Percent, key: 'doctorCommissions' },
           { name: 'Audit Logs', href: '/admin/audit', icon: FileText, key: 'auditLogs' },
           { name: 'Loan Approval', href: '/admin/loan-approval', icon: DollarSign, key: 'loanApproval' },
           { name: 'Expense Tracker', href: '/admin/expense-tracker', icon: DollarSign, key: 'dailyExpenses' },
@@ -359,6 +360,7 @@ const Layout = ({ children, title, subtitle }) => {
           ...baseItems,
           { name: 'Radiology Orders', href: '/radiology/orders', icon: Scan, key: 'radiologyOrders' },
           { name: 'Walk-In Orders', href: '/radiology/walk-in', icon: UserPlus, key: 'radiologyWalkIn' },
+          { name: 'Daily Work', href: '/radiology/daily-work', icon: Calendar, key: 'radiologyDailyWork' },
           { name: 'Loans', href: '/loans', icon: DollarSign, key: 'loans' },
         ]);
 

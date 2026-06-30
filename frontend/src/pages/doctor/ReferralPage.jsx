@@ -260,7 +260,7 @@ const ReferralPage = () => {
                         .logo {
                             width: 70pt;
                             height: 70pt;
-                            object-fit: contain;
+                            border-radius: 50%; object-fit: cover;
                         }
                         .clinic-name { 
                             font-size: 22pt; 

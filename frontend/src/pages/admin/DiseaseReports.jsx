@@ -412,11 +412,11 @@ const DiseaseReports = ({ forceSelectedMode = false }) => {
                             <div className="p-2 border-r border-black">
                                 <div className="font-bold">Health Facility: {window.__CS__?.name || 'Clinic'}</div>
                                 <div>Type: Private Clinic</div>
-                                <div>Zone: Hawassa</div>
+                                <div>Zone: Awash 7 Kilo</div>
                             </div>
                             <div className="p-2">
-                                <div className="font-bold">Woreda: Hawassa</div>
-                                <div>Region: Sidama Region</div>
+                                <div className="font-bold">Woreda: Awash 7 Kilo</div>
+                                <div>Region: Addis Ababa</div>
                             </div>
                             <div className="col-span-2 border-t border-black p-2 flex justify-between">
                                 <span>Report Period: </span>
@@ -651,11 +651,11 @@ const DiseaseReports = ({ forceSelectedMode = false }) => {
                         <div className="header-box">
                             <div className="w-1/2 pr-2 border-r border-black">
                                 <div><strong>Health Facility:</strong> ${window.__CS__?.name || 'Clinic'}</div>
-                                <div><strong>Type:</strong> Private Clinic&nbsp;&nbsp;&nbsp;&nbsp;<strong>Zone:</strong> Hawassa</div>
-                                <div><strong>Region:</strong> Sidama Region</div>
+                                <div><strong>Type:</strong> Private Clinic&nbsp;&nbsp;&nbsp;&nbsp;<strong>Location:</strong> Awash 7 Kilo</div>
+                                <div><strong>Region:</strong> Addis Ababa</div>
                             </div>
                             <div className="w-1/2 pl-2">
-                                <div><strong>Woreda:</strong> Hawassa</div>
+                                <div><strong>Woreda:</strong> Awash 7 Kilo</div>
                                 <div><strong>Report Period From:</strong> {startDate} <strong>To:</strong> {endDate}</div>
                                 <div><strong>Date Sent:</strong> {footerData.dateSent}</div>
                             </div>

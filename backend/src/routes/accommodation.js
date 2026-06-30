@@ -17,9 +17,10 @@ router.delete('/beds/:id', roleGuard(['ADMIN']), accommodationController.deleteB
 
 // Admission routes
 router.get('/admissions', accommodationController.getAdmissions);
-router.post('/admissions', roleGuard(['ADMIN', ...DOCTOR_ROLES]), accommodationController.createAdmission);
+router.post('/admissions', roleGuard(['ADMIN', ...DOCTOR_ROLES, 'NURSE']), accommodationController.createAdmission);
 router.post('/admissions/services', roleGuard(['ADMIN', ...DOCTOR_ROLES, 'NURSE']), accommodationController.addAdmissionService);
-router.put('/admissions/:id/extend', roleGuard(['ADMIN', ...DOCTOR_ROLES]), accommodationController.extendAdmission);
+router.put('/admissions/:id/extend', roleGuard(['ADMIN', ...DOCTOR_ROLES, 'NURSE']), accommodationController.extendAdmission);
+router.put('/admissions/services/:serviceId/complete', roleGuard(['ADMIN', ...DOCTOR_ROLES, 'NURSE']), accommodationController.completeAdmissionService);
 router.put('/admissions/:id/discharge', roleGuard(['ADMIN', ...DOCTOR_ROLES, 'NURSE']), accommodationController.dischargeAdmission);
 
 module.exports = router;

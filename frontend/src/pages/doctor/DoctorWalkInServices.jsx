@@ -123,7 +123,7 @@ const WalkInNurseOrders = () => {
             .logo {
               width: 60px;
               height: 60px;
-              object-fit: contain;
+              border-radius: 50%; object-fit: cover;
             }
             .clinic-info {
               text-align: left;

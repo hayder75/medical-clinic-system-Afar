@@ -305,7 +305,8 @@ exports.fillReport = async (req, res) => {
           conclusion: conclusion || null,
           recommendations: recommendations || null,
           additionalNotes: additionalNotes || '',
-          status: 'COMPLETED'
+          status: 'COMPLETED',
+          processedBy: radiologistId
         };
 
         const radiologyResult = existingResult
@@ -394,7 +395,8 @@ exports.fillReport = async (req, res) => {
         conclusion: conclusion || null,
         recommendations: recommendations || null,
         additionalNotes: additionalNotes || '',
-        status: 'COMPLETED'
+        status: 'COMPLETED',
+        processedBy: radiologistId
       };
 
       const radiologyResult = existingResult
@@ -788,7 +790,8 @@ exports.createRadiologyResult = async (req, res) => {
         testTypeId: data.testTypeId,
         resultText: data.resultText,
         additionalNotes: data.additionalNotes,
-        status: 'COMPLETED'
+        status: 'COMPLETED',
+        processedBy: radiologistId,
       },
       include: {
         testType: true,
@@ -979,7 +982,8 @@ exports.createBatchRadiologyResult = async (req, res) => {
         findings: findings || null,
         conclusion: conclusion || null,
         additionalNotes: additionalNotes,
-        status: 'COMPLETED'
+        status: 'COMPLETED',
+        processedBy: radiologistId,
       },
       include: {
         testType: true,
@@ -2042,6 +2046,128 @@ exports.getRadiologyReports = async (req, res) => {
     });
   } catch (error) {
     console.error('Error generating radiology reports:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ── Radiologist Daily Work ──────────────────────────────────────
+
+exports.getDailyWorkMonthly = async (req, res) => {
+  try {
+    const radiologistId = req.user.id;
+    const year = Number.parseInt(req.query.year, 10) || new Date().getFullYear();
+    const month = Number.parseInt(req.query.month, 10);
+    const normalizedMonth = Number.isInteger(month) ? month - 1 : new Date().getMonth();
+
+    const startDate = new Date(year, normalizedMonth, 1, 0, 0, 0, 0);
+    const endDate = new Date(year, normalizedMonth + 1, 0, 23, 59, 59, 999);
+    const daysInMonth = new Date(year, normalizedMonth + 1, 0).getDate();
+
+    const results = await prisma.radiologyResult.findMany({
+      where: {
+        processedBy: radiologistId,
+        createdAt: { gte: startDate, lte: endDate },
+        status: 'COMPLETED',
+      },
+      include: {
+        testType: { select: { id: true, name: true, price: true } },
+        batchOrder: { select: { id: true } },
+        order: { select: { id: true } },
+      },
+    });
+
+    const commission = await prisma.radiologistCommission.findUnique({
+      where: { radiologistId },
+    });
+    const pct = commission?.percentage || 0;
+    const hasCommission = pct > 0;
+
+    const dayMap = new Map();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const key = `${year}-${String(normalizedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      dayMap.set(key, { date: key, day, orders: 0, totalPrice: 0, commissionAmount: 0 });
+    }
+
+    results.forEach((r) => {
+      const key = `${r.createdAt.getFullYear()}-${String(r.createdAt.getMonth() + 1).padStart(2, '0')}-${String(r.createdAt.getDate()).padStart(2, '0')}`;
+      const bucket = dayMap.get(key);
+      if (!bucket) return;
+      bucket.orders += 1;
+      const price = r.testType?.price || 0;
+      bucket.totalPrice += price;
+      if (hasCommission) bucket.commissionAmount += price * (pct / 100);
+    });
+
+    res.json({
+      daily: Array.from(dayMap.values()),
+      hasCommission,
+      commissionPct: pct,
+      totalOrders: results.length,
+      totalCommission: results.reduce((sum, r) => sum + ((r.testType?.price || 0) * (pct / 100)), 0),
+    });
+  } catch (error) {
+    console.error('Error fetching radiologist daily work monthly:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getDailyWorkDayDetails = async (req, res) => {
+  try {
+    const radiologistId = req.user.id;
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ error: 'Date parameter required (YYYY-MM-DD)' });
+
+    const dayStart = new Date(`${date}T00:00:00.000Z`);
+    const dayEnd = new Date(`${date}T23:59:59.999Z`);
+
+    const results = await prisma.radiologyResult.findMany({
+      where: {
+        processedBy: radiologistId,
+        createdAt: { gte: dayStart, lte: dayEnd },
+        status: 'COMPLETED',
+      },
+      include: {
+        testType: { select: { id: true, name: true, price: true } },
+        batchOrder: { select: { id: true, patient: { select: { id: true, name: true } } } },
+        order: { select: { id: true, patient: { select: { id: true, name: true } } } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const commission = await prisma.radiologistCommission.findUnique({
+      where: { radiologistId },
+    });
+    const pct = commission?.percentage || 0;
+    const hasCommission = pct > 0;
+
+    const orders = results.map((r) => {
+      const price = r.testType?.price || 0;
+      const patient = r.batchOrder?.patient || r.order?.patient || null;
+      return {
+        id: r.id,
+        testName: r.testType?.name || 'Unknown',
+        price,
+        commissionPct: pct,
+        commissionAmount: hasCommission ? price * (pct / 100) : 0,
+        patientName: patient?.name || 'Unknown',
+        patientId: patient?.id,
+        createdAt: r.createdAt,
+      };
+    });
+
+    res.json({
+      date,
+      orders,
+      summary: {
+        totalOrders: orders.length,
+        totalPrice: orders.reduce((s, o) => s + o.price, 0),
+        totalCommission: orders.reduce((s, o) => s + o.commissionAmount, 0),
+      },
+      hasCommission,
+      commissionPct: pct,
+    });
+  } catch (error) {
+    console.error('Error fetching radiologist daily work details:', error);
     res.status(500).json({ error: error.message });
   }
 };

@@ -238,7 +238,7 @@ const MedicalCertificateList = () => {
         .logo {
           width: 80px;
           height: 80px;
-          object-fit: contain;
+          border-radius: 50%; object-fit: cover;
         }
         .clinic-info {
           text-align: left;

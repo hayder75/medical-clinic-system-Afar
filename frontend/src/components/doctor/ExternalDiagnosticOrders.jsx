@@ -252,7 +252,7 @@ const ExternalDiagnosticOrders = ({
           <style>
             @media print { @page { size: A4; margin: 10mm; } }
             body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; color: #1e293b; font-size: 12px; line-height: 1.5; }
-            .logo { width: 45px; height: 45px; object-fit: contain; }
+            .logo { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; }
             .clinic-info { text-align: left; }
             .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; margin-bottom: 14px; border-bottom: 2px solid #2563eb; }
             .header-left { display: flex; align-items: center; gap: 10px; }

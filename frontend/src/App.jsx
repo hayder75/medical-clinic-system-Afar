@@ -52,6 +52,8 @@ import DiseaseTallySheetPage from './pages/admin/DiseaseTallySheetPage';
 import DiseaseManagement from './pages/admin/DiseaseManagement';
 import ReportDashboard from './pages/report/ReportDashboard';
 import BillingPatientHistory from './components/billing/BillingPatientHistory';
+import InstitutionManagement from './pages/admin/InstitutionManagement';
+import InstitutionDetail from './pages/admin/InstitutionDetail';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -223,6 +225,26 @@ const AppRoutes = () => {
             <ProtectedRoute allowedRoles={['ADMIN']}>
               <Layout title="System View Settings" subtitle="Control which sidebar items each role can see">
                 <SystemView />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/institutions/:id"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <InstitutionDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/institutions"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <Layout title="Institution Management" subtitle="Manage corporate, NGO, charity, and government accounts">
+                <InstitutionManagement />
               </Layout>
             </ProtectedRoute>
           }
