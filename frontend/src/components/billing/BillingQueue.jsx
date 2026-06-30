@@ -43,12 +43,20 @@ const BillingQueue = () => {
     bankName: "",
     transNumber: "",
     insuranceId: "",
+    institutionId: "",
     notes: "",
     isEmergency: false,
     useAccount: false,
     paymentProofPath: "",
     waiveRegistrationForOldPatient: false,
   });
+
+  // Institutions list
+  const [institutions, setInstitutions] = useState([]);
+
+  useEffect(() => {
+    api.get('/admin/institutions').then((res) => setInstitutions(res.data)).catch(() => {});
+  }, []);
 
   // Patient account balance
   const [patientAccount, setPatientAccount] = useState(null);
@@ -188,6 +196,10 @@ const BillingQueue = () => {
       }
     }
 
+    if (paymentForm.type === "INSTITUTION" && !paymentForm.institutionId) {
+      errors.institutionId = "Please select an institution";
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -215,6 +227,7 @@ const BillingQueue = () => {
         bankName: paymentForm.bankName || null,
         transNumber: paymentForm.transNumber || null,
         insuranceId: paymentForm.insuranceId || null,
+        institutionId: paymentForm.institutionId || null,
         notes: paymentForm.notes || null,
         isEmergency: paymentForm.isEmergency,
         useAccount: paymentForm.useAccount,
@@ -249,6 +262,7 @@ const BillingQueue = () => {
       bankName: "",
       transNumber: "",
       insuranceId: "",
+      institutionId: "",
       notes: "",
       isEmergency: false,
       useAccount: false,
@@ -284,6 +298,7 @@ const BillingQueue = () => {
       bankName: "",
       transNumber: "",
       insuranceId: "",
+      institutionId: "",
       notes: isDeferred ? "Partial payment - remaining added to credit" : "",
       isEmergency: false,
       useAccount: false,
@@ -1064,6 +1079,7 @@ const BillingQueue = () => {
                     <option value="BANK">Bank Transfer</option>
                     <option value="INSURANCE">Insurance</option>
                     <option value="CHARITY">Charity</option>
+                    <option value="INSTITUTION">Institution</option>
                   </select>
                 </div>
 
@@ -1119,63 +1135,7 @@ const BillingQueue = () => {
                   )}
                 </div>
 
-                {/* Convert to Debt / Deferred Payment */}
-                {(selectedBilling.isDeferred || paymentForm.convertToDebt) && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        id="convertToDebt"
-                        checked={paymentForm.convertToDebt}
-                        onChange={(e) =>
-                          setPaymentForm({
-                            ...paymentForm,
-                            convertToDebt: e.target.checked,
-                          })
-                        }
-                        className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-orange-300 rounded"
-                      />
-                      <label
-                        htmlFor="convertToDebt"
-                        className="text-sm font-bold text-orange-800 cursor-pointer"
-                      >
-                        Convert remaining to patient debt (Credit)
-                      </label>
-                    </div>
-                    <p className="text-xs text-orange-700 mt-2">
-                      The unpaid balance will be automatically added to the
-                      patient's credit account. They can pay it off whenever
-                      they visit.
-                    </p>
-                    {paymentForm.convertToDebt &&
-                      paymentForm.amount &&
-                      Number(paymentForm.amount) > 0 && (
-                        <div className="mt-3 p-2 bg-orange-100 rounded text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-orange-800">Paying now:</span>
-                            <span className="font-bold text-green-700">
-                              ETB{" "}
-                              {Number(paymentForm.amount).toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="flex justify-between mt-1">
-                            <span className="text-orange-800">
-                              Added as debt:
-                            </span>
-                            <span className="font-bold text-red-600">
-                              ETB{" "}
-                              {Math.max(
-                                0,
-                                selectedBilling.totalAmount -
-                                (selectedBilling.paidAmount || 0) -
-                                Number(paymentForm.amount),
-                              ).toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                  </div>
-                )}
+                {/* Convert to Debt / Deferred Payment — REMOVED per client request */}
 
                 {/* Show convert to debt option for non-deferred bills too */}
                 {/* {!selectedBilling.isDeferred && !paymentForm.convertToDebt && (
@@ -1288,6 +1248,36 @@ const BillingQueue = () => {
                     {formErrors.insuranceId && (
                       <p className="text-red-500 text-sm mt-1">
                         {formErrors.insuranceId}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Institution Selection */}
+                {paymentForm.type === "INSTITUTION" && (
+                  <div>
+                    <label className="label">Institution *</label>
+                    <select
+                      className={`input ${formErrors.institutionId ? "border-red-500" : ""}`}
+                      value={paymentForm.institutionId}
+                      onChange={(e) =>
+                        setPaymentForm({
+                          ...paymentForm,
+                          institutionId: e.target.value,
+                        })
+                      }
+                      required
+                    >
+                      <option value="">Select Institution</option>
+                      {institutions.filter((i) => i.status === 'ACTIVE').map((inst) => (
+                        <option key={inst.id} value={inst.id}>
+                          {inst.name} ({inst.type})
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.institutionId && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {formErrors.institutionId}
                       </p>
                     )}
                   </div>

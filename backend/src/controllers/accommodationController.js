@@ -308,7 +308,9 @@ exports.getAdmissions = async (req, res) => {
                         mobile: true,
                         gender: true,
                         dob: true,
-                        bloodType: true
+                        bloodType: true,
+                        cardStatus: true,
+                        cardExpiryDate: true
                     }
                 },
                 bed: true,
@@ -519,13 +521,18 @@ exports.extendAdmission = async (req, res) => {
                         totalAmount: extraPrice,
                         status: 'PENDING',
                         billingType: 'ACCOMMODATION',
-                        notes: `Extension: ${admission.bed.name} for ${extraDays} more days`
+                        notes: `EXTEND|${admission.id}|${oldEndDate.toISOString().split('T')[0]}|${newEndDate.toISOString().split('T')[0]}|${admission.bed.name} for ${extraDays} more days`
                     }
                 });
             } else {
                 billing = await tx.billing.update({
                     where: { id: billing.id },
-                    data: { totalAmount: { increment: extraPrice } }
+                    data: {
+                        totalAmount: { increment: extraPrice },
+                        notes: billing.notes
+                            ? `${billing.notes} | EXTEND|${admission.id}|${oldEndDate.toISOString().split('T')[0]}|${newEndDate.toISOString().split('T')[0]}|${extraDays}d`
+                            : `EXTEND|${admission.id}|${oldEndDate.toISOString().split('T')[0]}|${newEndDate.toISOString().split('T')[0]}|${admission.bed.name} for ${extraDays} more days`
+                    }
                 });
             }
 
@@ -602,6 +609,39 @@ exports.dischargeAdmission = async (req, res) => {
         });
 
         res.json({ success: true, admission: updatedAdmission });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+    }
+};
+
+exports.completeAdmissionService = async (req, res) => {
+    try {
+        const { serviceId } = req.params;
+        const userId = req.user.id;
+
+        const svc = await prisma.admissionService.findUnique({
+            where: { id: serviceId },
+            include: { admission: true }
+        });
+        if (!svc) return res.status(404).json({ success: false, error: 'Service not found' });
+        if (svc.status === 'COMPLETED') {
+            return res.status(400).json({ success: false, error: 'Service already completed' });
+        }
+
+        // Check billing payment if linked
+        if (svc.billingId) {
+            const billing = await prisma.billing.findUnique({ where: { id: svc.billingId } });
+            if (billing && billing.status !== 'PAID') {
+                return res.status(400).json({ success: false, error: 'Cannot complete service: the linked bill is not yet paid. Please process payment first.' });
+            }
+        }
+
+        await prisma.admissionService.update({
+            where: { id: serviceId },
+            data: { status: 'COMPLETED' }
+        });
+
+        res.json({ success: true });
     } catch (error) {
         res.status(400).json({ success: false, error: error.message });
     }

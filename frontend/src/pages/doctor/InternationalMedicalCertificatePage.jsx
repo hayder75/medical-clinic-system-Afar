@@ -265,7 +265,7 @@ const InternationalMedicalCertificatePage = () => {
                         .logo {
                             width: 70px;
                             height: 70px;
-                            object-fit: contain;
+                            border-radius: 50%; object-fit: cover;
                         }
                         .clinic-name { 
                             font-size: 24px; 
@@ -511,7 +511,7 @@ const InternationalMedicalCertificatePage = () => {
                         </div>
 
                         <div class="address-footer">
-                            Address: Hawassa City AtoteWarka to Alito Asphalt road 300 m Behind to Alamura H/Berhan Church 
+                            Address: Awash 7 Kilo, Addis Ababa 
                             <br>Tell: 0913743989 / 0938489499
                         </div>
                     </div>

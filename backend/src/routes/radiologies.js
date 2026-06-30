@@ -33,4 +33,8 @@ router.get('/reports', authMiddleware, roleGuard(['RADIOLOGIST', 'ADMIN', 'REPOR
 // PDF generation
 router.get('/batch-orders/:batchOrderId/pdf', radiologyController.generateRadiologyResultsPDF);
 
+// Radiologist Daily Work
+router.get('/daily-work/monthly', authMiddleware, roleGuard(['RADIOLOGIST', 'ADMIN']), radiologyController.getDailyWorkMonthly);
+router.get('/daily-work/day-details', authMiddleware, roleGuard(['RADIOLOGIST', 'ADMIN']), radiologyController.getDailyWorkDayDetails);
+
 module.exports = router;

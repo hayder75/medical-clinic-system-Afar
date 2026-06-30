@@ -418,7 +418,7 @@ const EmergencyDrugOrdering = ({ visit, onOrdersPlaced }) => {
             .prescription-container { width: 105mm; min-height: 148mm; background: white; padding: 8mm; box-shadow: 0 10px 25px rgba(0,0,0,0.1); box-sizing: border-box; margin: 0 auto; }
             .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; margin-bottom: 12px; border-bottom: 2px solid #2563eb; }
             .header-left { display: flex; align-items: center; gap: 8px; }
-            .logo { width: 40px; height: 40px; object-fit: contain; }
+            .logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
             .clinic-name { font-size: 13px; font-weight: 700; margin: 0; color: #1e40af; text-transform: uppercase; }
             .clinic-tagline { font-size: 9px; color: #64748b; margin: 0; font-style: italic; }
             .report-title { font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; }

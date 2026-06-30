@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Trash2, Printer, Pill, AlertCircle, CheckCircle, Clock, Save, X, ChevronDown } from 'lucide-react';
+import { Search, Plus, Trash2, Printer, Pill, AlertCircle, CheckCircle, Clock, X, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -113,6 +113,14 @@ const resolveMedicationInstruction = (medication) => {
   return '';
 };
 
+const Card = ({ children, className = '' }) => (
+  <div className={'bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden self-start ' + className}>{children}</div>
+);
+const CardHeader = ({ children }) => (
+  <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">{children}</div>
+);
+const CardBody = ({ children }) => <div className="p-4 space-y-3">{children}</div>;
+
 const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlaced, existingOrders = [] }) => {
   const { user: currentUser } = useAuth();
   const [medicationSearch, setMedicationSearch] = useState('');
@@ -121,6 +129,8 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
   const [selectedMedications, setSelectedMedications] = useState([]);
   const [prescribedMedications, setPrescribedMedications] = useState([]);
   const [loadingPrescribed, setLoadingPrescribed] = useState(false);
+
+  const pharmacyMeds = selectedMedications.filter(m => !m.isCustomRx);
 
   const [customMedication, setCustomMedication] = useState({
     name: '',
@@ -148,6 +158,7 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
   const [isSavingCustomMed, setIsSavingCustomMed] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(null);
+  const [completedExternalOrders, setCompletedExternalOrders] = useState([]);
 
   const availableDosageForms = useMemo(() => {
     if (!customMedication.dosageFormCategory) return [];
@@ -186,9 +197,12 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
   const fetchPrescribedMedications = async () => {
     if (!visitId) return;
     try {
+      setLoadingPrescribed(true);
       const response = await api.get(`/doctors/visits/${visitId}`);
       const visitData = response.data;
-      setPrescribedMedications(visitData.medicationOrders || []);
+      const orders = visitData.medicationOrders || [];
+      setPrescribedMedications(orders.filter(o => o.type !== 'EXTERNAL'));
+      setCompletedExternalOrders(orders.filter(o => o.type === 'EXTERNAL'));
     } catch (error) {
       console.error('Error fetching prescribed medications:', error);
     } finally {
@@ -251,6 +265,11 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
 
   const addMedicationFromSearch = (medication) => {
     const isCustomSuggestion = Boolean(medication.isCustomSuggestion);
+    const isOutOfStock = !isCustomSuggestion && (medication.availableQuantity === 0 || medication.availableQuantity === null);
+    if (isOutOfStock) {
+      toast.error(`${medication.name} ${medication.strength || ''} is out of stock. Use "Custom Rx" instead.`);
+      return;
+    }
     const newMedication = {
       id: isCustomSuggestion ? `custom-picked-${Date.now()}` : medication.id,
       name: medication.name,
@@ -262,12 +281,37 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
       unitPrice: medication.unitPrice ?? 0,
       category: medication.category || '',
       instructionText: medication.instructions || '',
-      isCustom: isCustomSuggestion
+      isCustom: isCustomSuggestion,
+      isCustomRx: false
     };
     setSelectedMedications([...selectedMedications, newMedication]);
     setMedicationSearch('');
     setSearchResults([]);
     toast.success(`${medication.name} added to prescription`);
+  };
+
+  const useOutOfStockAsCustom = (medication) => {
+    setShowCustomForm(true);
+    setCustomMedication({
+      name: medication.name || '',
+      genericName: medication.genericName || medication.name || '',
+      strength: medication.strength || '',
+      strengthText: medication.strengthText || '',
+      dosageFormCategory: medication.dosageFormCategory || '',
+      dosageForm: medication.dosageForm || '',
+      routeCode: medication.routeCode || '',
+      quantity: '',
+      frequencyType: '',
+      frequencyValue: '',
+      frequencyUnit: 'times',
+      frequencyUnitPer: 'day',
+      durationValue: '',
+      durationUnit: 'DAYS',
+      instructions: ''
+    });
+    setMedicationSearch('');
+    setSearchResults([]);
+    toast.success(`Set "${medication.name}" as custom medication — add instructions and save`);
   };
 
   const searchCustomMedications = async (query) => {
@@ -292,12 +336,12 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
 
   const handleCustomMedSearchChange = (e) => {
     const query = e.target.value;
+    setCustomMedication(prev => ({ ...prev, name: query, genericName: query }));
     setCustomMedSearchQuery(query);
-    setCustomMedication({ ...customMedication, name: query, genericName: query });
-    const timeoutId = setTimeout(() => {
+    if (window.customSearchTimeout) clearTimeout(window.customSearchTimeout);
+    window.customSearchTimeout = setTimeout(() => {
       searchCustomMedications(query);
     }, 300);
-    return () => clearTimeout(timeoutId);
   };
 
   const selectCustomMedication = (customMed) => {
@@ -339,22 +383,22 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
     }
   };
 
-  const addCustomMedication = async (saveAndAddAnother = false) => {
+  const addCustomMedication = async () => {
     if (!customMedication.name.trim()) {
       toast.error('Please enter medication name');
       return;
     }
 
-    const normalizedName = customMedication.name.trim().toLowerCase();
-    const normalizedStrength = String(customMedication.strength || '').trim().toLowerCase();
-    const wasSelectedFromSearch = customMedSearchResults.some(
-      med => String(med.name || '').trim().toLowerCase() === normalizedName &&
-        String(med.strength || '').trim().toLowerCase() === normalizedStrength
-    );
+    setIsSavingCustomMed(true);
+    try {
+      const normalizedName = customMedication.name.trim().toLowerCase();
+      const normalizedStrength = String(customMedication.strength || '').trim().toLowerCase();
+      const wasSelectedFromSearch = customMedSearchResults.some(
+        med => String(med.name || '').trim().toLowerCase() === normalizedName &&
+          String(med.strength || '').trim().toLowerCase() === normalizedStrength
+      );
 
-    if (!wasSelectedFromSearch && customMedication.name.trim()) {
-      try {
-        setIsSavingCustomMed(true);
+      if (!wasSelectedFromSearch && customMedication.name.trim() && customMedication.strength?.trim()) {
         await api.post('/doctors/custom-medications', {
           name: customMedication.name,
           genericName: customMedication.genericName || customMedication.name,
@@ -374,55 +418,17 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
           instructions: customMedication.instructions || null
         });
         toast.success('Custom medication saved for future use');
-      } catch (error) {
-        console.error('Error saving custom medication:', error);
-      } finally {
-        setIsSavingCustomMed(false);
       }
-    }
 
-    const calculatedQty = calculatedQuantity;
-    const newMedication = {
-      id: `custom-${Date.now()}`,
-      name: customMedication.name,
-      genericName: customMedication.genericName || customMedication.name,
-      dosageFormCategory: customMedication.dosageFormCategory,
-      dosageForm: customMedication.dosageForm || 'Tablet',
-      strength: customMedication.strength || 'N/A',
-      strengthText: customMedication.strengthText,
-      manufacturer: 'Custom',
-      availableQuantity: 0,
-      unitPrice: 0,
-      category: '',
-      instructionText: customMedication.instructions || '',
-      isCustom: true
-    };
-
-    setSelectedMedications([...selectedMedications, newMedication]);
-
-    if (saveAndAddAnother) {
-      setCustomMedication({
-        name: '',
-        genericName: '',
-        strength: '',
-        strengthText: '',
-        dosageFormCategory: '',
-        dosageForm: '',
-        routeCode: '',
-        quantity: '',
-        frequencyType: '',
-        frequencyValue: '',
-        frequencyUnit: 'times',
-        frequencyUnitPer: 'day',
-        durationValue: '',
-        durationUnit: 'DAYS',
-        instructions: ''
+      const response = await api.post('/doctors/external-prescriptions', {
+        visitId,
+        patientId,
+        name: customMedication.name,
+        strength: customMedication.strength || 'N/A',
+        instructionText: customMedication.instructions || null
       });
-      setCustomMedSearchQuery('');
-      setCustomMedSearchResults([]);
-      setShowCustomMedSuggestions(false);
-      toast.success('Custom medication added to prescription');
-    } else {
+      const savedOrder = response.data.order;
+      setCompletedExternalOrders(prev => [savedOrder, ...prev]);
       setCustomMedication({
         name: '', genericName: '', strength: '', strengthText: '', dosageFormCategory: '',
         dosageForm: '', routeCode: '', quantity: '', frequencyType: '', frequencyValue: '',
@@ -432,7 +438,12 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
       setCustomMedSearchResults([]);
       setShowCustomMedSuggestions(false);
       setShowCustomForm(false);
-      toast.success('Custom medication added to prescription');
+      toast.success('External prescription saved');
+    } catch (error) {
+      console.error('Error saving external prescription:', error);
+      toast.error('Failed to save external prescription');
+    } finally {
+      setIsSavingCustomMed(false);
     }
   };
 
@@ -465,7 +476,7 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
     }
 
     try {
-      const orders = selectedMedications.map(med => ({
+      const pharmacyOrders = selectedMedications.filter(m => !m.isCustomRx).map(med => ({
         visitId: parsedVisitId,
         patientId: String(patientId),
         name: med.name || '',
@@ -481,10 +492,15 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
         category: med.category || null
       }));
 
-      for (const order of orders) {
+      if (pharmacyOrders.length === 0) {
+        toast.error('No pharmacy medications to submit. External Rx items are printed only.');
+        return;
+      }
+
+      for (const order of pharmacyOrders) {
         await api.post('/doctors/medication-orders', order);
       }
-      toast.success(`${orders.length} medication(s) prescribed successfully`);
+      toast.success(`${pharmacyOrders.length} medication(s) prescribed successfully`);
       setSelectedMedications([]);
       await fetchPrescribedMedications();
       if (onOrdersPlaced) onOrdersPlaced();
@@ -578,10 +594,15 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
     return isHealthOfficer ? `Mr. ${rawName}` : `Dr. ${rawName}`;
   };
 
-  const printPrescription = async () => {
+  const printPrescription = async (filterType = 'all') => {
     let medicationsToPrint = prescribedMedications.length > 0 ? prescribedMedications : selectedMedications;
+    if (filterType === 'pharmacy') {
+      medicationsToPrint = medicationsToPrint.filter(m => !m.isCustomRx);
+    } else if (filterType === 'external') {
+      medicationsToPrint = completedExternalOrders;
+    }
     if (medicationsToPrint.length === 0) {
-      toast.error('No medications to print. Please prescribe medications first.');
+      toast.error('No medications to print.');
       return;
     }
 
@@ -666,7 +687,7 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
             .prescription-container { width: 105mm; min-height: 148mm; background: white; padding: 8mm; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; box-sizing: border-box; display: block; margin: 0 auto; }
             .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; margin-bottom: 12px; border-bottom: 2px solid #2563eb; }
             .header-left { display: flex; align-items: center; gap: 8px; }
-            .logo { width: 40px; height: 40px; object-fit: contain; }
+            .logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
             .clinic-name { font-size: 13px; font-weight: 700; margin: 0; color: #1e40af; text-transform: uppercase; }
             .clinic-tagline { font-size: 9px; color: #64748b; margin: 0; font-style: italic; }
             .report-title { font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; }
@@ -694,7 +715,7 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
                 </div>
               </div>
               <div class="header-right">
-                <h2 class="report-title">Prescription</h2>
+                  <h2 class="report-title">Prescription</h2>
                 <div class="report-info">
                   Date: ${currentDate}<br>
                   Time: ${currentTime}
@@ -772,327 +793,305 @@ const MedicationOrdering = ({ visitId, patientId, patient, doctor, onOrdersPlace
     }
   };
 
+  const inputClass = 'w-full px-3 py-2 border rounded-lg focus:ring-2 text-sm bg-white text-slate-900 border-slate-300 focus:ring-slate-400 placeholder-slate-400';
+  const textareaClass = 'w-full px-2.5 py-1.5 border rounded text-sm focus:ring-2 bg-white text-slate-900 border-slate-300 focus:ring-slate-400 placeholder-slate-400';
+
   return (
     <div className="space-y-6">
-      <div>
-        <h4 className="font-semibold mb-3" style={{ color: '#0C0E0B' }}>Search Medications from Inventory</h4>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search medications by name..."
-            value={medicationSearch}
-            onChange={handleSearchChange}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-          {isSearching && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+      {/* ====== TOP SECTION: Current Selections ====== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* ── LEFT: Pharmacy Medications ── */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-slate-500" />
+              <h3 className="font-bold text-slate-800 text-base">Pharmacy Medications</h3>
+              {pharmacyMeds.length > 0 && (
+                <span className="text-xs font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">{pharmacyMeds.length}</span>
+              )}
             </div>
-          )}
-        </div>
-
-        {searchResults.length > 0 && (
-          <div className="mt-3 border border-gray-200 rounded-lg max-h-60 overflow-y-auto bg-white shadow-sm">
-            {searchResults.map((medication) => (
-              <div
-                key={medication.id}
-                className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                onClick={() => addMedicationFromSearch(medication)}
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {medication.name}
-                      {medication.strength ? ` - ${medication.strength}` : ''}
-                    </p>
-                  </div>
-                  {medication.isCustomSuggestion ? (
-                    <span className="text-xs font-semibold text-indigo-600">Saved custom</span>
-                  ) : (
-                    <span className="text-xs font-semibold text-green-600">{medication.availableQuantity} in stock</span>
-                  )}
+            <button onClick={() => printPrescription('pharmacy')}
+              disabled={pharmacyMeds.length === 0}
+              className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition disabled:opacity-40 disabled:cursor-not-allowed">
+              <Printer className="h-3.5 w-3.5" /> Print Order
+            </button>
+          </CardHeader>
+          <CardBody>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input type="text" placeholder="Search inventory medications..."
+                value={medicationSearch} onChange={handleSearchChange}
+                className={inputClass + ' pl-10'} />
+              {isSearching && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-500" />
                 </div>
+              )}
+            </div>
+
+            {searchResults.filter(m => !m.isCustomSuggestion).length > 0 && (
+              <div className="border border-slate-200 rounded-lg max-h-48 overflow-y-auto bg-white shadow-sm">
+                {searchResults.filter(m => !m.isCustomSuggestion).map((medication) => {
+                  const isOOS = medication.availableQuantity === 0 || medication.availableQuantity === null;
+                  const isLowStock = !isOOS && medication.availableQuantity <= 5;
+                  return (
+                  <div key={medication.id} className={`border-b border-slate-100 last:border-b-0 ${isOOS ? 'opacity-60' : ''}`}>
+                    <div className={`p-3 flex items-center justify-between ${isOOS ? '' : 'hover:bg-slate-50 cursor-pointer'}`}
+                      onClick={() => !isOOS && addMedicationFromSearch(medication)}>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-slate-900 text-sm">
+                          {medication.name}{medication.strength ? ` - ${medication.strength}` : ''}
+                        </p>
+                      </div>
+                      {isOOS ? (
+                        <span className="text-xs font-semibold text-red-500 flex-shrink-0 ml-2">Out of Stock</span>
+                      ) : isLowStock ? (
+                        <span className="text-xs font-semibold text-amber-600 flex-shrink-0 ml-2">Low: {medication.availableQuantity}</span>
+                      ) : (
+                        <span className="text-xs font-semibold text-emerald-600 flex-shrink-0 ml-2">{medication.availableQuantity} in stock</span>
+                      )}
+                    </div>
+                    {isOOS && (
+                      <div className="px-3 pb-2 flex justify-end">
+                        <button onClick={() => useOutOfStockAsCustom(medication)}
+                          className="text-xs font-bold text-white bg-red-600 px-3 py-1.5 rounded-lg hover:bg-red-700 transition shadow-sm">
+                          Use as Custom Rx →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            )}
 
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold" style={{ color: '#0C0E0B' }}>Manual Entry / Custom Medication</h4>
-          <button
-            onClick={() => setShowCustomForm(!showCustomForm)}
-            className="flex items-center px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            {showCustomForm ? 'Cancel' : 'Add Custom'}
-          </button>
-        </div>
+            {pharmacyMeds.length > 0 && (
+              <div className="space-y-2">
+                {pharmacyMeds.map((medication, index) => {
+                  const origIdx = selectedMedications.indexOf(medication);
+                  return (
+                <div key={medication.id} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                  <div className="flex justify-between items-start mb-1.5">
+                    <p className="font-bold text-slate-900 text-sm">{index + 1}. {medication.name}</p>
+                    <button onClick={() => removeMedication(origIdx)}
+                      className="text-red-500 hover:text-red-600 p-1 hover:bg-red-50 rounded transition-colors flex-shrink-0">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <textarea value={medication.instructionText} onChange={(e) => updateMedication(origIdx, 'instructionText', e.target.value)}
+                    className={textareaClass}
+                    placeholder="Instructions (e.g. 1 tablet twice daily for 7 days)" rows={2} />
+                </div>
+                  );
+                })}
+              </div>
+            )}
 
-        {showCustomForm && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-indigo-900 mb-1">Medication Name *</label>
+            {pharmacyMeds.length > 0 && (
+              <button onClick={submitMedicationOrders}
+                className="w-full font-bold py-3 rounded-xl shadow-sm transition-all hover:shadow flex items-center justify-center gap-2 bg-slate-800 text-white hover:bg-slate-700">
+                <CheckCircle className="h-5 w-5" />
+                <span>Submit to Pharmacy</span>
+              </button>
+            )}
+          </CardBody>
+        </Card>
+
+        {/* ── RIGHT: Patient Prescription (External) ── */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-slate-500" />
+              <h3 className="font-bold text-slate-800 text-base">Patient Prescription (External)</h3>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <p className="text-xs text-slate-500 italic">Not available at our pharmacy — patient will purchase externally</p>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2 block">Add Custom Medication</span>
+              <div className="space-y-2">
                 <div className="relative">
-                  <input
-                    type="text"
-                    value={customMedication.name}
+                  <input type="text" value={customMedication.name}
                     onChange={handleCustomMedSearchChange}
-                    className="w-full px-3 py-2 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 bg-white"
-                    placeholder="e.g. Paracetamol"
-                  />
+                    className={inputClass}
+                    placeholder="Medication name *" />
                   {showCustomMedSuggestions && customMedSearchResults.length > 0 && (
-                    <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-40 overflow-y-auto">
+                    <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded shadow-lg max-h-36 overflow-y-auto">
                       {customMedSearchResults.map((med) => (
-                        <div
-                          key={med.id}
-                          onClick={() => selectCustomMedication(med)}
-                          className="px-3 py-2 hover:bg-indigo-50 cursor-pointer text-xs"
-                        >
-                          <span className="font-semibold">{med.name}</span> - {med.strength}
+                        <div key={med.id} onClick={() => selectCustomMedication(med)}
+                          className="px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs text-slate-700">
+                          <span className="font-semibold text-slate-900">{med.name}</span> - {med.strength}
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-indigo-900 mb-1">Strength (Optional)</label>
-                <input
-                  type="text"
-                  value={customMedication.strength}
+                <input type="text" value={customMedication.strength}
                   onChange={(e) => handleCustomFieldChange('strength', e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 bg-white"
-                  placeholder="e.g. 500mg"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-sm font-bold text-indigo-900 mb-1.5">Instructions (Quantity, Frequency, Duration, Route)</label>
-              <textarea
-                value={customMedication.instructions}
-                onChange={(e) => handleCustomFieldChange('instructions', e.target.value)}
-                className="w-full px-4 py-2.5 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
-                placeholder="e.g. Take 1 tablet twice daily for 7 days after meals"
-                rows={3}
-              />
-            </div>
-
-            <div className="flex flex-wrap gap-3 pt-4 mt-4 border-t border-indigo-200">
-              <button
-                onClick={() => addCustomMedication(true)}
-                disabled={isSavingCustomMed}
-                className="flex items-center px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors"
-              >
-                {isSavingCustomMed ? (
-                  <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2" />
-                ) : (
-                  <Save className="h-5 w-5 mr-2" />
-                )}
-                Save & Add Another
-              </button>
-              <button
-                onClick={() => addCustomMedication(false)}
-                disabled={isSavingCustomMed}
-                className="flex items-center px-4 py-2.5 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors"
-              >
-                {isSavingCustomMed ? (
-                  <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2" />
-                ) : (
-                  <CheckCircle className="h-5 w-5 mr-2" />
-                )}
-                Save & Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCustomForm(false);
-                  setCustomMedication({
-                    name: '', genericName: '', strength: '', strengthText: '', dosageFormCategory: '',
-                    dosageForm: '', routeCode: '', quantity: '', frequencyType: '', frequencyValue: '',
-                    frequencyUnit: 'times', frequencyUnitPer: 'day', durationValue: '', durationUnit: 'DAYS', instructions: ''
-                  });
-                }}
-                className="flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg font-bold hover:bg-gray-600 transition-colors"
-              >
-                <X className="h-5 w-5 mr-2" />
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {selectedMedications.length > 0 && (
-        <div className="space-y-4">
-          <h4 className="font-semibold text-gray-900">Current Prescription</h4>
-          {selectedMedications.map((medication, index) => (
-            <div key={medication.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm border-l-4 border-l-blue-500">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <h5 className="font-bold text-gray-900 text-lg">{index + 1}. {medication.name}</h5>
-                </div>
-                <button
-                  onClick={() => removeMedication(index)}
-                  className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-full transition-colors"
-                >
-                  <Trash2 className="h-5 w-5" />
+                  className={inputClass}
+                  placeholder="Strength (e.g. 500mg)" />
+                <textarea value={customMedication.instructions}
+                  onChange={(e) => handleCustomFieldChange('instructions', e.target.value)}
+                  className={textareaClass} rows={3}
+                  placeholder="Instructions (e.g. 1 tablet twice daily for 7 days after meals)" />
+                <button onClick={addCustomMedication} disabled={isSavingCustomMed}
+                  className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-sm font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition disabled:opacity-50">
+                  {isSavingCustomMed ? (
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4" />
+                  )}
+                  Add to Rx
                 </button>
               </div>
+            </div>
 
-              {medication.isCustom ? (
-                <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Instructions (Quantity, Frequency, Duration, Route)</label>
-                    <textarea
-                      value={medication.instructionText}
-                      onChange={(e) => updateMedication(index, 'instructionText', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g. Take 1 tablet twice daily for 7 days after meals"
-                      rows={2}
-                    />
-                  </div>
-                </div>
+            <p className="text-center text-slate-400 text-sm py-2">External prescriptions appear in the bottom card once saved</p>
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* ====== BOTTOM SECTION: Prescribed Records ====== */}
+      {(prescribedMedications.length > 0 || completedExternalOrders.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
+
+          {/* ── LEFT: Sent to Pharmacy ── */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-slate-500" />
+                <h3 className="font-bold text-slate-800 text-base">Sent to Pharmacy</h3>
+                {prescribedMedications.length > 0 && (
+                  <span className="text-xs font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">{prescribedMedications.length}</span>
+                )}
+              </div>
+              <button onClick={printPrescription}
+                disabled={prescribedMedications.length === 0}
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                <Printer className="h-3.5 w-3.5" /> Reprint Order
+              </button>
+            </CardHeader>
+            <CardBody>
+              {prescribedMedications.length === 0 ? (
+                <p className="text-center text-slate-400 text-sm py-4">No pharmacy items submitted yet</p>
               ) : (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Instructions (Quantity, Frequency, Duration, Route)</label>
-                  <textarea
-                    value={medication.instructionText}
-                    onChange={(e) => updateMedication(index, 'instructionText', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g. Take 1 tablet twice daily for 7 days after meals"
-                    rows={2}
-                  />
+                <div className="space-y-2">
+                  {prescribedMedications.map((order, idx) => (
+                    <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-900 text-sm">{idx + 1}. {formatMedicationName(order.name)}</p>
+                          {resolveMedicationInstruction(order) && (
+                            <p className="text-xs text-slate-500 mt-0.5">{resolveMedicationInstruction(order)}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                          <span className={`text-xs font-bold uppercase px-1.5 py-0.5 rounded ${
+                            order.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
+                            order.status === 'UNPAID' ? 'bg-amber-100 text-amber-700' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>{order.status}</span>
+                          {order.status === 'UNPAID' && (
+                            <div className="flex gap-1">
+                              <button onClick={() => setEditingOrder(order)}
+                                className="text-blue-500 hover:text-blue-600 p-1 hover:bg-blue-50 rounded" title="Edit Order">
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-5M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
+                                </svg>
+                              </button>
+                              <button onClick={() => handleDeleteOrder(order.id)} disabled={deleteLoading === order.id}
+                                className="text-red-500 hover:text-red-600 p-1 hover:bg-red-50 rounded disabled:opacity-50" title="Delete Order">
+                                {deleteLoading === order.id ? (
+                                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs mt-1.5 text-slate-400 italic">Sent to pharmacy for dispensing</p>
+                    </div>
+                  ))}
                 </div>
               )}
-            </div>
-          ))}
+            </CardBody>
+          </Card>
 
-          <div className="flex flex-col items-end space-y-4 pt-4 border-t">
-            <button
-              onClick={submitMedicationOrders}
-              className="w-full font-bold py-4 rounded-xl shadow-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <CheckCircle className="h-6 w-6" />
-              <span>Complete Prescription</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {prescribedMedications.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4 mt-6">
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="font-semibold text-gray-900">Prescribed Medication Record</h4>
-            <div className="flex gap-2">
-              <button
-                onClick={printPrescription}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition"
-              >
-                <Printer className="h-4 w-4" /> Print Prescription
-              </button>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {prescribedMedications.map((order, idx) => (
-              <div key={idx} className="p-3 bg-gray-50 border rounded-lg flex justify-between items-center">
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900">{idx + 1}. {formatMedicationName(order.name)}</p>
-                  {resolveMedicationInstruction(order) && (
-                    <p className="text-xs text-gray-600 ml-4 italic">
-                      {resolveMedicationInstruction(order)}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-blue-600 uppercase">{order.status}</span>
-                  {order.status === 'UNPAID' && (
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => setEditingOrder(order)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
-                        title="Edit Order"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-5M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteOrder(order.id)}
-                        disabled={deleteLoading === order.id}
-                        className="p-1.5 text-red-600 hover:bg-red-100 rounded-md transition-colors disabled:opacity-50"
-                        title="Delete Order"
-                      >
-                        {deleteLoading === order.id ? (
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
+          {/* ── RIGHT: Patient's External Prescription ── */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-slate-500" />
+                <h3 className="font-bold text-slate-800 text-base">Patient's External Prescription</h3>
+                {completedExternalOrders.length > 0 && (
+                  <span className="text-xs font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">{completedExternalOrders.length}</span>
+                )}
               </div>
-            ))}
-          </div>
+              <button onClick={() => printPrescription('external')}
+                disabled={completedExternalOrders.length === 0}
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                <Printer className="h-3.5 w-3.5" /> Reprint Rx
+              </button>
+            </CardHeader>
+            <CardBody>
+              {completedExternalOrders.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-slate-500 text-sm">No external prescriptions on record</p>
+                  <p className="text-slate-400 text-xs mt-1">External prescriptions are given to the patient as a printed slip</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500 italic mb-2">Prescription provided — patient will collect from external pharmacy</p>
+                  {completedExternalOrders.map((med, idx) => (
+                    <div key={med.id || idx} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      <p className="font-bold text-slate-900 text-sm">{idx + 1}. {med.name}</p>
+                      {resolveMedicationInstruction(med) && (
+                        <p className="text-xs text-slate-500 mt-0.5">{resolveMedicationInstruction(med)}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardBody>
+          </Card>
         </div>
       )}
 
+      {/* ────────── EDIT ORDER MODAL ────────── */}
       {editingOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b flex justify-between items-center">
-              <h3 className="text-lg font-bold">Edit Medication Order</h3>
-              <button onClick={() => setEditingOrder(null)} className="text-gray-400 hover:text-gray-600">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-800">Edit Medication Order</h3>
+              <button onClick={() => setEditingOrder(null)} className="text-slate-400 hover:text-slate-600">
                 <Plus className="h-6 w-6 transform rotate-45" />
               </button>
             </div>
             <form onSubmit={handleUpdateOrder} className="p-6">
               <div className="space-y-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Medication Name</label>
-                  <input
-                    type="text"
-                    value={editingOrder.name}
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Medication Name</label>
+                  <input type="text" value={editingOrder.name}
                     onChange={(e) => setEditingOrder({ ...editingOrder, name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
+                    className={inputClass} required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Instructions (Quantity, Frequency, Duration, Route)</label>
-                  <textarea
-                    value={editingOrder.instructions || editingOrder.instructionText || ''}
-                    onChange={(e) => setEditingOrder({
-                      ...editingOrder,
-                      instructionText: e.target.value,
-                      instructions: e.target.value
-                    })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    rows={4}
-                    placeholder="e.g. 1 tablet twice daily for 5 days after meals"
-                  />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Instructions (Quantity, Frequency, Duration, Route)</label>
+                  <textarea value={editingOrder.instructions || editingOrder.instructionText || ''}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, instructionText: e.target.value, instructions: e.target.value })}
+                    className={textareaClass} rows={4}
+                    placeholder="e.g. 1 tablet twice daily for 5 days after meals" />
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setEditingOrder(null)}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
-                >
-                  Update Order
-                </button>
+                <button type="button" onClick={() => setEditingOrder(null)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg">Cancel</button>
+                <button type="submit"
+                  className="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700">Update Order</button>
               </div>
             </form>
           </div>

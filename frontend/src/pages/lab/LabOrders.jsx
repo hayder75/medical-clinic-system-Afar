@@ -861,7 +861,7 @@ const LabOrders = () => {
             .logo {
               width: 70px;
               height: 70px;
-              object-fit: contain;
+              border-radius: 50%; object-fit: cover;
             }
             .clinic-info {
               text-align: left;

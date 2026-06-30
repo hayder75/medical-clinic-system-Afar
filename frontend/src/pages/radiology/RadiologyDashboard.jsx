@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
+import RadiologistDailyWork from './RadiologistDailyWork';
 import RadiologyOrders from '../../components/radiology/RadiologyOrders';
 import api from '../../services/api';
 import { 
@@ -188,6 +189,7 @@ const RadiologyDashboard = () => {
     <Routes>
       <Route path="/" element={<DashboardOverview />} />
       <Route path="/orders" element={<RadiologyOrders />} />
+      <Route path="/daily-work" element={<RadiologistDailyWork />} />
     </Routes>
   );
 };

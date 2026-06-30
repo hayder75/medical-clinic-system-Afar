@@ -129,4 +129,22 @@ router.get('/doctor-commissions', roleGuard(['ADMIN']), adminController.getDocto
 router.get('/doctor-commissions/:doctorId', roleGuard(['ADMIN']), adminController.getSingleDoctorCommissions);
 router.put('/doctor-commissions/:doctorId', roleGuard(['ADMIN']), adminController.updateDoctorCommissions);
 
+// Radiologist Commissions
+router.get('/radiologist-commissions', roleGuard(['ADMIN']), adminController.getRadiologistCommissions);
+router.put('/radiologist-commissions/:radiologistId', roleGuard(['ADMIN']), adminController.updateRadiologistCommission);
+
+// Institution Management
+const institutionController = require('../controllers/institutionController');
+
+router.get('/institutions', roleGuard(['ADMIN', 'BILLING_OFFICER']), institutionController.getInstitutions);
+router.get('/institutions/:id', roleGuard(['ADMIN', 'BILLING_OFFICER']), institutionController.getInstitution);
+router.post('/institutions', roleGuard(['ADMIN']), institutionController.createInstitution);
+router.put('/institutions/:id', roleGuard(['ADMIN']), institutionController.updateInstitution);
+router.delete('/institutions/:id', roleGuard(['ADMIN']), institutionController.deleteInstitution);
+router.get('/institutions/:id/patients', roleGuard(['ADMIN']), institutionController.getLinkedPatients);
+router.post('/institutions/:id/patients/link', roleGuard(['ADMIN']), institutionController.linkPatient);
+router.delete('/institutions/:id/patients/:linkId', roleGuard(['ADMIN']), institutionController.unlinkPatient);
+router.post('/institutions/:id/patients/create-and-link', roleGuard(['ADMIN']), institutionController.createAndLinkPatient);
+router.get('/institutions/:id/report', roleGuard(['ADMIN', 'REPORT']), institutionController.getInstitutionReport);
+
 module.exports = router;

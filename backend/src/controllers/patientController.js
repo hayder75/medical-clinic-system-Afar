@@ -34,8 +34,8 @@ exports.searchPatients = async (req, res) => {
     const { query, type } = req.query;
     console.log('🔍 Patient search request:', { query, type });
 
-    if (!query || query.trim().length < 2) {
-      return res.status(400).json({ error: 'Search query must be at least 2 characters long' });
+    if (!query || query.trim().length < 1) {
+      return res.status(400).json({ error: 'Search query is required' });
     }
 
     const searchTerm = query.trim();

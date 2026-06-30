@@ -82,6 +82,9 @@ model User {
   transfersInitiated         PatientTransfer[]            @relation("TransferFromDoctor")
   transfersReceived          PatientTransfer[]            @relation("TransferToDoctor")
   commissions                DoctorCommission[]
+  radiologistCommission      RadiologistCommission?
+  radiologyResultsProcessed  RadiologyResult[]       @relation("RadiologyResultProcessor")
+  institutionLinksCreated    PatientInstitution[]
 
   @@index([role])
   @@index([availability])
@@ -217,6 +220,7 @@ model Patient {
   internationalMedicalCertificates InternationalMedicalCertificate[]
   admissions                 Admission[]
   patientTransfers           PatientTransfer[]
+  institutionLinks            PatientInstitution[]
 
   @@index([status])
   @@index([type])
@@ -426,21 +430,23 @@ model Billing {
 
 model BillPayment {
   id          String      @id @default(uuid())
-  billingId   String
-  patientId   String
-  amount      Float
-  type        PaymentType
-  bankName    String?
-  transNumber String?
-  insuranceId String?
-  notes       String?
-  createdById String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  billing     Billing     @relation(fields: [billingId], references: [id])
-  insurance   Insurance?  @relation(fields: [insuranceId], references: [id])
-  patient     Patient     @relation(fields: [patientId], references: [id])
-  createdBy   User?       @relation("BillPaymentCreator", fields: [createdById], references: [id])
+  billingId     String
+  patientId     String
+  amount        Float
+  type          PaymentType
+  bankName      String?
+  transNumber   String?
+  insuranceId   String?
+  institutionId String?
+  notes         String?
+  createdById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  billing       Billing     @relation(fields: [billingId], references: [id])
+  insurance     Insurance?  @relation(fields: [insuranceId], references: [id])
+  institution   Institution? @relation(fields: [institutionId], references: [id])
+  patient       Patient     @relation(fields: [patientId], references: [id])
+  createdBy     User?       @relation("BillPaymentCreator", fields: [createdById], references: [id])
 }
 
 model PharmacyInvoice {
@@ -1014,6 +1020,16 @@ model DoctorCommission {
   @@index([doctorId])
 }
 
+model RadiologistCommission {
+  id              String   @id @default(uuid())
+  radiologistId   String   @unique
+  percentage      Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  radiologist     User     @relation(fields: [radiologistId], references: [id])
+}
+
 model ContinuousInfusion {
   id                Int                   @id @default(autoincrement())
   medicationOrderId Int                   @unique
@@ -1168,11 +1184,13 @@ model RadiologyResult {
   recommendations    String?
   additionalNotes    String?
   status             OrderStatus           @default(UNPAID)
+  processedBy        String?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   batchOrder         BatchOrder?           @relation(fields: [batchOrderId], references: [id])
   order              RadiologyOrder?       @relation(fields: [orderId], references: [id])
   testType           InvestigationType     @relation(fields: [testTypeId], references: [id])
+  processor          User?                 @relation("RadiologyResultProcessor", fields: [processedBy], references: [id])
   attachments        RadiologyResultFile[]
 }
 
@@ -1983,12 +2001,53 @@ enum BillingType {
   ACCOMMODATION
 }
 
+enum InstitutionType {
+  CORPORATE
+  NGO
+  CHARITY
+  GOVERNMENT
+}
+
+model Institution {
+  id            String              @id @default(uuid())
+  name          String
+  type          InstitutionType
+  tinNumber     String?
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  status        String              @default("ACTIVE")
+  totalBilled   Float               @default(0)
+  totalPaid     Float               @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  patients      PatientInstitution[]
+  billPayments  BillPayment[]
+}
+
+model PatientInstitution {
+  id            String      @id @default(uuid())
+  patientId     String
+  institutionId String
+  linkedById    String
+  linkedAt      DateTime    @default(now())
+  notes         String?
+  patient       Patient     @relation(fields: [patientId], references: [id])
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  linkedBy      User        @relation(fields: [linkedById], references: [id])
+
+  @@unique([patientId, institutionId])
+  @@index([institutionId])
+}
+
 enum PaymentType {
   CASH
   BANK
   INSURANCE
   CHARITY
   CREDIT
+  INSTITUTION
 }
 
 enum MedicineCategory {

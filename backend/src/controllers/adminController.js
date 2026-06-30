@@ -6376,3 +6376,57 @@ exports.updateDoctorCommissions = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// ── Radiologist Commissions ─────────────────────────────────────
+
+exports.getRadiologistCommissions = async (req, res) => {
+  try {
+    const radiologists = await prisma.user.findMany({
+      where: { role: 'RADIOLOGIST', isActive: true },
+      select: {
+        id: true,
+        fullname: true,
+        qualifications: true,
+        radiologistCommission: true,
+      },
+      orderBy: { fullname: 'asc' },
+    });
+
+    const result = radiologists.map(r => ({
+      id: r.id,
+      fullname: r.fullname,
+      qualifications: r.qualifications,
+      percentage: r.radiologistCommission?.percentage || 0,
+    }));
+
+    res.json({ radiologists: result });
+  } catch (error) {
+    console.error('Error fetching radiologist commissions:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateRadiologistCommission = async (req, res) => {
+  try {
+    const { radiologistId } = req.params;
+    const { percentage } = req.body;
+
+    const pct = Math.min(100, Math.max(0, parseFloat(percentage) || 0));
+
+    const radiologist = await prisma.user.findUnique({ where: { id: radiologistId } });
+    if (!radiologist || radiologist.role !== 'RADIOLOGIST') {
+      return res.status(404).json({ error: 'Radiologist not found' });
+    }
+
+    await prisma.radiologistCommission.upsert({
+      where: { radiologistId },
+      update: { percentage: pct },
+      create: { radiologistId, percentage: pct },
+    });
+
+    res.json({ message: 'Radiologist commission updated', radiologistId, percentage: pct });
+  } catch (error) {
+    console.error('Error updating radiologist commission:', error);
+    res.status(500).json({ error: error.message });
+  }
+};

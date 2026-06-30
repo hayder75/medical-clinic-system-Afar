@@ -30,6 +30,7 @@ const ROLE_SIDEBAR_ITEMS = {
     { key: 'patientAccounts', label: 'Patient Accounts', href: '/admin/patient-accounts' },
     { key: 'bedManagement', label: 'Bed Management', href: '/admin/beds' },
     { key: 'cardProducts', label: 'Card Products', href: '/admin/card-products' },
+    { key: 'institutions', label: 'Institution Accounts', href: '/admin/institutions' },
     { key: 'auditLogs', label: 'Audit Logs', href: '/admin/audit' },
     { key: 'loanApproval', label: 'Loan Approval', href: '/admin/loan-approval' },
     { key: 'systemView', label: 'System View', href: '/admin/system-view' },
@@ -120,6 +121,7 @@ const ROLE_SIDEBAR_ITEMS = {
     { key: 'dashboard', label: 'Dashboard', href: '/' },
     { key: 'radiologyOrders', label: 'Radiology Orders', href: '/radiology/orders' },
     { key: 'radiologyWalkIn', label: 'Walk-In Orders', href: '/radiology/walk-in' },
+    { key: 'radiologyDailyWork', label: 'Daily Work', href: '/radiology/daily-work' },
     { key: 'loans', label: 'Loans', href: '/loans' },
   ],
   REPORT: [
