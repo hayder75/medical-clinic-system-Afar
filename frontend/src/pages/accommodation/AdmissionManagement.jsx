@@ -65,9 +65,9 @@ const AdmissionManagement = () => {
     const [selectedPatientCard, setSelectedPatientCard] = useState(null);
     const [includeCardActivation, setIncludeCardActivation] = useState(false);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (showLoading = true) => {
         try {
-            setLoading(true);
+            if (showLoading) setLoading(true);
             const [admRes, bedRes] = await Promise.all([
                 api.get(`/accommodation/admissions?status=${statusFilter}`),
                 api.get('/accommodation/beds')
@@ -78,7 +78,7 @@ const AdmissionManagement = () => {
         } catch (error) {
             toast.error('Failed to fetch admission data');
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
     }, [statusFilter]);
 
@@ -94,13 +94,13 @@ const AdmissionManagement = () => {
     };
 
     useEffect(() => {
-        fetchData();
+        fetchData(true);
         fetchServices();
     }, [fetchData]);
 
-    // Auto-refresh polling every 5 seconds
+    // Auto-refresh polling every 5 seconds (silent — no loading flash)
     useEffect(() => {
-        const interval = setInterval(fetchData, 5000);
+        const interval = setInterval(() => fetchData(false), 5000);
         return () => clearInterval(interval);
     }, [fetchData]);
 
