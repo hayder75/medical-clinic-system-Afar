@@ -24,7 +24,7 @@ const PharmacyStockRequests = () => {
     try {
       setLoading(true);
       const [reqRes, medRes] = await Promise.all([
-        api.get('/warehouse/requests', { params: { status: activeTab } }),
+        api.get('/warehouse/requests', { params: activeTab === 'ALL' ? {} : { status: activeTab } }),
         api.get('/medications/catalog'),
       ]);
       setRequests(reqRes.data.requests || []);
