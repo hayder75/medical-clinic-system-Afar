@@ -36,7 +36,8 @@ const StaffManagement = () => {
     { value: 'LAB_TECHNICIAN', label: 'Lab Technician' },
     { value: 'PHARMACIST', label: 'Pharmacist' },
     { value: 'BILLING_OFFICER', label: 'Billing Officer' },
-    { value: 'PHARMACY_BILLING_OFFICER', label: 'Pharmacy Billing Officer' }
+    { value: 'PHARMACY_BILLING_OFFICER', label: 'Pharmacy Billing Officer' },
+    { value: 'INVENTORY_MANAGER', label: 'Inventory Manager' }
   ];
 
   const qualifications = [
