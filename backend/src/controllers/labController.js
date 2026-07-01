@@ -31,7 +31,7 @@ const getOrders = async (req, res) => {
     const { date, status } = req.query;
     const where = {};
 
-    const pendingStatuses = ['UNPAID', 'PAID', 'QUEUED', 'IN_PROGRESS'];
+    const pendingStatuses = ['PAID', 'QUEUED', 'IN_PROGRESS'];
     const completedStatuses = ['COMPLETED'];
     const allVisibleStatuses = [...pendingStatuses, ...completedStatuses];
     const statusList = status === 'COMPLETED'
@@ -730,7 +730,7 @@ const getLabStats = async (req, res) => {
       }
     } : {};
 
-    const pendingStatuses = ['UNPAID', 'PAID', 'QUEUED'];
+    const pendingStatuses = ['PAID', 'QUEUED'];
     const inProgressStatuses = ['IN_PROGRESS'];
     const completedStatuses = ['COMPLETED', 'VERIFIED'];
 
