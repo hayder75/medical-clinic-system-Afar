@@ -10,6 +10,8 @@ const categories = [
     title: 'Medical Clinic',
     icon: Activity,
     color: 'bg-blue-500',
+    lightColor: 'bg-blue-50',
+    textColor: 'text-blue-600',
     description: 'Patient records, disease reports, and clinical data',
     reports: [
       { title: 'Central Register', path: '/admin/central-register', desc: 'Patient registration records with disability & payment summaries' },
@@ -24,6 +26,8 @@ const categories = [
     title: 'Doctor Performance',
     icon: Stethoscope,
     color: 'bg-green-500',
+    lightColor: 'bg-green-50',
+    textColor: 'text-green-600',
     description: 'Doctor activity, revenue, and patient metrics',
     reports: [
       { title: 'Doctor Performance Report', path: '/admin/doctor-performance', desc: 'Per-doctor revenue, patients, procedures, and orders' },
@@ -35,6 +39,8 @@ const categories = [
     title: 'Billing & Revenue',
     icon: DollarSign,
     color: 'bg-yellow-500',
+    lightColor: 'bg-yellow-50',
+    textColor: 'text-yellow-600',
     description: 'Financial analytics, revenue reports, and billing performance',
     reports: [
       { title: 'Revenue Analytics', path: '/admin/financial-reports', desc: 'Full financial reports with daily/monthly breakdowns' },
@@ -47,6 +53,8 @@ const categories = [
     title: 'Lab Reports',
     icon: TestTube,
     color: 'bg-purple-500',
+    lightColor: 'bg-purple-50',
+    textColor: 'text-purple-600',
     description: 'Laboratory test statistics and technician performance',
     reports: [
       { title: 'Lab Reports Dashboard', path: '/admin/lab-reports', desc: 'Test statistics, category breakdowns, technician data' },
@@ -57,6 +65,8 @@ const categories = [
     title: 'Nurse',
     icon: UserCheck,
     color: 'bg-pink-500',
+    lightColor: 'bg-pink-50',
+    textColor: 'text-pink-600',
     description: 'Nurse performance and family planning services',
     reports: [
       { title: 'Nurse Performance Report', path: '/admin/nurse-performance', desc: 'Per-nurse triages, services, and revenue' },
@@ -68,6 +78,8 @@ const categories = [
     title: 'Pharmacy',
     icon: Pill,
     color: 'bg-red-500',
+    lightColor: 'bg-red-50',
+    textColor: 'text-red-600',
     description: 'Pharmacy revenue and medication dispensing',
     reports: [
       { title: 'Pharmacy Revenue', path: '/admin/financial-reports', desc: 'Pharmacy financial data and prescription stats' },
@@ -76,7 +88,7 @@ const categories = [
 ];
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
-  <div className="bg-white rounded-xl shadow-sm border p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+  <div className="bg-white rounded-xl border p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
     <div className={`p-2.5 rounded-lg ${color}`}>
       <Icon className="h-5 w-5 text-white" />
     </div>
@@ -132,63 +144,60 @@ const ReportHub = () => {
     ],
   };
 
+  const activeCat = categories.find(c => c.id === activeCategory);
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex items-center gap-3 mb-6">
         <div className="p-2.5 bg-blue-100 rounded-lg">
           <BarChart3 className="h-6 w-6 text-blue-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-gray-500">View and manage all hospital reports</p>
+          <h1 className="text-xl font-bold text-gray-900">Reports</h1>
+          <p className="text-sm text-gray-500">View and manage all hospital reports</p>
         </div>
       </div>
 
-      {/* Category Navigation */}
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-6">
         {categories.map(cat => (
           <button
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${
               activeCategory === cat.id
-                ? 'bg-gray-900 text-white shadow-lg'
+                ? `${cat.color} text-white shadow-md`
                 : 'bg-white text-gray-700 border hover:bg-gray-50 shadow-sm'
             }`}
           >
-            <cat.icon className={`h-4 w-4 ${activeCategory === cat.id ? 'text-white' : `text-${cat.color.replace('bg-', '')}`}`} />
+            <cat.icon className="h-4 w-4" />
             {cat.title}
           </button>
         ))}
       </div>
 
-      {/* Active Category - Stats + Reports */}
-      {categories.filter(c => c.id === activeCategory).map(cat => (
-        <div key={cat.id} className="space-y-4">
-          {/* Category header */}
+      {activeCat && (
+        <div className="space-y-6">
           <div className="bg-white rounded-xl shadow-sm border p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`p-2 rounded-lg ${cat.color}`}>
-                <cat.icon className="h-5 w-5 text-white" />
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`p-2 rounded-lg ${activeCat.color}`}>
+                <activeCat.icon className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-900">{cat.title}</h2>
-                <p className="text-sm text-gray-500">{cat.description}</p>
+                <h2 className="text-lg font-bold text-gray-900">{activeCat.title}</h2>
+                <p className="text-sm text-gray-500">{activeCat.description}</p>
               </div>
             </div>
-            {categoryStats[cat.id] && (
+            {categoryStats[activeCat.id] && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {categoryStats[cat.id].map((s, i) => (
+                {categoryStats[activeCat.id].map((s, i) => (
                   <StatCard key={i} {...s} />
                 ))}
               </div>
             )}
           </div>
 
-          {/* Report Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {cat.reports.map((report, idx) => (
+            {activeCat.reports.map((report, idx) => (
               <button
                 key={idx}
                 onClick={() => navigate(report.path)}
@@ -207,7 +216,7 @@ const ReportHub = () => {
             ))}
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 };

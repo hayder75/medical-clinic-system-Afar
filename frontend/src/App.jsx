@@ -234,7 +234,9 @@ const AppRoutes = () => {
           path="/admin/institutions/:id"
           element={
             <ProtectedRoute allowedRoles={['ADMIN']}>
-              <InstitutionDetail />
+              <Layout title="Institution Detail" subtitle="View and manage institution accounts">
+                <InstitutionDetail />
+              </Layout>
             </ProtectedRoute>
           }
         />
