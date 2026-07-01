@@ -347,19 +347,16 @@ const AccommodationTab = ({ visit, onUpdated }) => {
                     </div>
                 </div>
             ) : showAssignForm ? (
-                <div className="bg-white rounded-3xl p-8 border-2 border-primary-50 shadow-xl max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <h4 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-                        <Bed className="h-8 w-8 text-primary-600" />
-                        Admit Patient to Ward
-                    </h4>
+                <div className="bg-white rounded-xl shadow-sm border p-6 max-w-2xl mx-auto">
+                    <h4 className="text-lg font-bold text-gray-900 mb-4">Admit Patient to Ward</h4>
 
-                    <form onSubmit={handleAssignBed} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <form onSubmit={handleAssignBed} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-bold text-gray-700 mb-2 px-1 uppercase tracking-wide">Select Available Bed *</label>
+                                <label className="label">Select Available Bed *</label>
                                 <select
                                     required
-                                    className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent focus:border-primary-500 focus:bg-white rounded-2xl outline-none transition-all text-gray-900"
+                                    className="input"
                                     value={formData.bedId}
                                     onChange={(e) => setFormData({ ...formData, bedId: e.target.value })}
                                 >
@@ -373,61 +370,52 @@ const AccommodationTab = ({ visit, onUpdated }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2 px-1 uppercase tracking-wide">Stay Duration (Days) *</label>
+                                <label className="label">Stay Duration (Days) *</label>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="number"
                                         required
                                         min="1"
-                                        className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent focus:border-primary-500 focus:bg-white rounded-2xl outline-none transition-all text-gray-900"
+                                        className="input"
                                         value={durationDays}
                                         onChange={(e) => setDurationDays(e.target.value)}
                                     />
-                                    <span className="text-gray-500 font-bold">Days</span>
+                                    <span className="text-sm text-gray-500 font-medium">Days</span>
                                 </div>
-                                <p className="text-[10px] text-primary-600 mt-1 font-medium italic">
+                                <p className="text-xs text-gray-400 mt-1">
                                     Ends on: {new Date(formData.expectedEndDate).toLocaleDateString()}
                                 </p>
                             </div>
                         </div>
 
-                        {/* Initial Services Selection */}
-                        <div className="space-y-4">
-                            <label className="block text-sm font-bold text-gray-700 px-1 uppercase tracking-wide">Select Preliminary Services</label>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-2 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div>
+                            <label className="label">Select Preliminary Services</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2">
                                 {services.map(svc => {
                                     const isSelected = selectedInitialServices.find(s => s.id === svc.id);
                                     return (
                                         <div
                                             key={svc.id}
                                             onClick={() => toggleInitialService(svc)}
-                                            className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${isSelected ? 'border-primary-500 bg-primary-50 shadow-sm' : 'border-white bg-white hover:border-gray-200'
+                                            className={`p-2.5 rounded-lg border cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
                                                 }`}
                                         >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex-1">
-                                                    <p className={`font-bold text-sm ${isSelected ? 'text-primary-900' : 'text-gray-800'}`}>{svc.name}</p>
-                                                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">{svc.price.toLocaleString()} ETB</p>
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <p className={`text-sm font-medium ${isSelected ? 'text-blue-900' : 'text-gray-800'}`}>{svc.name}</p>
+                                                    <p className="text-xs text-gray-500">{svc.price.toLocaleString()} ETB</p>
                                                 </div>
-                                                <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
+                                                <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
                                                     }`}>
-                                                    {isSelected && <CheckCircle2 className="h-3 w-3 text-white" />}
+                                                    {isSelected && <CheckCircle2 className="h-2.5 w-2.5 text-white" />}
                                                 </div>
                                             </div>
 
                                             {isSelected && (
-                                                <div className="flex items-center gap-2 pt-2 border-t border-primary-100 mt-2" onClick={e => e.stopPropagation()}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => updateInitialServiceQuantity(svc.id, -1)}
-                                                        className="h-6 w-6 rounded bg-white border border-primary-200 text-primary-600 flex items-center justify-center hover:bg-primary-100"
-                                                    >-</button>
-                                                    <span className="text-xs font-bold w-4 text-center">{isSelected.quantity}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => updateInitialServiceQuantity(svc.id, 1)}
-                                                        className="h-6 w-6 rounded bg-white border border-primary-200 text-primary-600 flex items-center justify-center hover:bg-primary-100"
-                                                    >+</button>
+                                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-blue-100" onClick={e => e.stopPropagation()}>
+                                                    <button type="button" onClick={() => updateInitialServiceQuantity(svc.id, -1)} className="h-5 w-5 rounded border border-gray-300 text-gray-600 flex items-center justify-center text-xs hover:bg-gray-100">-</button>
+                                                    <span className="text-xs font-medium w-4 text-center">{isSelected.quantity}</span>
+                                                    <button type="button" onClick={() => updateInitialServiceQuantity(svc.id, 1)} className="h-5 w-5 rounded border border-gray-300 text-gray-600 flex items-center justify-center text-xs hover:bg-gray-100">+</button>
                                                 </div>
                                             )}
                                         </div>
@@ -437,48 +425,37 @@ const AccommodationTab = ({ visit, onUpdated }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2 px-1 uppercase tracking-wide">Admission Notes & Instructions</label>
+                            <label className="label">Admission Notes & Instructions</label>
                             <textarea
-                                className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent focus:border-primary-500 focus:bg-white rounded-2xl outline-none transition-all text-gray-900"
-                                rows="4"
+                                className="input"
+                                rows="3"
                                 placeholder="Reason for admission, specific nursing instructions, etc..."
                                 value={formData.notes}
                                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                             />
                         </div>
 
-                        <div className="flex gap-4 pt-4">
-                            <button
-                                type="button"
-                                onClick={() => setShowAssignForm(false)}
-                                className="flex-1 px-8 py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200 transition-all uppercase tracking-widest text-sm"
-                            >
+                        <div className="flex gap-3 pt-2">
+                            <button type="button" onClick={() => setShowAssignForm(false)} className="btn btn-outline flex-1">
                                 Cancel
                             </button>
-                            <button
-                                type="submit"
-                                disabled={actionLoading}
-                                className="flex-1 px-8 py-4 bg-primary-600 text-white rounded-2xl font-bold hover:bg-primary-700 transition-all shadow-lg shadow-primary-200 uppercase tracking-widest text-sm flex items-center justify-center gap-3"
-                            >
-                                {actionLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
+                            <button type="submit" disabled={actionLoading} className="btn btn-primary flex-1 flex items-center justify-center gap-2">
+                                {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                                 Confirm Admission
                             </button>
                         </div>
                     </form>
                 </div>
             ) : (
-                <div className="bg-white rounded-3xl p-16 text-center border-2 border-dashed border-gray-100">
-                    <div className="h-24 w-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 text-gray-200">
-                        <Bed className="h-12 w-12" />
+                <div className="bg-white rounded-xl shadow-sm border p-6 text-center">
+                    <div className="h-10 w-10 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <Bed className="h-5 w-5 text-gray-400" />
                     </div>
-                    <h4 className="text-2xl font-bold text-gray-900 mb-2">Patient not currently admitted</h4>
-                    <p className="text-gray-500 max-w-md mx-auto mb-8">
-                        This patient is not currently assigned to any bed. Do they require overnight monitoring or ward care?
+                    <h4 className="text-base font-bold text-gray-900 mb-1">Patient not currently admitted</h4>
+                    <p className="text-sm text-gray-500 mb-4">
+                        This patient is not currently assigned to any bed.
                     </p>
-                    <button
-                        onClick={() => setShowAssignForm(true)}
-                        className="px-10 py-4 bg-primary-600 text-white rounded-2xl font-bold hover:bg-primary-700 transition-all shadow-xl shadow-primary-100 uppercase tracking-widest text-sm"
-                    >
+                    <button onClick={() => setShowAssignForm(true)} className="btn btn-primary">
                         Prepare Admission
                     </button>
                 </div>
