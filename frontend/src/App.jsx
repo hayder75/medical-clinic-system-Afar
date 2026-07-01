@@ -54,6 +54,11 @@ import ReportDashboard from './pages/report/ReportDashboard';
 import BillingPatientHistory from './components/billing/BillingPatientHistory';
 import InstitutionManagement from './pages/admin/InstitutionManagement';
 import InstitutionDetail from './pages/admin/InstitutionDetail';
+import InventoryDashboard from './pages/inventory/InventoryDashboard';
+import WarehouseStock from './pages/inventory/WarehouseStock';
+import StockRequestsInv from './pages/inventory/StockRequests';
+import StockMovements from './pages/inventory/StockMovements';
+import PharmacyStockRequests from './pages/pharmacy/PharmacyStockRequests';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -113,6 +118,8 @@ const AppRoutes = () => {
         return '/radiology';
       case 'REPORT':
         return '/report';
+      case 'INVENTORY_MANAGER':
+        return '/inventory';
       default:
         return '/login';
     }
@@ -663,6 +670,57 @@ const AppRoutes = () => {
             <ProtectedRoute allowedRoles={['PHARMACIST', 'PHARMACY_BILLING_OFFICER']}>
               <Layout title="Pharmacy" subtitle="Medication dispensing, billing, and inventory">
                 <PharmacyDashboard />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pharmacy/stock-requests"
+          element={
+            <ProtectedRoute allowedRoles={['PHARMACIST', 'PHARMACY_BILLING_OFFICER']}>
+              <Layout title="Stock Requests" subtitle="Request medications from the warehouse">
+                <PharmacyStockRequests />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/inventory"
+          element={
+            <ProtectedRoute allowedRoles={['INVENTORY_MANAGER']}>
+              <Layout title="Inventory Dashboard" subtitle="Warehouse overview and management">
+                <InventoryDashboard />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/stock"
+          element={
+            <ProtectedRoute allowedRoles={['INVENTORY_MANAGER']}>
+              <Layout title="Warehouse Stock" subtitle="Manage warehouse medication inventory">
+                <WarehouseStock />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/requests"
+          element={
+            <ProtectedRoute allowedRoles={['INVENTORY_MANAGER']}>
+              <Layout title="Stock Requests" subtitle="Process pharmacy stock requests">
+                <StockRequestsInv />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/movements"
+          element={
+            <ProtectedRoute allowedRoles={['INVENTORY_MANAGER']}>
+              <Layout title="Stock Movements" subtitle="Audit trail of all stock changes">
+                <StockMovements />
               </Layout>
             </ProtectedRoute>
           }

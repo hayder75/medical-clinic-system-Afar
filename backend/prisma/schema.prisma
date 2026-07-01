@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model User {
@@ -85,6 +86,11 @@ model User {
   radiologistCommission      RadiologistCommission?
   radiologyResultsProcessed  RadiologyResult[]       @relation("RadiologyResultProcessor")
   institutionLinksCreated    PatientInstitution[]
+  stockRequestsRequested     StockRequest[]           @relation("StockRequest_requestedBy")
+  stockRequestsApproved      StockRequest[]           @relation("StockRequest_approvedBy")
+  stockMovements             StockMovement[]
+  purchaseOrdersOrdered      PurchaseOrder[]          @relation("PO_orderedBy")
+  purchaseOrdersReceived     PurchaseOrder[]          @relation("PO_receivedBy")
 
   @@index([role])
   @@index([availability])
@@ -993,6 +999,152 @@ model MedicationCatalog {
   @@index([category])
   @@index([name])
   @@index([isRetailOnly])
+
+  warehouseStock    WarehouseStock?
+  stockRequestItems StockRequestItem[]
+  stockMovements    StockMovement[]
+  poItems           PurchaseOrderItem[]
+}
+
+model WarehouseStock {
+  id                  String           @id @default(uuid())
+  medicationCatalogId String           @unique
+  quantity            Int
+  minimumStock        Int              @default(10)
+  unitCost            Float?
+  expiryDate          DateTime?
+  updatedAt           DateTime         @updatedAt
+  medicationCatalog   MedicationCatalog @relation(fields: [medicationCatalogId], references: [id])
+
+  @@index([quantity])
+}
+
+enum StockRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELIVERED
+  PARTIALLY_DELIVERED
+}
+
+model StockRequest {
+  id              String              @id @default(uuid())
+  status          StockRequestStatus  @default(PENDING)
+  requestedById   String
+  approvedById    String?
+  notes           String?
+  rejectReason    String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  requestedBy     User                @relation("StockRequest_requestedBy", fields: [requestedById], references: [id])
+  approvedBy      User?               @relation("StockRequest_approvedBy", fields: [approvedById], references: [id])
+  items           StockRequestItem[]
+
+  @@index([status])
+  @@index([requestedById])
+  @@index([createdAt])
+}
+
+model StockRequestItem {
+  id                  String           @id @default(uuid())
+  stockRequestId      String
+  medicationCatalogId String
+  quantityRequested   Int
+  quantityDelivered   Int?
+  stockRequest        StockRequest     @relation(fields: [stockRequestId], references: [id], onDelete: Cascade)
+  medicationCatalog   MedicationCatalog @relation(fields: [medicationCatalogId], references: [id])
+
+  @@index([stockRequestId])
+  @@index([medicationCatalogId])
+}
+
+enum MovementType {
+  STOCK_REQUEST_OUT
+  STOCK_REQUEST_IN
+  MANUAL_ADJUST
+  PURCHASE_IN
+}
+
+model StockMovement {
+  id                  String       @id @default(uuid())
+  medicationCatalogId String
+  quantity            Int
+  type                MovementType
+  referenceType       String?
+  referenceId         String?
+  userId              String
+  notes               String?
+  createdAt           DateTime     @default(now())
+  medicationCatalog   MedicationCatalog @relation(fields: [medicationCatalogId], references: [id])
+  user                User         @relation(fields: [userId], references: [id])
+
+  @@index([medicationCatalogId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Supplier {
+  id              String          @id @default(uuid())
+  name            String
+  contactPerson   String?
+  phone           String?
+  email           String?
+  address         String?
+  status          SupplierStatus  @default(ACTIVE)
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  purchaseOrders  PurchaseOrder[]
+
+  @@index([name])
+  @@index([status])
+}
+
+enum PurchaseOrderStatus {
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id              String               @id @default(uuid())
+  supplierId      String
+  status          PurchaseOrderStatus  @default(ORDERED)
+  orderedById     String
+  receivedById    String?
+  notes           String?
+  totalAmount     Float?
+  orderedAt       DateTime             @default(now())
+  receivedAt      DateTime?
+  updatedAt       DateTime             @updatedAt
+  supplier        Supplier             @relation(fields: [supplierId], references: [id])
+  orderedBy       User                 @relation("PO_orderedBy", fields: [orderedById], references: [id])
+  receivedBy      User?                @relation("PO_receivedBy", fields: [receivedById], references: [id])
+  items           PurchaseOrderItem[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([orderedAt])
+}
+
+model PurchaseOrderItem {
+  id                  String           @id @default(uuid())
+  purchaseOrderId     String
+  medicationCatalogId String
+  quantityOrdered     Int
+  quantityReceived    Int              @default(0)
+  unitPrice           Float?
+  purchaseOrder       PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  medicationCatalog   MedicationCatalog @relation(fields: [medicationCatalogId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([medicationCatalogId])
 }
 
 model Assignment {
@@ -1890,6 +2042,7 @@ enum Role {
   HEALTH_OFFICER
   HOSPITAL_MANAGER
   HR_OFFICER
+  INVENTORY_MANAGER
   IT_SUPPORT
   LAB_TECHNICIAN
   MEDICAL_RECORDS_OFFICER

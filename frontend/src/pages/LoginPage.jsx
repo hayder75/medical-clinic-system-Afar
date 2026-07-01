@@ -18,8 +18,21 @@ const LoginPage = () => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [userSearch, setUserSearch] = useState('');
 
-  const { login } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      const roleRoutes = {
+        ADMIN: '/admin', DOCTOR: '/doctor/dashboard', NURSE: '/nurse',
+        RECEPTIONIST: '/reception', BILLING_OFFICER: '/billing',
+        PHARMACY_BILLING_OFFICER: '/pharmacy-billing', PHARMACIST: '/pharmacy',
+        LAB_TECHNICIAN: '/lab', RADIOLOGIST: '/radiology', REPORT: '/report',
+        INVENTORY_MANAGER: '/inventory'
+      };
+      navigate(roleRoutes[user.role] || '/login', { replace: true });
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     const fetchUsers = async () => {

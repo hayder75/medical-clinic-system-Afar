@@ -12,7 +12,7 @@ import {
   parseDoctorWorkspaceConfig,
 } from '../../utils/doctorWorkspace';
 
-const ROLES = ['ADMIN', 'DOCTOR', 'NURSE', 'BILLING_OFFICER', 'RECEPTIONIST', 'PHARMACY_BILLING_OFFICER', 'PHARMACIST', 'LAB_TECHNICIAN', 'RADIOLOGIST', 'REPORT'];
+const ROLES = ['ADMIN', 'DOCTOR', 'NURSE', 'BILLING_OFFICER', 'RECEPTIONIST', 'PHARMACY_BILLING_OFFICER', 'PHARMACIST', 'INVENTORY_MANAGER', 'LAB_TECHNICIAN', 'RADIOLOGIST', 'REPORT'];
 
 const ROLE_SIDEBAR_ITEMS = {
   ADMIN: [
@@ -100,6 +100,7 @@ const ROLE_SIDEBAR_ITEMS = {
     { key: 'prescriptionQueue', label: 'Prescription Queue', href: '/pharmacy/queue' },
     { key: 'inventory', label: 'Inventory', href: '/pharmacy/inventory' },
     { key: 'pharmacyWalkInSales', label: 'Walk-in Sales', href: '/pharmacy/walk-in-sales' },
+    { key: 'stockRequests', label: 'Request Stock', href: '/pharmacy/stock-requests' },
     { key: 'loans', label: 'Loans', href: '/loans' },
   ],
   PHARMACIST: [
@@ -108,7 +109,14 @@ const ROLE_SIDEBAR_ITEMS = {
     { key: 'prescriptionQueue', label: 'Prescription Queue', href: '/pharmacy/queue' },
     { key: 'inventory', label: 'Inventory', href: '/pharmacy/inventory' },
     { key: 'pharmacyWalkInSales', label: 'Walk-in Sales', href: '/pharmacy/walk-in-sales' },
+    { key: 'stockRequests', label: 'Request Stock', href: '/pharmacy/stock-requests' },
     { key: 'loans', label: 'Loans', href: '/loans' },
+  ],
+  INVENTORY_MANAGER: [
+    { key: 'dashboard', label: 'Dashboard', href: '/' },
+    { key: 'warehouseStock', label: 'Warehouse Stock', href: '/inventory/stock' },
+    { key: 'stockRequests', label: 'Stock Requests', href: '/inventory/requests' },
+    { key: 'stockMovements', label: 'Stock Movements', href: '/inventory/movements' },
   ],
   LAB_TECHNICIAN: [
     { key: 'dashboard', label: 'Dashboard', href: '/' },
@@ -280,6 +288,7 @@ function SidebarTab({ sidebarConfig, setSidebarConfig, saving, onSave }) {
     RECEPTIONIST: 'bg-pink-500 text-white',
     PHARMACY_BILLING_OFFICER: 'bg-orange-500 text-white',
     PHARMACIST: 'bg-orange-600 text-white',
+    INVENTORY_MANAGER: 'bg-teal-600 text-white',
     LAB_TECHNICIAN: 'bg-cyan-600 text-white',
     RADIOLOGIST: 'bg-teal-600 text-white',
   };

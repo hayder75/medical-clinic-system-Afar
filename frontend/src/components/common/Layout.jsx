@@ -88,7 +88,10 @@ const Layout = ({ children, title, subtitle }) => {
     if (href === '/') {
       return location.pathname === '/' || location.pathname === '/admin' || location.pathname === '/nurse' || location.pathname === '/doctor';
     }
-    return location.pathname.startsWith(href);
+    if (href === '/inventory') {
+      return location.pathname === '/inventory';
+    }
+    return location.pathname === href || location.pathname.startsWith(href + '/');
   };
 
   const fetchSidebarVisibility = useCallback(async () => {
@@ -351,9 +354,17 @@ const Layout = ({ children, title, subtitle }) => {
           ...baseItems,
           { name: 'Pharmacy', href: '/pharmacy', icon: Pill, key: 'pharmacy' },
           { name: 'Sales Report', href: '/pharmacy/sales-report', icon: CalendarRange, key: 'salesReport' },
+          { name: 'Request Stock', href: '/pharmacy/stock-requests', icon: Package, key: 'stockRequests' },
           { name: 'Loans', href: '/loans', icon: DollarSign, key: 'loans' },
         ]);
 
+      case 'INVENTORY_MANAGER':
+        return filterByRole([
+          { name: 'Dashboard', href: '/inventory', icon: Home, key: 'dashboard' },
+          { name: 'Warehouse Stock', href: '/inventory/stock', icon: Package, key: 'warehouseStock' },
+          { name: 'Stock Requests', href: '/inventory/requests', icon: FileText, key: 'stockRequests' },
+          { name: 'Stock Movements', href: '/inventory/movements', icon: Activity, key: 'stockMovements' },
+        ]);
 
       case 'RADIOLOGIST':
         return filterByRole([
