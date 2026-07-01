@@ -405,8 +405,9 @@ const LabOrders = () => {
           parsedResults = defaultResults;
         }
 
-        // Mark as completed if result exists or if order status is COMPLETED
-        const isCompleted = existingResult ? true : (labOrder.status === 'COMPLETED');
+        // Mark as completed only if result has actual data or status is COMPLETED
+        const hasActualResults = existingResult?.results && Object.keys(existingResult.results).some(k => k !== '_images' && existingResult.results[k] && String(existingResult.results[k]).trim() !== '');
+        const isCompleted = existingResult ? (existingResult.status === 'COMPLETED' || hasActualResults) : (labOrder.status === 'COMPLETED');
 
         // Initialize with resultFields from labTest
         initialResults[orderId] = {
@@ -1205,6 +1206,11 @@ const LabOrders = () => {
         for (const oid of group.entries) {
           const r = testResults[oid];
           if (r && r.orderId && r.labTestId) {
+            const hasResults = Object.values(r.results || {}).some(v => v && String(v).trim() !== '');
+            const hasAdditionalNotes = r.additionalNotes && String(r.additionalNotes).trim() !== '';
+            const hasImages = (labImages['panel_' + panelId] && labImages['panel_' + panelId].length > 0) ||
+              (r.results?._images && r.results._images.length > 0);
+            if (!hasResults && !hasAdditionalNotes && !hasImages) continue;
             try {
               await api.post('/labs/results/lab-test', {
                 orderId: r.orderId,

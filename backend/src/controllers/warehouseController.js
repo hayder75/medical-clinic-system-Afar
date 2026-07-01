@@ -220,4 +220,4 @@ const getMovements = async (req, res) => {
   }
 };
 
-module.exports = { getStock, updateStock, getRequests, createRequest, approveRequest, rejectRequest, deliverRequest, getMovements };
+module.exports = { getStock, updateStock, createMedication, getRequests, createRequest, approveRequest, rejectRequest, deliverRequest, getMovements };
