@@ -147,12 +147,7 @@ const DoctorAppointments = () => {
           <div className="flex space-x-3">
             <button
               onClick={() => setShowFilterModal(true)}
-              className="px-4 py-2 rounded-lg border transition flex items-center space-x-2"
-              style={{ 
-                backgroundColor: 'white',
-                borderColor: '#E5E7EB',
-                color: '#0C0E0B'
-              }}
+              className="btn btn-outline flex items-center space-x-2"
             >
               <Filter className="h-4 w-4" />
               <span>Filters</span>
@@ -167,8 +162,7 @@ const DoctorAppointments = () => {
             </button>
             <button
               onClick={() => setShowScheduleModal(true)}
-              className="px-6 py-2 rounded-lg text-white font-medium transition flex items-center space-x-2"
-              style={{ backgroundColor: '#2e13d1' }}
+              className="btn btn-primary flex items-center space-x-2"
             >
               <Plus className="h-5 w-5" />
               <span>Schedule Appointment</span>
@@ -341,12 +335,7 @@ const DoctorAppointments = () => {
             {activeFilterCount() > 0 && (
               <button
                 onClick={clearFilters}
-                className="px-4 py-2 rounded-lg border transition"
-                style={{ 
-                  backgroundColor: 'white',
-                  borderColor: '#E5E7EB',
-                  color: '#0C0E0B'
-                }}
+                className="btn btn-outline"
               >
                 Clear Filters
               </button>
@@ -367,14 +356,13 @@ const DoctorAppointments = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                  <label className="label">
                     Status
                   </label>
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    style={{ borderColor: '#E5E7EB' }}
+                    className="input"
                   >
                     <option value="ALL">All Statuses</option>
                     <option value="SCHEDULED">Scheduled</option>
@@ -387,7 +375,7 @@ const DoctorAppointments = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                  <label className="label">
                     Date
                   </label>
                   <input
@@ -395,8 +383,7 @@ const DoctorAppointments = () => {
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
                     disabled={showTodayOnly}
-                    className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-100 disabled:text-gray-400"
-                    style={{ borderColor: '#E5E7EB' }}
+                    className="input disabled:bg-gray-100 disabled:text-gray-400"
                   />
                   {showTodayOnly && (
                     <p className="mt-2 text-xs" style={{ color: '#6B7280' }}>
@@ -406,14 +393,13 @@ const DoctorAppointments = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                  <label className="label">
                     Type
                   </label>
                   <select
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    style={{ borderColor: '#E5E7EB' }}
+                    className="input"
                   >
                     <option value="ALL">All Types</option>
                     <option value="CONSULTATION">Consultation</option>
@@ -423,17 +409,15 @@ const DoctorAppointments = () => {
               </div>
 
               <div className="flex space-x-3 mt-6">
-                <button
-                  onClick={clearFilters}
-                  className="flex-1 px-4 py-2 border rounded-lg transition"
-                  style={{ borderColor: '#E5E7EB', color: '#0C0E0B' }}
-                >
+<button
+                onClick={clearFilters}
+                className="flex-1 btn btn-outline"
+              >
                   Clear All
                 </button>
                 <button
                   onClick={() => setShowFilterModal(false)}
-                  className="flex-1 px-4 py-2 rounded-lg text-white transition"
-                  style={{ backgroundColor: '#2e13d1' }}
+                  className="flex-1 btn btn-primary"
                 >
                   Apply Filters
                 </button>

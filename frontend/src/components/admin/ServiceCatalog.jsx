@@ -668,6 +668,7 @@ const ServiceCatalog = () => {
                       >
                         <option value="">Select group...</option>
                         <option value="HEMATOLOGY">Hematology</option>
+                        <option value="COAGULATION">Coagulation</option>
                         <option value="CHEMISTRY">Chemistry</option>
                         <option value="SEROLOGY">Serology</option>
                         <option value="MICROBIOLOGY">Microbiology</option>

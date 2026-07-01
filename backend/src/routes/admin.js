@@ -136,6 +136,7 @@ router.put('/radiologist-commissions/:radiologistId', roleGuard(['ADMIN']), admi
 // Institution Management
 const institutionController = require('../controllers/institutionController');
 
+router.get('/institutions/patient/:patientId', roleGuard(['ADMIN', 'BILLING_OFFICER']), institutionController.getPatientInstitutions);
 router.get('/institutions', roleGuard(['ADMIN', 'BILLING_OFFICER']), institutionController.getInstitutions);
 router.get('/institutions/:id', roleGuard(['ADMIN', 'BILLING_OFFICER']), institutionController.getInstitution);
 router.post('/institutions', roleGuard(['ADMIN']), institutionController.createInstitution);

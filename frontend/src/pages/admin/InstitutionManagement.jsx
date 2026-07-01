@@ -119,7 +119,7 @@ const InstitutionManagement = () => {
               <p className="text-sm text-gray-500">Manage corporate, NGO, charity, and government accounts</p>
             </div>
           </div>
-          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition">
+          <button onClick={openCreate} className="btn btn-primary flex items-center gap-2">
             <Plus className="h-4 w-4" /> Add Institution
           </button>
         </div>
@@ -130,7 +130,7 @@ const InstitutionManagement = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name..." className="pl-9 pr-4 py-2 rounded-lg border border-gray-200 text-sm w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
-            <button type="submit" className="px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition">Search</button>
+            <button type="submit" className="btn btn-primary btn-sm">Search</button>
           </form>
           <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-200 text-sm">
             <option value="">All Types</option>
@@ -190,39 +190,39 @@ const InstitutionManagement = () => {
             <form onSubmit={handleSave} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Name *</label>
+                  <label className="label">Name *</label>
                   <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input w-full" required />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Type *</label>
+                  <label className="label">Type *</label>
                   <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input w-full">
                     {INSTITUTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">TIN Number</label>
+                  <label className="label">TIN Number</label>
                   <input value={form.tinNumber} onChange={(e) => setForm({ ...form, tinNumber: e.target.value })} className="input w-full" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Person</label>
+                  <label className="label">Contact Person</label>
                   <input value={form.contactPerson} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} className="input w-full" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Phone</label>
+                  <label className="label">Phone</label>
                   <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input w-full" />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Email</label>
+                  <label className="label">Email</label>
                   <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input w-full" />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Address</label>
+                  <label className="label">Address</label>
                   <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input w-full" />
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                <button type="button" onClick={() => setShowModal(false)} className="btn btn-outline">Cancel</button>
+                <button type="submit" disabled={saving} className="btn btn-primary">
                   {saving ? 'Saving...' : editing ? 'Update' : 'Create'}
                 </button>
               </div>

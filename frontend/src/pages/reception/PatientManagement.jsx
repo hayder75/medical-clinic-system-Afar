@@ -302,7 +302,7 @@ const PatientManagement = () => {
                 placeholder="Search by name, ID, or phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="input pl-10"
               />
             </div>
           </div>
@@ -312,7 +312,7 @@ const PatientManagement = () => {
             <select
               value={cardStatusFilter}
               onChange={(e) => setCardStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="input"
             >
               <option value="ALL">All Cards</option>
               <option value="ACTIVE">Active</option>
@@ -322,7 +322,7 @@ const PatientManagement = () => {
 
             <button
               onClick={fetchPatients}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
+              className="btn btn-primary btn-sm flex items-center gap-2"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh
@@ -432,7 +432,7 @@ const PatientManagement = () => {
                                 toast.error(err.response?.data?.error || 'Failed to complete visit');
                               }
                             }}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+                            className="btn btn-success btn-sm"
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
                             Complete
@@ -484,14 +484,14 @@ const PatientManagement = () => {
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="label">
                 Card Type For Reactivation
               </label>
               <select
                 value={activateForm.cardType}
                 onChange={(e) => setActivateForm({ ...activateForm, cardType: e.target.value })}
                 disabled={activatingCard}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${activatingCard ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                className={`input ${activatingCard ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               >
                 {cardProducts.filter(c => c.isActive).map(c => (
                   <option key={c.id} value={c.slug}>{c.name}</option>
@@ -503,7 +503,7 @@ const PatientManagement = () => {
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="label">
                 Notes (Optional)
               </label>
               <textarea
@@ -511,8 +511,7 @@ const PatientManagement = () => {
                 onChange={(e) => setActivateForm({ ...activateForm, notes: e.target.value })}
                 rows={3}
                 disabled={activatingCard}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${activatingCard ? 'bg-gray-100 cursor-not-allowed' : ''
-                  }`}
+                className={`input ${activatingCard ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 placeholder="Add any notes about this activation..."
               />
             </div>
@@ -534,20 +533,14 @@ const PatientManagement = () => {
               <button
                 onClick={() => setShowActivateModal(false)}
                 disabled={activatingCard}
-                className={`px-4 py-2 text-gray-700 rounded-lg ${activatingCard
-                    ? 'bg-gray-100 cursor-not-allowed'
-                    : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
+                className={`btn btn-outline ${activatingCard ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 Cancel
               </button>
               <button
                 onClick={handleActivateCard}
                 disabled={activatingCard}
-                className={`px-4 py-2 text-white rounded-lg flex items-center gap-2 ${activatingCard
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-green-500 hover:bg-green-600'
-                  }`}
+                className={`btn btn-success flex items-center gap-2 ${activatingCard ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {activatingCard ? (
                   <>
@@ -687,7 +680,7 @@ const PatientManagement = () => {
             <div className="space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -695,15 +688,14 @@ const PatientManagement = () => {
                   value={editForm.name}
                   onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                   disabled={updatingPatient}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                  className={`input ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   required
                 />
               </div>
 
               {/* Mobile */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Mobile
                 </label>
                 <input
@@ -711,15 +703,14 @@ const PatientManagement = () => {
                   value={editForm.mobile}
                   onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}
                   disabled={updatingPatient}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                  className={`input ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   placeholder="e.g., 0912345678"
                 />
               </div>
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Email
                 </label>
                 <input
@@ -727,15 +718,14 @@ const PatientManagement = () => {
                   value={editForm.email}
                   onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                   disabled={updatingPatient}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                  className={`input ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   placeholder="patient@example.com"
                 />
               </div>
 
               {/* Address */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Address
                 </label>
                 <textarea
@@ -743,15 +733,14 @@ const PatientManagement = () => {
                   onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
                   disabled={updatingPatient}
                   rows={2}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                  className={`input ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   placeholder="Patient address"
                 />
               </div>
 
               {/* Emergency Contact */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Emergency Contact
                 </label>
                 <input
@@ -759,15 +748,14 @@ const PatientManagement = () => {
                   value={editForm.emergencyContact}
                   onChange={(e) => setEditForm({ ...editForm, emergencyContact: e.target.value })}
                   disabled={updatingPatient}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                  className={`input ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   placeholder="Emergency contact name or phone"
                 />
               </div>
 
               {/* Date of Birth */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Date of Birth
                 </label>
                 <input
@@ -775,22 +763,20 @@ const PatientManagement = () => {
                   value={editForm.dob}
                   onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
                   disabled={updatingPatient}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                  className={`input ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
               </div>
 
               {/* Gender */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Gender
                 </label>
                 <select
                   value={editForm.gender}
                   onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
                   disabled={updatingPatient}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                  className={`input ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 >
                   <option value="">Select Gender</option>
                   <option value="MALE">Male</option>
@@ -801,15 +787,14 @@ const PatientManagement = () => {
 
               {/* Blood Type */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Blood Type
                 </label>
                 <select
                   value={editForm.bloodType}
                   onChange={(e) => setEditForm({ ...editForm, bloodType: e.target.value })}
                   disabled={updatingPatient}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                  className={`input ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 >
                   <option value="">Select Blood Type</option>
                   <option value="A_PLUS">A+</option>
@@ -826,15 +811,14 @@ const PatientManagement = () => {
 
               {/* Marital Status */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Marital Status
                 </label>
                 <select
                   value={editForm.maritalStatus}
                   onChange={(e) => setEditForm({ ...editForm, maritalStatus: e.target.value })}
                   disabled={updatingPatient}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                  className={`input ${updatingPatient ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 >
                   <option value="">Select Marital Status</option>
                   <option value="SINGLE">Single</option>
@@ -853,20 +837,14 @@ const PatientManagement = () => {
                   setSelectedPatient(null);
                 }}
                 disabled={updatingPatient}
-                className={`px-4 py-2 text-gray-700 rounded-lg ${updatingPatient
-                    ? 'bg-gray-100 cursor-not-allowed'
-                    : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
+                className={`btn btn-outline ${updatingPatient ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpdatePatient}
                 disabled={updatingPatient || !editForm.name.trim()}
-                className={`px-4 py-2 text-white rounded-lg flex items-center gap-2 ${updatingPatient || !editForm.name.trim()
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-500 hover:bg-blue-600'
-                  }`}
+                className={`btn btn-primary flex items-center gap-2 ${updatingPatient || !editForm.name.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {updatingPatient ? (
                   <>

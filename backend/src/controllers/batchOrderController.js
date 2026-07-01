@@ -1365,8 +1365,17 @@ exports.createLabTestOrders = async (req, res) => {
       });
 
       // Add services to billing
+      const billedPanelGroups = new Set();
       for (const order of createdOrders) {
         if (order.labTest.serviceId) {
+          // Ensure the service record has labGroup set if this test belongs to a panel
+          if (order.labTest.group?.name) {
+            await tx.service.updateMany({
+              where: { id: order.labTest.serviceId, labGroup: null },
+              data: { labGroup: order.labTest.group.name }
+            });
+          }
+
           const existingBillingService = await tx.billingService.findFirst({
             where: {
               billingId: billing.id,
@@ -1375,14 +1384,21 @@ exports.createLabTestOrders = async (req, res) => {
           });
 
           if (!existingBillingService) {
-            const panelMember = !!order.labTest.groupId;
+            const groupId = order.labTest.groupId;
+            let price;
+            if (groupId) {
+              price = billedPanelGroups.has(groupId) ? 0 : (panelPricing[groupId] || 0);
+              billedPanelGroups.add(groupId);
+            } else {
+              price = order.labTest.price;
+            }
             await tx.billingService.create({
               data: {
                 billingId: billing.id,
                 serviceId: order.labTest.serviceId,
                 quantity: 1,
-                unitPrice: panelMember ? 0 : order.labTest.price,
-                totalPrice: panelMember ? 0 : order.labTest.price
+                unitPrice: price,
+                totalPrice: price
               }
             });
           }
@@ -1403,7 +1419,8 @@ exports.createLabTestOrders = async (req, res) => {
                   price: order.labTest.price,
                   unit: order.labTest.unit || 'UNIT',
                   description: `Auto-generated LAB service for lab test ${order.labTest.name}`,
-                  isActive: true
+                  isActive: true,
+                  labGroup: order.labTest.group?.name || null
                 },
                 select: { id: true }
               });
