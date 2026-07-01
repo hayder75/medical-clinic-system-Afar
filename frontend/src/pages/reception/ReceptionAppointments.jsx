@@ -338,20 +338,14 @@ const ReceptionAppointments = () => {
           <div className="flex space-x-3">
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 rounded-lg transition flex items-center space-x-2 text-white font-medium"
-              style={{ backgroundColor: '#2e13d1' }}
+              className="btn btn-primary flex items-center space-x-2"
             >
               <Plus className="h-4 w-4" />
               <span>Create Appointment</span>
             </button>
             <button
               onClick={() => setShowFilterModal(true)}
-              className="px-4 py-2 rounded-lg border transition flex items-center space-x-2"
-              style={{ 
-                backgroundColor: 'white',
-                borderColor: '#E5E7EB',
-                color: '#0C0E0B'
-              }}
+              className="btn btn-outline flex items-center space-x-2"
             >
               <Filter className="h-4 w-4" />
               <span>Filters</span>
@@ -392,8 +386,7 @@ const ReceptionAppointments = () => {
               placeholder="Search by patient name, ID, or phone number..."
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border rounded-lg"
-              style={{ borderColor: '#E5E7EB' }}
+              className="input pl-10"
             />
           </div>
         </div>
@@ -619,14 +612,13 @@ const ReceptionAppointments = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                  <label className="label">
                     Status
                   </label>
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    style={{ borderColor: '#E5E7EB' }}
+                    className="input"
                   >
                     <option value="ALL">All Statuses</option>
                     <option value="SCHEDULED">Scheduled</option>
@@ -639,27 +631,25 @@ const ReceptionAppointments = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                  <label className="label">
                     Date
                   </label>
                   <input
                     type="date"
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    style={{ borderColor: '#E5E7EB' }}
+                    className="input"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                  <label className="label">
                     Type
                   </label>
                   <select
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    style={{ borderColor: '#E5E7EB' }}
+                    className="input"
                   >
                     <option value="ALL">All Types</option>
                     <option value="CONSULTATION">Consultation</option>
@@ -668,14 +658,13 @@ const ReceptionAppointments = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                  <label className="label">
                     Doctor
                   </label>
                   <select
                     value={doctorFilter}
                     onChange={(e) => setDoctorFilter(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    style={{ borderColor: '#E5E7EB' }}
+                    className="input"
                   >
                     <option value="ALL">All Doctors</option>
                     {doctors.map(doctor => (
@@ -690,15 +679,13 @@ const ReceptionAppointments = () => {
               <div className="flex space-x-3 mt-6">
                 <button
                   onClick={clearFilters}
-                  className="flex-1 px-4 py-2 border rounded-lg transition"
-                  style={{ borderColor: '#E5E7EB', color: '#0C0E0B' }}
+                  className="flex-1 btn btn-outline"
                 >
                   Clear All
                 </button>
                 <button
                   onClick={() => setShowFilterModal(false)}
-                  className="flex-1 px-4 py-2 rounded-lg text-white transition"
-                  style={{ backgroundColor: '#2e13d1' }}
+                  className="flex-1 btn btn-primary"
                 >
                   Apply Filters
                 </button>
@@ -730,7 +717,7 @@ const ReceptionAppointments = () => {
                   // Step 1: Patient Search
                   <div>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                      <label className="label">
                         Search Patient
                       </label>
                       <div className="relative">
@@ -740,8 +727,7 @@ const ReceptionAppointments = () => {
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder="Search by name, ID, or phone number..."
-                          className="w-full pl-10 pr-4 py-3 border rounded-lg"
-                          style={{ borderColor: '#E5E7EB' }}
+                          className="input pl-10"
                           autoFocus
                         />
                       </div>
@@ -846,7 +832,7 @@ const ReceptionAppointments = () => {
 
                     {/* Doctor Selection */}
                     <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                      <label className="label">
                         Select Doctor *
                       </label>
                       <div className="relative">
@@ -855,8 +841,7 @@ const ReceptionAppointments = () => {
                           value={formData.doctorId}
                           onChange={(e) => setFormData({ ...formData, doctorId: e.target.value })}
                           required
-                          className="w-full pl-10 pr-4 py-3 border rounded-lg"
-                          style={{ borderColor: '#E5E7EB' }}
+                          className="input pl-10"
                         >
                           <option value="">Select a doctor...</option>
                           {doctors.map(doctor => (
@@ -870,7 +855,7 @@ const ReceptionAppointments = () => {
 
                     {/* Appointment Date */}
                     <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                      <label className="label">
                         Appointment Date *
                       </label>
                       <div className="relative">
@@ -881,15 +866,14 @@ const ReceptionAppointments = () => {
                           value={formData.appointmentDate}
                           onChange={(e) => setFormData({ ...formData, appointmentDate: e.target.value })}
                           min={new Date().toISOString().split('T')[0]}
-                          className="w-full pl-10 pr-4 py-3 border rounded-lg"
-                          style={{ borderColor: '#E5E7EB' }}
+                          className="input pl-10"
                         />
                       </div>
                     </div>
 
                     {/* Appointment Time */}
                     <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                      <label className="label">
                         Appointment Time *
                       </label>
                       <div className="relative">
@@ -899,23 +883,21 @@ const ReceptionAppointments = () => {
                           required
                           value={formData.appointmentTime}
                           onChange={(e) => setFormData({ ...formData, appointmentTime: e.target.value })}
-                          className="w-full pl-10 pr-4 py-3 border rounded-lg"
-                          style={{ borderColor: '#E5E7EB' }}
+                          className="input pl-10"
                         />
                       </div>
                     </div>
 
                     {/* Appointment Type */}
                     <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                      <label className="label">
                         Type *
                       </label>
                       <select
                         value={formData.type}
                         onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                         required
-                        className="w-full px-4 py-3 border rounded-lg"
-                        style={{ borderColor: '#E5E7EB' }}
+                        className="input"
                       >
                         <option value="CONSULTATION">Consultation (Charges apply)</option>
                         <option value="FOLLOW_UP">Follow-up (Free)</option>
@@ -929,14 +911,13 @@ const ReceptionAppointments = () => {
 
                     {/* Duration */}
                     <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                      <label className="label">
                         Duration
                       </label>
                       <select
                         value={formData.duration}
                         onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                        className="w-full px-4 py-3 border rounded-lg"
-                        style={{ borderColor: '#E5E7EB' }}
+                        className="input"
                       >
                         <option value="15 minutes">15 minutes</option>
                         <option value="30 minutes">30 minutes</option>
@@ -947,7 +928,7 @@ const ReceptionAppointments = () => {
 
                     {/* Reason */}
                     <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                      <label className="label">
                         Reason for Visit
                       </label>
                       <input
@@ -955,14 +936,13 @@ const ReceptionAppointments = () => {
                         value={formData.reason}
                         onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                         placeholder="e.g., Routine checkup, Lab result review"
-                        className="w-full px-4 py-3 border rounded-lg"
-                        style={{ borderColor: '#E5E7EB' }}
+                        className="input"
                       />
                     </div>
 
                     {/* Notes */}
                     <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: '#0C0E0B' }}>
+                      <label className="label">
                         Notes
                       </label>
                       <textarea
@@ -970,8 +950,7 @@ const ReceptionAppointments = () => {
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                         placeholder="Additional notes or instructions"
                         rows={3}
-                        className="w-full px-4 py-3 border rounded-lg"
-                        style={{ borderColor: '#E5E7EB' }}
+                        className="input"
                       />
                     </div>
 
@@ -980,16 +959,14 @@ const ReceptionAppointments = () => {
                       <button
                         type="button"
                         onClick={() => setStep(1)}
-                        className="flex-1 px-4 py-3 border rounded-lg transition"
-                        style={{ borderColor: '#E5E7EB', color: '#0C0E0B' }}
+                        className="flex-1 btn btn-outline"
                       >
                         Back
                       </button>
                       <button
                         type="submit"
                         disabled={createLoading}
-                        className="flex-1 px-4 py-3 rounded-lg text-white font-medium transition disabled:opacity-50"
-                        style={{ backgroundColor: '#2e13d1' }}
+                        className="flex-1 btn btn-primary"
                       >
                         {createLoading ? 'Creating...' : 'Create Appointment'}
                       </button>

@@ -203,11 +203,11 @@ const InstitutionDetail = () => {
             <form onSubmit={handleSave} className="max-w-lg space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Name</label>
+                  <label className="label">Name</label>
                   <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input w-full" required />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Type</label>
+                  <label className="label">Type</label>
                   <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input w-full">
                     <option value="CORPORATE">Corporate</option>
                     <option value="NGO">NGO</option>
@@ -216,34 +216,34 @@ const InstitutionDetail = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Status</label>
+                  <label className="label">Status</label>
                   <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="input w-full">
                     <option value="ACTIVE">Active</option>
                     <option value="INACTIVE">Inactive</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">TIN Number</label>
+                  <label className="label">TIN Number</label>
                   <input value={form.tinNumber} onChange={(e) => setForm({ ...form, tinNumber: e.target.value })} className="input w-full" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Person</label>
+                  <label className="label">Contact Person</label>
                   <input value={form.contactPerson} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} className="input w-full" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Phone</label>
+                  <label className="label">Phone</label>
                   <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input w-full" />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Email</label>
+                  <label className="label">Email</label>
                   <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input w-full" />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Address</label>
+                  <label className="label">Address</label>
                   <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input w-full" />
                 </div>
               </div>
-              <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+              <button type="submit" disabled={saving} className="btn btn-primary">
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
@@ -254,10 +254,10 @@ const InstitutionDetail = () => {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-bold text-gray-700">Linked Patients ({linkedPatients.length})</h3>
                 <div className="flex gap-2">
-                  <button onClick={() => setShowLinkModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700">
+                  <button onClick={() => setShowLinkModal(true)} className="btn btn-primary btn-sm flex items-center gap-1.5">
                     <Search className="h-3.5 w-3.5" /> Link Existing
                   </button>
-                  <button onClick={() => setCreateNewOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-blue-200 text-blue-600 hover:bg-blue-50">
+                  <button onClick={() => setCreateNewOpen(true)} className="btn btn-outline btn-sm flex items-center gap-1.5">
                     <UserPlus className="h-3.5 w-3.5" /> Create & Link
                   </button>
                   <button onClick={fetchLinkedPatients} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
@@ -334,27 +334,27 @@ const InstitutionDetail = () => {
                     <h3 className="text-lg font-bold text-gray-900 mb-3">Create & Link Patient</h3>
                     <form onSubmit={handleCreateAndLink} className="space-y-3">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Name *</label>
+                        <label className="label">Name *</label>
                         <input value={newPatientForm.name} onChange={(e) => setNewPatientForm({ ...newPatientForm, name: e.target.value })} className="input w-full" required />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Date of Birth</label>
+                        <label className="label">Date of Birth</label>
                         <input type="date" value={newPatientForm.dob} onChange={(e) => setNewPatientForm({ ...newPatientForm, dob: e.target.value })} className="input w-full" />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Gender</label>
+                        <label className="label">Gender</label>
                         <select value={newPatientForm.gender} onChange={(e) => setNewPatientForm({ ...newPatientForm, gender: e.target.value })} className="input w-full">
                           <option value="MALE">Male</option>
                           <option value="FEMALE">Female</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Phone</label>
+                        <label className="label">Phone</label>
                         <input value={newPatientForm.mobile} onChange={(e) => setNewPatientForm({ ...newPatientForm, mobile: e.target.value })} className="input w-full" />
                       </div>
                       <div className="flex justify-end gap-3 pt-2">
-                        <button type="button" onClick={() => setCreateNewOpen(false)} className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50">Cancel</button>
-                        <button type="submit" className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700">Create & Link</button>
+                        <button type="button" onClick={() => setCreateNewOpen(false)} className="btn btn-outline">Cancel</button>
+                        <button type="submit" className="btn btn-primary">Create & Link</button>
                       </div>
                     </form>
                   </div>
@@ -367,14 +367,14 @@ const InstitutionDetail = () => {
             <div>
               <div className="flex flex-wrap items-center gap-3 mb-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">From</label>
+                  <label className="label">From</label>
                   <input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} className="input" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">To</label>
+                  <label className="label">To</label>
                   <input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="input" />
                 </div>
-                <button onClick={fetchReport} className="mt-5 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5">
+                <button onClick={fetchReport} className="mt-5 btn btn-primary flex items-center gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5" /> Load Report
                 </button>
               </div>

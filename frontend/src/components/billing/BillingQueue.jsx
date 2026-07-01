@@ -53,6 +53,9 @@ const BillingQueue = () => {
 
   // Institutions list
   const [institutions, setInstitutions] = useState([]);
+  const [patientInstitutions, setPatientInstitutions] = useState([]);
+  const [showInstConfirm, setShowInstConfirm] = useState(false);
+  const [pendingInstAction, setPendingInstAction] = useState(null);
 
   useEffect(() => {
     api.get('/admin/institutions').then((res) => setInstitutions(res.data)).catch(() => {});
@@ -64,6 +67,55 @@ const BillingQueue = () => {
 
   // Form validation errors
   const [formErrors, setFormErrors] = useState({});
+  const [expandedPanels, setExpandedPanels] = useState(new Set());
+
+  const handlePaymentTypeChange = (newType) => {
+    setFormErrors({ ...formErrors, institutionId: undefined });
+    if (newType === "CASH" && patientInstitutions.length > 0) {
+      setPendingInstAction({
+        type: "CASH_WITH_INST",
+        institution: patientInstitutions[0],
+        newType: "INSTITUTION",
+      });
+      setShowInstConfirm(true);
+      return;
+    }
+    if (newType === "INSTITUTION" && patientInstitutions.length > 0) {
+      setPaymentForm({ ...paymentForm, type: "INSTITUTION", institutionId: patientInstitutions[0].id });
+      setPendingInstAction({
+        type: "INST_CONFIRM",
+        institution: patientInstitutions[0],
+        newType: "INSTITUTION",
+      });
+      setShowInstConfirm(true);
+      return;
+    }
+    setPaymentForm({ ...paymentForm, type: newType, institutionId: "" });
+  };
+
+  const handleInstConfirm = () => {
+    if (pendingInstAction?.type === "PAYMENT_CONFIRM") {
+      setShowInstConfirm(false);
+      setPendingInstAction(null);
+      processPayment();
+      return;
+    }
+    if (pendingInstAction?.type === "CASH_WITH_INST") {
+      setPaymentForm(prev => ({ ...prev, type: "INSTITUTION", institutionId: pendingInstAction.institution.id }));
+    }
+    setShowInstConfirm(false);
+    setPendingInstAction(null);
+  };
+
+  const handleInstCancel = () => {
+    if (pendingInstAction?.type === "CASH_WITH_INST") {
+      setPaymentForm(prev => ({ ...prev, type: "CASH", institutionId: "" }));
+    } else if (pendingInstAction?.type === "INST_CONFIRM" || pendingInstAction?.type === "PAYMENT_CONFIRM") {
+      setPaymentForm(prev => ({ ...prev, type: paymentForm.type, institutionId: "" }));
+    }
+    setShowInstConfirm(false);
+    setPendingInstAction(null);
+  };
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -170,6 +222,30 @@ const BillingQueue = () => {
     }
   };
 
+  const handleDeletePanel = async (billingId, labGroup) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to remove the entire "${labGroup}" panel and all its tests from this billing? This will also cancel the corresponding orders on the doctor's side.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await api.delete(`/billing/panel/${billingId}/${labGroup}`);
+      toast.success(
+        `Panel "${labGroup}" removed and synced with doctor side.`,
+      );
+      await fetchBillings();
+    } catch (error) {
+      console.error("Error deleting panel:", error);
+      toast.error(error.response?.data?.error || "Failed to remove panel");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Removed filterBillings state-setter function logic here as it's now a useMemo hook
 
   // Clean validation function
@@ -204,6 +280,46 @@ const BillingQueue = () => {
     return Object.keys(errors).length === 0;
   };
 
+  const processPayment = async () => {
+    const submittedAmount = Number(paymentForm.amount);
+    const paymentData = {
+      billingId: selectedBilling.id,
+      amount: submittedAmount,
+      type: paymentForm.type,
+      bankName: paymentForm.bankName || null,
+      transNumber: paymentForm.transNumber || null,
+      insuranceId: paymentForm.insuranceId || null,
+      institutionId: paymentForm.institutionId || null,
+      notes: paymentForm.notes || null,
+      isEmergency: paymentForm.isEmergency,
+      useAccount: paymentForm.useAccount,
+      convertToDebt: paymentForm.convertToDebt || false,
+      paymentProofPath: paymentForm.paymentProofPath || null,
+      waiveRegistrationForOldPatient:
+        canWaiveRegistration && paymentForm.waiveRegistrationForOldPatient,
+    };
+
+    try {
+      await api.post("/billing/payments", paymentData);
+
+      const remaining = (selectedBilling.totalAmount - (selectedBilling.paidAmount || 0)) - submittedAmount;
+      if (paymentForm.convertToDebt && remaining > 0) {
+        toast.success(`Payment processed! ETB ${remaining.toLocaleString()} added to patient's credit account as debt.`);
+      } else {
+        toast.success("Payment processed successfully!");
+      }
+      setShowPaymentForm(false);
+      setShowInstConfirm(false);
+      setPendingInstAction(null);
+      setSelectedBilling(null);
+      resetPaymentForm();
+      fetchBillings();
+    } catch (error) {
+      console.error("Payment error:", error);
+      toast.error(error.response?.data?.error || "Payment failed");
+    }
+  };
+
   const handlePayment = async (e) => {
     e.preventDefault();
 
@@ -216,43 +332,16 @@ const BillingQueue = () => {
       return;
     }
 
-    try {
-      const submittedAmount = Number(paymentForm.amount);
-
-      // Prepare payment data
-      const paymentData = {
-        billingId: selectedBilling.id,
-        amount: submittedAmount,
-        type: paymentForm.type,
-        bankName: paymentForm.bankName || null,
-        transNumber: paymentForm.transNumber || null,
-        insuranceId: paymentForm.insuranceId || null,
-        institutionId: paymentForm.institutionId || null,
-        notes: paymentForm.notes || null,
-        isEmergency: paymentForm.isEmergency,
-        useAccount: paymentForm.useAccount,
-        convertToDebt: paymentForm.convertToDebt || false,
-        paymentProofPath: paymentForm.paymentProofPath || null,
-        waiveRegistrationForOldPatient:
-          canWaiveRegistration && paymentForm.waiveRegistrationForOldPatient,
-      };
-
-      await api.post("/billing/payments", paymentData);
-
-      const remaining = (selectedBilling.totalAmount - (selectedBilling.paidAmount || 0)) - submittedAmount;
-      if (paymentForm.convertToDebt && remaining > 0) {
-        toast.success(`Payment processed! ETB ${remaining.toLocaleString()} added to patient's credit account as debt.`);
-      } else {
-        toast.success("Payment processed successfully!");
-      }
-      setShowPaymentForm(false);
-      setSelectedBilling(null);
-      resetPaymentForm();
-      fetchBillings();
-    } catch (error) {
-      console.error("Payment error:", error);
-      toast.error(error.response?.data?.error || "Payment failed");
+    if (paymentForm.type === "INSTITUTION" && patientInstitutions.length > 0) {
+      setPendingInstAction({
+        type: "PAYMENT_CONFIRM",
+        institution: patientInstitutions.find(i => i.id === paymentForm.institutionId) || patientInstitutions[0],
+      });
+      setShowInstConfirm(true);
+      return;
     }
+
+    await processPayment();
   };
 
   const resetPaymentForm = () => {
@@ -270,6 +359,9 @@ const BillingQueue = () => {
       paymentProofPath: "",
       waiveRegistrationForOldPatient: false,
     });
+    setPatientInstitutions([]);
+    setShowInstConfirm(false);
+    setPendingInstAction(null);
     setFormErrors({});
   };
 
@@ -288,24 +380,53 @@ const BillingQueue = () => {
       setPatientAccount(null);
     }
 
+    // Fetch patient's linked institutions
+    let linkedInsts = [];
+    try {
+      const res = await api.get(`/admin/institutions/patient/${billing.patientId}`);
+      linkedInsts = res.data || [];
+      setPatientInstitutions(linkedInsts);
+    } catch {
+      setPatientInstitutions([]);
+    }
+
     // For deferred billings, pre-set the convertToDebt flag and allow partial payment
     const isDeferred = billing.isDeferred || false;
     const remainingBalance = billing.totalAmount - (billing.paidAmount || 0);
 
-    setPaymentForm({
-      type: "CASH",
-      amount: isDeferred ? "" : remainingBalance.toString(),
-      bankName: "",
-      transNumber: "",
-      insuranceId: "",
-      institutionId: "",
-      notes: isDeferred ? "Partial payment - remaining added to credit" : "",
-      isEmergency: false,
-      useAccount: false,
-      convertToDebt: isDeferred,
-      paymentProofPath: "",
-      waiveRegistrationForOldPatient: false,
-    });
+    // If patient has linked institutions, auto-select Institution without popup
+    if (linkedInsts.length > 0) {
+      const inst = linkedInsts[0];
+      setPaymentForm({
+        type: "INSTITUTION",
+        amount: isDeferred ? "" : remainingBalance.toString(),
+        bankName: "",
+        transNumber: "",
+        insuranceId: "",
+        institutionId: inst.id,
+        notes: isDeferred ? "Partial payment - remaining added to credit" : "",
+        isEmergency: false,
+        useAccount: false,
+        convertToDebt: isDeferred,
+        paymentProofPath: "",
+        waiveRegistrationForOldPatient: false,
+      });
+    } else {
+      setPaymentForm({
+        type: "CASH",
+        amount: isDeferred ? "" : remainingBalance.toString(),
+        bankName: "",
+        transNumber: "",
+        insuranceId: "",
+        institutionId: "",
+        notes: isDeferred ? "Partial payment - remaining added to credit" : "",
+        isEmergency: false,
+        useAccount: false,
+        convertToDebt: isDeferred,
+        paymentProofPath: "",
+        waiveRegistrationForOldPatient: false,
+      });
+    }
     setFormErrors({});
     setShowPaymentForm(true);
   };
@@ -720,73 +841,106 @@ const BillingQueue = () => {
                     </div>
                   )}
                   <div className="space-y-1">
-                    {billing.services.map((service, index) => {
-                      const quantity = service.quantity || 1;
-                      const unitPrice = service.unitPrice || 0;
-                      const totalPrice =
-                        service.totalPrice || unitPrice * quantity;
-                      const serviceName = service.service?.name || "Service";
-                      const serviceCategory = service.service?.category || "";
+                    {(() => {
                       const isDeferredConnected = billing.isDeferred && billing.notes?.includes('DEFERRED_CONNECTED');
-
-                      const categoryDisplay = serviceCategory
-                        ? serviceCategory.charAt(0) +
-                        serviceCategory.slice(1).toLowerCase() +
-                        ": "
-                        : "";
-
-                      return (
-                        <div
-                          key={index}
-                          className={`flex justify-between items-center text-sm py-1 ${isDeferredConnected ? 'bg-green-50 rounded px-2' : ''}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            {billing.status === "PENDING" && (
-                              <button
-                                onClick={() =>
-                                  handleDeleteService(
-                                    billing.id,
-                                    service.serviceId,
-                                    serviceName,
-                                  )
-                                }
-                                className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700 bg-red-100 border border-red-200 hover:bg-red-200 hover:border-red-300 rounded-md shadow-sm transition-all mr-2"
-                                title={`Remove ${serviceName}`}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                                Delete
-                              </button>
-                            )}
-                            <span className={isDeferredConnected ? 'text-green-700' : 'text-gray-600'}>
-                              {categoryDisplay}
-                              {serviceName}
-                              {quantity > 1 && (
-                                <span className="text-gray-500 ml-1">
-                                  (×{quantity})
-                                </span>
+                      const renderServiceRow = (service, index) => {
+                        const quantity = service.quantity || 1;
+                        const unitPrice = service.unitPrice || 0;
+                        const totalPrice = service.totalPrice || unitPrice * quantity;
+                        const serviceName = service.service?.name || "Service";
+                        const serviceCategory = service.service?.category || "";
+                        const categoryDisplay = serviceCategory
+                          ? serviceCategory.charAt(0) + serviceCategory.slice(1).toLowerCase() + ": "
+                          : "";
+                        return (
+                          <div key={index}
+                            className={`flex justify-between items-center text-sm py-1 pl-6 ${isDeferredConnected ? 'bg-green-50 rounded px-2' : ''}`}>
+                            <div className="flex items-center gap-2">
+                              {billing.status === "PENDING" && (
+                                <button onClick={() => handleDeleteService(billing.id, service.serviceId, serviceName)}
+                                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700 bg-red-100 border border-red-200 hover:bg-red-200 hover:border-red-300 rounded-md shadow-sm transition-all mr-2"
+                                  title={`Remove ${serviceName}`}>
+                                  <Trash2 className="h-3 w-3" /> Delete
+                                </button>
                               )}
-                              {isDeferredConnected && (
-                                <span className="ml-2 text-[10px] font-bold bg-green-200 text-green-800 px-1.5 py-0.5 rounded">
-                                  ✓ ALREADY PAID
-                                </span>
-                              )}
+                              <span className={isDeferredConnected ? 'text-green-700' : 'text-gray-600'}>
+                                {categoryDisplay}{serviceName}
+                                {quantity > 1 && <span className="text-gray-500 ml-1">(×{quantity})</span>}
+                                {isDeferredConnected && <span className="ml-2 text-[10px] font-bold bg-green-200 text-green-800 px-1.5 py-0.5 rounded">✓ ALREADY PAID</span>}
+                              </span>
+                            </div>
+                            <span className={`font-medium ${isDeferredConnected ? 'text-green-600' : ''}`}>
+                              {isDeferredConnected ? <span className="text-green-600">ETB {totalPrice.toLocaleString()} ✓</span>
+                                : quantity > 1
+                                ? <>ETB {unitPrice.toLocaleString()} × {quantity} = ETB {totalPrice.toLocaleString()}</>
+                                : <>ETB {totalPrice.toLocaleString()}</>}
                             </span>
                           </div>
-                          <span className={`font-medium ${isDeferredConnected ? 'text-green-600' : ''}`}>
-                            {isDeferredConnected ? (
-                              <span className="text-green-600">ETB {totalPrice.toLocaleString()} ✓</span>
-                            ) : quantity > 1 ? (
-                              <>
-                                ETB {unitPrice.toLocaleString()} × {quantity} =
-                                ETB {totalPrice.toLocaleString()}
-                              </>
-                            ) : (
-                              <>ETB {totalPrice.toLocaleString()}</>
-                            )}
-                          </span>
-                        </div>
-                      );
-                    })}
+                        );
+                      };
+
+                      // Group services by labGroup
+                      const grouped = {};
+                      const ungrouped = [];
+                      for (const svc of billing.services) {
+                        const grp = svc.service?.labGroup;
+                        if (grp) {
+                          if (!grouped[grp]) grouped[grp] = [];
+                          grouped[grp].push(svc);
+                        } else {
+                          ungrouped.push(svc);
+                        }
+                      }
+
+                      const rows = [];
+                      let idx = 0;
+
+                      // Render ungrouped services
+                      for (const svc of ungrouped) {
+                        rows.push(renderServiceRow(svc, idx++));
+                      }
+
+                      // Render grouped panels
+                      for (const [panel, members] of Object.entries(grouped)) {
+                        const panelKey = `${billing.id}-${panel}`;
+                        const isOpen = expandedPanels.has(panelKey);
+                        const totalPanelPrice = members.reduce((sum, m) => sum + (m.totalPrice || m.unitPrice * (m.quantity || 1)), 0);
+                        const categoryDisplay = members[0]?.service?.category
+                          ? members[0].service.category.charAt(0) + members[0].service.category.slice(1).toLowerCase() + ": "
+                          : "";
+
+                        rows.push(
+                          <div key={panel}>
+                            <div className="flex justify-between items-center text-sm py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-md cursor-pointer hover:bg-slate-100 transition-colors"
+                              onClick={() => {
+                                const next = new Set(expandedPanels);
+                                if (isOpen) next.delete(panelKey);
+                                else next.add(panelKey);
+                                setExpandedPanels(next);
+                              }}>
+                              <div className="flex items-center gap-2 font-medium text-slate-800">
+                                <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                                {categoryDisplay}{panel}
+                                <span className="text-xs text-slate-500 font-normal">({members.length} tests)</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {billing.status === "PENDING" && (
+                                  <button onClick={(e) => { e.stopPropagation(); handleDeletePanel(billing.id, panel); }}
+                                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700 bg-red-100 border border-red-200 hover:bg-red-200 hover:border-red-300 rounded-md shadow-sm transition-all"
+                                    title={`Remove ${panel} panel`}>
+                                    <Trash2 className="h-3 w-3" /> Delete
+                                  </button>
+                                )}
+                                <span className="font-medium text-slate-700">ETB {totalPanelPrice.toLocaleString()}</span>
+                              </div>
+                            </div>
+                            {isOpen && members.map((m) => renderServiceRow(m, `${panel}-${idx++}`))}
+                          </div>
+                        );
+                      }
+
+                      return rows;
+                    })()}
                   </div>
                 </div>
               )}
@@ -1071,7 +1225,7 @@ const BillingQueue = () => {
                     className="input"
                     value={paymentForm.type}
                     onChange={(e) =>
-                      setPaymentForm({ ...paymentForm, type: e.target.value })
+                      handlePaymentTypeChange(e.target.value)
                     }
                     required
                   >
@@ -1350,6 +1504,50 @@ const BillingQueue = () => {
                 disabled={loading}
               >
                 Process Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Institution Confirmation Modal */}
+      {showInstConfirm && pendingInstAction && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="h-10 w-10 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {pendingInstAction.type === "CASH_WITH_INST"
+                    ? "Patient Linked to Institution"
+                    : "Confirm Institution Payment"}
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {pendingInstAction.type === "CASH_WITH_INST" ? (
+                    <>This patient is linked to <strong>{pendingInstAction.institution.name}</strong> ({pendingInstAction.institution.type}). Would you like to bill their institution instead of cash?</>
+                  ) : (
+                    <>Are you sure you want to use the institution account linked to patient <strong>{selectedBilling?.patient?.name || 'this patient'}</strong> with institution <strong>{pendingInstAction.institution.name}</strong>?</>
+                  )}
+                </p>
+              </div>
+            </div>
+            {(pendingInstAction.type === "INST_CONFIRM" || pendingInstAction.type === "PAYMENT_CONFIRM") && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 text-sm">
+                <p className="text-blue-800 font-medium">Institution Balance</p>
+                <p className="text-blue-700 mt-1">Total Billed: ETB {pendingInstAction.institution.totalBilled?.toLocaleString() || '0'}</p>
+                <p className="text-blue-700">Total Paid: ETB {pendingInstAction.institution.totalPaid?.toLocaleString() || '0'}</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <button onClick={handleInstCancel}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                {pendingInstAction.type === "CASH_WITH_INST" ? "No, keep Cash" : "Cancel"}
+              </button>
+              <button onClick={handleInstConfirm}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                {pendingInstAction.type === "CASH_WITH_INST" ? "Yes, use Institution" : (pendingInstAction.type === "PAYMENT_CONFIRM" ? "Confirm Payment" : "Confirm")}
               </button>
             </div>
           </div>

@@ -1986,7 +1986,8 @@ exports.getBillings = async (req, res) => {
               select: {
                 code: true,
                 name: true,
-                category: true
+                category: true,
+                labGroup: true
               }
             }
           }
@@ -2292,7 +2293,8 @@ exports.getUnpaidBillings = async (req, res) => {
               select: {
                 code: true,
                 name: true,
-                category: true
+                category: true,
+                labGroup: true
               }
             }
           }
@@ -2457,7 +2459,8 @@ exports.getInsuranceBillings = async (req, res) => {
               select: {
                 code: true,
                 name: true,
-                category: true
+                category: true,
+                labGroup: true
               }
             }
           }
@@ -2506,7 +2509,8 @@ exports.getEmergencyBillings = async (req, res) => {
               select: {
                 code: true,
                 name: true,
-                category: true
+                category: true,
+                labGroup: true
               }
             }
           }
@@ -3140,6 +3144,24 @@ exports.deleteBillingService = async (req, res) => {
             }
           });
         }
+
+        // F. Clean up orphaned BatchOrders that had LabTestOrder links but no BatchOrderService
+        if (visitId) {
+          const orphanedBatchOrders = await tx.batchOrder.findMany({
+            where: { visitId }
+          });
+          for (const bo of orphanedBatchOrders) {
+            const remainingLabTestOrders = await tx.labTestOrder.count({
+              where: { batchOrderId: bo.id }
+            });
+            const remainingServices = await tx.batchOrderService.count({
+              where: { batchOrderId: bo.id }
+            });
+            if (remainingLabTestOrders === 0 && remainingServices === 0) {
+              await tx.batchOrder.delete({ where: { id: bo.id } });
+            }
+          }
+        }
       }
 
       // If billing has no more services, delete it
@@ -3176,6 +3198,156 @@ exports.deleteBillingService = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error deleting billing service:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.deleteBillingPanel = async (req, res) => {
+  try {
+    const { billingId, labGroup } = req.params;
+    const userId = req.user.id;
+
+    console.log("🗑️ Deleting billing panel: Billing " + billingId + ", LabGroup " + labGroup);
+
+    const billing = await prisma.billing.findUnique({
+      where: { id: billingId },
+      include: {
+        services: {
+          include: { service: true }
+        },
+        visit: true
+      }
+    });
+
+    if (!billing) {
+      return res.status(404).json({ error: 'Billing not found' });
+    }
+
+    const statuses = ['PENDING', 'EMERGENCY_PENDING', 'PENDING_INSURANCE'];
+    if (!statuses.includes(billing.status)) {
+      return res.status(400).json({ error: 'Cannot delete services from a processed or cancelled billing' });
+    }
+
+    const panelServices = billing.services.filter(s => s.service?.labGroup === labGroup);
+    if (panelServices.length === 0) {
+      return res.status(404).json({ error: 'No services found for this panel' });
+    }
+
+    const totalAmountToRemove = panelServices.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+    const panelName = panelServices[0].service?.labGroup || labGroup;
+
+    await prisma.$transaction(async (tx) => {
+      for (const bs of panelServices) {
+        await tx.billingService.delete({
+          where: {
+            billingId_serviceId: {
+              billingId,
+              serviceId: bs.serviceId
+            }
+          }
+        });
+
+        const visitId = billing.visitId;
+        if (visitId) {
+          const batchOrders = await tx.batchOrder.findMany({
+            where: { visitId },
+            include: { services: true }
+          });
+
+          for (const batchOrder of batchOrders) {
+            const matchingService = batchOrder.services.find(s => s.serviceId === bs.serviceId);
+            if (matchingService) {
+              await tx.batchOrderService.delete({
+                where: { id: matchingService.id }
+              });
+
+              const remainingServices = await tx.batchOrderService.findMany({
+                where: { batchOrderId: batchOrder.id }
+              });
+
+              if (remainingServices.length === 0) {
+                await tx.batchOrder.delete({
+                  where: { id: batchOrder.id }
+                });
+              }
+            }
+          }
+
+          const investigationTypes = await tx.investigationType.findMany({
+            where: { serviceId: bs.serviceId }
+          });
+
+          if (investigationTypes.length > 0) {
+            const itIds = investigationTypes.map(it => it.id);
+            await tx.labOrder.deleteMany({
+              where: { visitId, typeId: { in: itIds }, status: { in: ['UNPAID', 'PAID', 'QUEUED'] } }
+            });
+            await tx.radiologyOrder.deleteMany({
+              where: { visitId, typeId: { in: itIds }, status: { in: ['UNPAID', 'PAID', 'QUEUED'] } }
+            });
+          }
+
+          const labTestsWithService = await tx.labTest.findMany({
+            where: { serviceId: bs.serviceId }
+          });
+
+          if (labTestsWithService.length > 0) {
+            const labTestIds = labTestsWithService.map(lt => lt.id);
+            await tx.labTestOrder.deleteMany({
+              where: { visitId, labTestId: { in: labTestIds }, status: { in: ['UNPAID', 'PAID', 'QUEUED'] } }
+            });
+          }
+        }
+      }
+
+      // Clean up orphaned BatchOrders that had LabTestOrder links but no BatchOrderService
+      if (billing.visitId) {
+        const orphanedBatchOrders = await tx.batchOrder.findMany({
+          where: { visitId: billing.visitId }
+        });
+        for (const bo of orphanedBatchOrders) {
+          const remainingLabTestOrders = await tx.labTestOrder.count({
+            where: { batchOrderId: bo.id }
+          });
+          const remainingServices = await tx.batchOrderService.count({
+            where: { batchOrderId: bo.id }
+          });
+          if (remainingLabTestOrders === 0 && remainingServices === 0) {
+            await tx.batchOrder.delete({ where: { id: bo.id } });
+          }
+        }
+      }
+
+      const updatedBilling = await tx.billing.update({
+        where: { id: billingId },
+        data: { totalAmount: { decrement: totalAmountToRemove } },
+        include: { services: true }
+      });
+
+      if (updatedBilling.services.length === 0) {
+        await tx.billing.delete({ where: { id: billingId } });
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'DELETE_BILLING_PANEL',
+        entity: 'Billing',
+        entityId: 0,
+        details: JSON.stringify({ billingId, labGroup, panelName, servicesRemoved: panelServices.length, amountRemoved: totalAmountToRemove, visitId: billing.visitId }),
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Panel "${panelName}" removed with ${panelServices.length} service(s) and synced with doctor side.`
+    });
+
+  } catch (error) {
+    console.error('❌ Error deleting billing panel:', error);
     res.status(500).json({ error: error.message });
   }
 };

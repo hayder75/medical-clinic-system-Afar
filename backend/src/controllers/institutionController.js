@@ -166,6 +166,24 @@ exports.createAndLinkPatient = async (req, res) => {
   }
 };
 
+exports.getPatientInstitutions = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const links = await prisma.patientInstitution.findMany({
+      where: { patientId },
+      include: {
+        institution: {
+          select: { id: true, name: true, type: true, tinNumber: true, phone: true, totalBilled: true, totalPaid: true, status: true },
+        },
+      },
+    });
+    res.json(links.map(l => l.institution));
+  } catch (error) {
+    console.error('Error fetching patient institutions:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 exports.getInstitutionReport = async (req, res) => {
   try {
     const { id } = req.params;

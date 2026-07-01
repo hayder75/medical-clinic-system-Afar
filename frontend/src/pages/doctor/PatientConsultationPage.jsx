@@ -255,6 +255,7 @@ const PatientConsultationPage = () => {
   const [allVitals, setAllVitals] = useState([]); // All vitals for this visit
   const [activeTab, setActiveTab] = useState('vitals');
   const [labSubTab, setLabSubTab] = useState(null);
+  const [expandedLabPanels, setExpandedLabPanels] = useState({});
   const labDefaultSet = useRef(false);
   const [radiologySubTab, setRadiologySubTab] = useState(null);
   const radiologyDefaultSet = useRef(false);
@@ -4509,69 +4510,152 @@ const PatientConsultationPage = () => {
                               </div>
                             ))}
 
-                          {/* Show pending new lab test orders (these replace BatchOrder display when using new system) */}
-                          {labTestOrders
-                            .filter(order => !order.results || order.results.length === 0)
-                            .map((order) => (
-                              <div key={order.id} className="p-4 border rounded-lg border-gray-200 bg-gray-50">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <p className="font-medium text-gray-800">
-                                      {order.labTest.name}
-                                    </p>
-                                    <p className="text-sm text-gray-600">
-                                      Status: <span className="font-medium">{order.status}</span>
-                                    </p>
-                                    <p className="text-sm text-gray-600">
-                                      Created: {new Date(order.createdAt).toLocaleDateString()}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={() => {
-                                        const printContent = `
-                                          <div style="padding: 20px; font-family: Arial, sans-serif;">
-                                            <h2>Lab Order</h2>
-                                            <p><strong>Test:</strong> ${order.labTest.name}</p>
-                                            <p><strong>Category:</strong> ${order.labTest.category || 'N/A'}</p>
-                                            <p><strong>Status:</strong> ${order.status}</p>
-                                            <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
-                                            ${order.instructions ? `<p><strong>Instructions:</strong> ${order.instructions}</p>` : ''}
+                          {/* Show pending new lab test orders grouped by panel */}
+                          {(() => {
+                            const pending = labTestOrders.filter(order => !order.results || order.results.length === 0);
+                            const panelGroups = {};
+                            const standalone = [];
+                            pending.forEach(order => {
+                              const g = order.labTest?.group;
+                              if (g && g.id) {
+                                if (!panelGroups[g.id]) panelGroups[g.id] = { group: g, orders: [] };
+                                panelGroups[g.id].orders.push(order);
+                              } else {
+                                standalone.push(order);
+                              }
+                            });
+                            const panelEntries = Object.values(panelGroups);
+                            return (<>
+                              {panelEntries.map(pg => {
+                                const panelKey = 'pending-panel-'+pg.group.id;
+                                const isOpen = expandedLabPanels[panelKey];
+                                return (
+                                  <div key={panelKey} className="border rounded-lg border-gray-200 bg-gray-50 overflow-hidden">
+                                    <div
+                                      className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
+                                      onClick={() => setExpandedLabPanels(prev => ({ ...prev, [panelKey]: !prev[panelKey] }))}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <ChevronRight className={`h-4 w-4 text-gray-500 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                                        <div>
+                                          <p className="font-medium text-gray-800">{pg.group.name} Panel</p>
+                                          <p className="text-xs text-gray-500">{pg.orders.length} tests</p>
+                                        </div>
+                                      </div>
+                                      <span className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-200 rounded-full">
+                                        {pg.orders[0]?.status || 'PENDING'}
+                                      </span>
+                                    </div>
+                                    {isOpen && (
+                                      <div className="border-t border-gray-200 divide-y divide-gray-100">
+                                        {pg.orders.map(order => (
+                                          <div key={order.id} className="px-4 py-3">
+                                            <div className="flex justify-between items-start">
+                                              <div>
+                                                <p className="text-sm font-medium text-gray-800">{order.labTest.name}</p>
+                                                <p className="text-xs text-gray-500">Created: {new Date(order.createdAt).toLocaleDateString()}</p>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  onClick={() => {
+                                                    const printContent = `
+                                                      <div style="padding: 20px; font-family: Arial, sans-serif;">
+                                                        <h2>Lab Order</h2>
+                                                        <p><strong>Test:</strong> ${order.labTest.name}</p>
+                                                        <p><strong>Category:</strong> ${order.labTest.category || 'N/A'}</p>
+                                                        <p><strong>Status:</strong> ${order.status}</p>
+                                                        <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
+                                                        ${order.instructions ? `<p><strong>Instructions:</strong> ${order.instructions}</p>` : ''}
+                                                      </div>
+                                                    `;
+                                                    const printWindow = window.open('', '_blank');
+                                                    printWindow.document.write(printContent);
+                                                    printWindow.document.close();
+                                                    printWindow.print();
+                                                  }}
+                                                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                                                  title="Print Lab Order"
+                                                >
+                                                  <Printer className="h-3 w-3" />
+                                                  Print
+                                                </button>
+                                                <button
+                                                  onClick={() => handleDeleteLabTestOrder(order.id)}
+                                                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                                                  title="Delete Lab Test Order"
+                                                >
+                                                  <Trash2 className="h-3 w-3" />
+                                                  Delete
+                                                </button>
+                                                <span className="px-2 py-0.5 text-[10px] font-medium text-gray-600 bg-gray-100 rounded-full">
+                                                  {order.status}
+                                                </span>
+                                              </div>
+                                            </div>
+                                            {order.instructions && (
+                                              <p className="mt-2 text-xs text-gray-600">{order.instructions}</p>
+                                            )}
                                           </div>
-                                        `;
-                                        const printWindow = window.open('', '_blank');
-                                        printWindow.document.write(printContent);
-                                        printWindow.document.close();
-                                        printWindow.print();
-                                      }}
-                                      className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                                      title="Print Lab Order"
-                                    >
-                                      <Printer className="h-4 w-4" />
-                                      Print
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteLabTestOrder(order.id)}
-                                      className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded transition-colors"
-                                      title="Delete Lab Test Order"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                      Delete
-                                    </button>
-                                    <span className="px-2 py-1 text-xs font-medium text-gray-800 bg-gray-200 rounded-full">
-                                      {order.status}
-                                    </span>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
+                                );
+                              })}
+                              {standalone.map(order => (
+                                <div key={order.id} className="p-4 border rounded-lg border-gray-200 bg-gray-50">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <p className="font-medium text-gray-800">{order.labTest.name}</p>
+                                      <p className="text-sm text-gray-600">Created: {new Date(order.createdAt).toLocaleDateString()}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => {
+                                          const printContent = `
+                                            <div style="padding: 20px; font-family: Arial, sans-serif;">
+                                              <h2>Lab Order</h2>
+                                              <p><strong>Test:</strong> ${order.labTest.name}</p>
+                                              <p><strong>Category:</strong> ${order.labTest.category || 'N/A'}</p>
+                                              <p><strong>Status:</strong> ${order.status}</p>
+                                              <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
+                                              ${order.instructions ? `<p><strong>Instructions:</strong> ${order.instructions}</p>` : ''}
+                                            </div>
+                                          `;
+                                          const printWindow = window.open('', '_blank');
+                                          printWindow.document.write(printContent);
+                                          printWindow.document.close();
+                                          printWindow.print();
+                                        }}
+                                        className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                                        title="Print Lab Order"
+                                      >
+                                        <Printer className="h-4 w-4" />
+                                        Print
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteLabTestOrder(order.id)}
+                                        className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded transition-colors"
+                                        title="Delete Lab Test Order"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete
+                                      </button>
+                                      <span className="px-2 py-1 text-xs font-medium text-gray-800 bg-gray-200 rounded-full">
+                                        {order.status}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {order.instructions && (
+                                    <div className="mt-3">
+                                      <p className="text-sm font-medium mb-1 text-gray-800">Instructions:</p>
+                                      <p className="text-sm text-gray-700">{order.instructions}</p>
+                                    </div>
+                                  )}
                                 </div>
-
-                                {order.instructions && (
-                                  <div className="mt-3">
-                                    <p className="text-sm font-medium mb-1 text-gray-800">Instructions:</p>
-                                    <p className="text-sm text-gray-700">{order.instructions}</p>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                              ))}
+                            </>);
+                          })()}
                         </div>
                       </div>
                     ) : (

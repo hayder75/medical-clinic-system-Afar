@@ -229,7 +229,7 @@ const PreRegistration = () => {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="btn btn-primary"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add to Queue
@@ -290,7 +290,7 @@ const PreRegistration = () => {
                 placeholder="Search by name or phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="input pl-10"
               />
             </div>
           </div>
@@ -314,7 +314,7 @@ const PreRegistration = () => {
                 setSearchQuery('');
                 fetchVirtualQueue();
               }}
-              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+              className="btn btn-secondary"
             >
               Clear
             </button>
@@ -380,14 +380,14 @@ const PreRegistration = () => {
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleProcessQueue(item.id)}
-                      className="flex items-center px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                      className="btn btn-success btn-sm"
                     >
                       <Play className="w-4 h-4 mr-1" />
                       Process
                     </button>
                     <button
                       onClick={() => handleCancelQueue(item.id)}
-                      className="flex items-center px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
+                      className="btn btn-danger btn-sm"
                     >
                       <X className="w-4 h-4 mr-1" />
                       Cancel
@@ -417,7 +417,7 @@ const PreRegistration = () => {
             <div className="space-y-4">
               {/* Patient Search */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Search Existing Patient (Optional)
                 </label>
                 <div className="space-y-2">
@@ -429,7 +429,7 @@ const PreRegistration = () => {
                         setPatientSearchQuery('');
                         setPatientSearchResults([]);
                       }}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="input"
                     >
                       <option value="name">Name</option>
                       <option value="phone">Phone</option>
@@ -442,7 +442,7 @@ const PreRegistration = () => {
                         placeholder={`Search by ${patientSearchType === 'name' ? 'name' : patientSearchType === 'phone' ? 'phone number' : 'patient ID'}...`}
                     value={patientSearchQuery}
                     onChange={(e) => setPatientSearchQuery(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="input"
                   />
                       {patientSearchQuery.length >= 2 && patientSearchResults.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
@@ -488,41 +488,41 @@ const PreRegistration = () => {
 
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Patient Name *
                 </label>
                 <input
                   type="text"
                   value={addForm.name}
                   onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="input"
                   required
                 />
               </div>
 
               {/* Phone */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Phone Number *
                 </label>
                 <input
                   type="tel"
                   value={addForm.phone}
                   onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="input"
                   required
                 />
               </div>
 
               {/* Priority */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Priority
                 </label>
                 <select
                   value={addForm.priority}
                   onChange={(e) => setAddForm({ ...addForm, priority: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="input"
                 >
                   <option value={3}>Normal</option>
                   <option value={2}>Priority</option>
@@ -532,14 +532,14 @@ const PreRegistration = () => {
 
               {/* Notes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="label">
                   Notes (Optional)
                 </label>
                 <textarea
                   value={addForm.notes}
                   onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="input"
                 />
               </div>
             </div>
@@ -547,14 +547,14 @@ const PreRegistration = () => {
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+                className="btn btn-outline"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddToQueue}
                 disabled={!addForm.name || !addForm.phone}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="btn btn-primary"
               >
                 Add to Queue
               </button>

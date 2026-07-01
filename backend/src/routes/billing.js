@@ -38,5 +38,6 @@ router.get('/emergency', roleGuard(['BILLING_OFFICER', 'ADMIN']), billingControl
 router.post('/emergency-payment', roleGuard(['BILLING_OFFICER', 'ADMIN']), billingController.processEmergencyPayment);
 
 router.delete('/service/:billingId/:serviceId', roleGuard(['BILLING_OFFICER', 'ADMIN']), billingController.deleteBillingService);
+router.delete('/panel/:billingId/:labGroup', roleGuard(['BILLING_OFFICER', 'ADMIN']), billingController.deleteBillingPanel);
 
 module.exports = router;
