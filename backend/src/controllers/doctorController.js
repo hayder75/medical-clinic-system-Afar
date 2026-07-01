@@ -1427,7 +1427,7 @@ exports.getUnifiedQueue = async (req, res) => {
                 { batchOrders: { some: { doctorId: doctorId } } },
                 { labTestOrders: { some: { doctorId: doctorId } } },
                 // For main queue, also include IN_DOCTOR_QUEUE visits with suggestedDoctorId
-                ...(queueFilter === 'main' ? [{
+                ...(queueFilter === 'main' || queueFilter === 'all' ? [{
                   AND: [
                     { status: 'IN_DOCTOR_QUEUE' },
                     { suggestedDoctorId: doctorId }
@@ -1589,7 +1589,13 @@ exports.getUnifiedQueue = async (req, res) => {
           status: statusFilter,
           OR: [
             { batchOrders: { some: { doctorId: doctorId } } },
-            { labTestOrders: { some: { doctorId: doctorId } } }
+            { labTestOrders: { some: { doctorId: doctorId } } },
+            ...(queueFilter === 'main' || queueFilter === 'all' ? [{
+              AND: [
+                { status: 'IN_DOCTOR_QUEUE' },
+                { suggestedDoctorId: doctorId }
+              ]
+            }] : [])
           ]
         },
         include: {
