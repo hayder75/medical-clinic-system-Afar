@@ -9,6 +9,8 @@ const LAB_GROUPS = [
   { name: 'Thyroid Function Tests', category: 'Blood Chemistry', displayOrder: 5 },
   { name: 'Serology', category: 'Serology', displayOrder: 6 },
   { name: 'Microbiology', category: 'Microbiology', displayOrder: 7 },
+  { name: 'Dipstick', category: 'Urinalysis', displayOrder: 24 },
+  { name: 'Urine microscopy', category: 'Urinalysis', displayOrder: 25 },
   { name: 'Coagulation Studies', category: 'Hematology', displayOrder: 8 },
   { name: 'Cardiac Markers', category: 'Blood Chemistry', displayOrder: 9 },
   { name: 'Tumor Markers', category: 'Blood Chemistry', displayOrder: 10 },
@@ -82,20 +84,65 @@ const LAB_TESTS = [
     { fieldName: 'species', label: 'Species', fieldType: 'OPTIONS', options: 'P.falciparum,P.vivax,P.ovale,P.malariae,Mixed,Negative', normalRange: 'Negative' },
     { fieldName: 'parasite_density', label: 'Parasite Density', fieldType: 'TEXT', normalRange: '' }
   ]},
-  { name: 'Urinalysis', code: 'MICRO-UA', category: 'Microbiology', price: 0, groupName: 'Microbiology', displayOrder: 2, fields: [
-    { fieldName: 'ua_color', label: 'Color', fieldType: 'OPTIONS', options: 'Yellow,Straw,Dark Amber,Red,Brown,Clear', normalRange: 'Yellow/Straw' },
-    { fieldName: 'ua_appearance', label: 'Appearance', fieldType: 'OPTIONS', options: 'Clear,Slightly Cloudy,Cloudy,Turbid', normalRange: 'Clear' },
-    { fieldName: 'ua_ph', label: 'pH', fieldType: 'NUMERIC', unit: '', normalRange: '4.5-8.0' },
-    { fieldName: 'ua_sg', label: 'Specific Gravity', fieldType: 'NUMERIC', unit: '', normalRange: '1.005-1.030' },
-    { fieldName: 'ua_glucose', label: 'Glucose', fieldType: 'OPTIONS', options: 'Negative,Trace,1+,2+,3+,4+', normalRange: 'Negative' },
-    { fieldName: 'ua_protein', label: 'Protein', fieldType: 'OPTIONS', options: 'Negative,Trace,1+,2+,3+,4+', normalRange: 'Negative' },
-    { fieldName: 'ua_blood', label: 'Blood', fieldType: 'OPTIONS', options: 'Negative,Trace,1+,2+,3+,4+', normalRange: 'Negative' },
-    { fieldName: 'ua_ketones', label: 'Ketones', fieldType: 'OPTIONS', options: 'Negative,Trace,1+,2+,3+', normalRange: 'Negative' },
-    { fieldName: 'ua_bilirubin', label: 'Bilirubin', fieldType: 'OPTIONS', options: 'Negative,1+,2+,3+', normalRange: 'Negative' },
-    { fieldName: 'ua_urobilinogen', label: 'Urobilinogen', fieldType: 'NUMERIC', unit: 'mg/dL', normalRange: '0.1-1.0' },
-    { fieldName: 'ua_nitrite', label: 'Nitrite', fieldType: 'OPTIONS', options: 'Negative,Positive', normalRange: 'Negative' },
-    { fieldName: 'ua_leukocytes', label: 'Leukocyte Esterase', fieldType: 'OPTIONS', options: 'Negative,Trace,1+,2+,3+', normalRange: 'Negative' },
-    { fieldName: 'ua_microscopy', label: 'Microscopy', fieldType: 'TEXT', normalRange: '' }
+  // --- Dipstick (12 tests) ---
+  { name: 'Color', code: 'UACOLOR', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 1, fields: [
+    { fieldName: 'color', label: 'Color', fieldType: 'OPTIONS', options: 'Yellow,Straw,Dark Amber,Red,Brown,Clear', normalRange: 'Yellow/Straw' }
+  ]},
+  { name: 'Appearance', code: 'UAAPPEAR', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 2, fields: [
+    { fieldName: 'appearance', label: 'Appearance', fieldType: 'OPTIONS', options: 'Clear,Slightly Cloudy,Cloudy,Turbid', normalRange: 'Clear' }
+  ]},
+  { name: 'pH', code: 'UAPH', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 3, fields: [
+    { fieldName: 'ph', label: 'pH', fieldType: 'NUMERIC', unit: '', normalRange: '4.5-8.0' }
+  ]},
+  { name: 'Sp. Gravity', code: 'UASG', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 4, fields: [
+    { fieldName: 'sg', label: 'Specific Gravity', fieldType: 'NUMERIC', unit: '', normalRange: '1.005-1.030' }
+  ]},
+  { name: 'Sugar', code: 'UASUGAR', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 5, fields: [
+    { fieldName: 'sugar', label: 'Glucose (Sugar)', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'Bilirubin', code: 'UABILI', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 6, fields: [
+    { fieldName: 'bilirubin', label: 'Bilirubin', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'Keton', code: 'UAKETON', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 7, fields: [
+    { fieldName: 'keton', label: 'Ketones', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'Blood', code: 'UABLOOD', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 8, fields: [
+    { fieldName: 'blood', label: 'Blood', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'Nitrite', code: 'UANITRITE', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 9, fields: [
+    { fieldName: 'nitrite', label: 'Nitrite', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'Urobilinogen', code: 'UAUROBIL', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 10, fields: [
+    { fieldName: 'urobilinogen', label: 'Urobilinogen', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'Leukocyte', code: 'UALEUK', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 11, fields: [
+    { fieldName: 'leukocyte', label: 'Leukocyte Esterase', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'Albumin', code: 'UAALB', category: 'Urinalysis', price: 0, groupName: 'Dipstick', displayOrder: 12, fields: [
+    { fieldName: 'albumin', label: 'Albumin (Protein)', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  // --- Urine microscopy (6 tests) ---
+  { name: 'Bacteria', code: 'UABACT', category: 'Urinalysis', price: 0, groupName: 'Urine microscopy', displayOrder: 1, fields: [
+    { fieldName: 'bacteria', label: 'Bacteria', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'Casts in urine', code: 'UACASTS', category: 'Urinalysis', price: 0, groupName: 'Urine microscopy', displayOrder: 2, fields: [
+    { fieldName: 'casts', label: 'Casts', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'Crystals/LPF', code: 'UACRYST', category: 'Urinalysis', price: 0, groupName: 'Urine microscopy', displayOrder: 3, fields: [
+    { fieldName: 'crystals', label: 'Crystals', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'Epithelial cells/LPF', code: 'UAEPI', category: 'Urinalysis', price: 0, groupName: 'Urine microscopy', displayOrder: 4, fields: [
+    { fieldName: 'epi', label: 'Epithelial Cells', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'RBC/HPF', code: 'UARBC', category: 'Urinalysis', price: 0, groupName: 'Urine microscopy', displayOrder: 5, fields: [
+    { fieldName: 'rbc_hpf', label: 'RBC/HPF', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  { name: 'WBC/HPF', code: 'UAWBC', category: 'Urinalysis', price: 0, groupName: 'Urine microscopy', displayOrder: 6, fields: [
+    { fieldName: 'wbc_hpf', label: 'WBC/HPF', fieldType: 'OPTIONS', options: 'None,Few,Moderate,Many', normalRange: 'None' }
+  ]},
+  // --- Standalone ---
+  { name: 'Urine pregnancy test', code: 'UAPREG', category: 'Urinalysis', price: 50, groupName: null, displayOrder: 99, fields: [
+    { fieldName: 'preg', label: 'Urine Pregnancy', fieldType: 'OPTIONS', options: 'Positive,Negative', normalRange: 'Negative' }
   ]},
   { name: 'Stool Microscopy', code: 'MICRO-STOOL', category: 'Microbiology', price: 0, groupName: 'Microbiology', displayOrder: 3, fields: [
     { fieldName: 'stool_consistency', label: 'Consistency', fieldType: 'OPTIONS', options: 'Formed,Soft,Watery,Mucoid,Bloody', normalRange: 'Formed' },
