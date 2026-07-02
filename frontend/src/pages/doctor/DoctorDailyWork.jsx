@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Printer, RefreshCw, Activity, DollarSign, CreditCard, Users, TrendingUp, BanknoteIcon } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Printer, RefreshCw, Activity, DollarSign, CreditCard, Users, TrendingUp, BanknoteIcon, X, Percent } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -52,6 +52,9 @@ const DoctorDailyWork = () => {
   const [dayDetails, setDayDetails] = useState(null);
   const [loadingMonthly, setLoadingMonthly] = useState(false);
   const [loadingDay, setLoadingDay] = useState(false);
+  const [showCommissionModal, setShowCommissionModal] = useState(false);
+  const [showMonthBreakdown, setShowMonthBreakdown] = useState(false);
+  const [expandedPatients, setExpandedPatients] = useState(new Set());
 
   const monthName = useMemo(() => new Date(year, month, 1).toLocaleString('en-US', { month: 'long' }), [year, month]);
   const firstWeekday = useMemo(() => new Date(year, month, 1).getDay(), [year, month]);
@@ -105,6 +108,66 @@ const DoctorDailyWork = () => {
       : [];
     return [...base, ...cardEntries];
   }, [selectedDaySummary]);
+
+  const CATEGORY_ICONS = {
+    LAB: { icon: Activity, color: { bg: 'bg-cyan-100', text: 'text-cyan-700' } },
+    RADIOLOGY: { icon: Activity, color: { bg: 'bg-indigo-100', text: 'text-indigo-700' } },
+    PROCEDURE: { icon: TrendingUp, color: { bg: 'bg-orange-100', text: 'text-orange-700' } },
+    DENTAL: { icon: TrendingUp, color: { bg: 'bg-pink-100', text: 'text-pink-700' } },
+    TREATMENT: { icon: TrendingUp, color: { bg: 'bg-rose-100', text: 'text-rose-700' } },
+    EMERGENCY_DRUG: { icon: CreditCard, color: { bg: 'bg-red-100', text: 'text-red-700' } },
+    CONSULTATION: { icon: Users, color: { bg: 'bg-blue-100', text: 'text-blue-700' } },
+    NURSE: { icon: Users, color: { bg: 'bg-teal-100', text: 'text-teal-700' } },
+    DOCTOR_WALKIN: { icon: Users, color: { bg: 'bg-purple-100', text: 'text-purple-700' } },
+  };
+  const CATEGORY_LABELS = {
+    LAB: 'Lab Ordered', RADIOLOGY: 'Radiology', PROCEDURE: 'Procedures',
+    DENTAL: 'Dental', TREATMENT: 'Treatment', EMERGENCY_DRUG: 'Emergency Med',
+    CONSULTATION: 'Consultation', NURSE: 'Nurse Service', DOCTOR_WALKIN: 'Doctor Walk-in',
+    OTHER: 'Other',
+  };
+
+  const buildCategoryCards = (breakdown, summary) => {
+    const cards = [];
+    if (breakdown) {
+      Object.entries(breakdown).forEach(([cat, data]) => {
+        if (data.count > 0) {
+          const iconDef = CATEGORY_ICONS[cat] || { icon: Activity, color: { bg: 'bg-gray-100', text: 'text-gray-700' } };
+          cards.push({
+            label: CATEGORY_LABELS[cat] || formatCategory(cat),
+            value: `${data.count} orders · ${formatCurrency(data.revenue)}`,
+            icon: iconDef.icon,
+            color: iconDef.color,
+          });
+        }
+      });
+    }
+    if (summary?.cardOpened?.count > 0) {
+      cards.push({
+        label: 'Cards Opened',
+        value: `${summary.cardOpened.count} · ${formatCurrency(summary.cardOpened.revenue)}`,
+        icon: CreditCard,
+        color: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+      });
+    }
+    if (summary?.cardActivation?.count > 0) {
+      cards.push({
+        label: 'Cards Activated',
+        value: `${summary.cardActivation.count} · ${formatCurrency(summary.cardActivation.revenue)}`,
+        icon: CreditCard,
+        color: { bg: 'bg-green-100', text: 'text-green-700' },
+      });
+    }
+    return cards;
+  };
+
+  const monthBreakdownCards = useMemo(() =>
+    buildCategoryCards(monthlySummary?.categoryBreakdown, monthlySummary),
+  [monthlySummary]);
+
+  const dayBreakdownCards = useMemo(() =>
+    buildCategoryCards(selectedDaySummary?.categoryBreakdown, selectedDaySummary),
+  [selectedDaySummary]);
 
   const groupedSelectedVisits = useMemo(() => {
     const groupedMap = new Map();
@@ -256,9 +319,8 @@ const DoctorDailyWork = () => {
             return (
               <button key={cell.date} type="button" onClick={() => setSelectedDate(cell.date)}
                 className={`min-h-[80px] rounded-xl border p-2 text-left transition-all ${isSel ? 'border-blue-500 bg-blue-600 text-white shadow-md' : hasAct ? 'border-blue-200 bg-white hover:border-blue-400' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                <div className={`text-[10px] font-semibold ${isSel ? 'text-blue-200' : 'text-gray-400'}`}>{cell.day}</div>
-                <div className={`mt-1 text-base font-bold ${isSel ? 'text-white' : 'text-gray-900'}`}>{cell.visits}</div>
-                <div className={`text-[9px] ${isSel ? 'text-blue-200' : 'text-gray-500'}`}>visits</div>
+                <div className={`text-base font-bold ${isSel ? 'text-white' : 'text-gray-900'}`}>{cell.day}</div>
+                {cell.visits > 0 && <div className={`text-[10px] ${isSel ? 'text-blue-200' : 'text-gray-500'}`}>{cell.visits} visit{cell.visits !== 1 ? 's' : ''}</div>}
                 {cell.billedAmount > 0 && <div className={`mt-1.5 text-[9px] truncate ${isSel ? 'text-blue-100' : 'text-gray-500'}`}>{formatCurrency(cell.billedAmount)}</div>}
               </button>
             );
@@ -266,15 +328,38 @@ const DoctorDailyWork = () => {
         </div>
       </div>
 
-      {/* Monthly Stats */}
-      {monthlyStats.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2.5">Month Summary</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+      {/* Monthly Stats - Collapsible */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <button onClick={() => setShowMonthBreakdown(!showMonthBreakdown)} className="flex items-center justify-between w-full text-left">
+          <h3 className="text-sm font-semibold text-gray-700">Month Summary</h3>
+          <span className="text-xs text-gray-400">{showMonthBreakdown ? '▲ Hide' : '▼ Show'}</span>
+        </button>
+        {showMonthBreakdown && monthlyStats.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-3">
             {monthlyStats.map((s) => <StatCard key={s.label} {...s} />)}
           </div>
-        </div>
-      )}
+        )}
+        {showMonthBreakdown && monthBreakdownCards.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-3">
+            {monthBreakdownCards.map((s) => <StatCard key={s.label} {...s} />)}
+            {monthlySummary?.commissionAmount > 0 && (
+              <button onClick={(e) => { e.stopPropagation(); setShowCommissionModal(true); }} className="rounded-xl border bg-white p-3 shadow-sm hover:shadow-md transition-shadow text-left w-full group">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-purple-100 p-2">
+                    <Percent className="h-4 w-4 text-purple-700" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 truncate">Your Share</p>
+                    <p className="mt-0.5 text-sm font-bold text-gray-900">{formatCurrency(monthlySummary.commissionAmount)}</p>
+                    <p className="text-[10px] text-red-500 font-medium mt-0.5">Click for details</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-gray-500 transition-colors shrink-0" />
+                </div>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Day Detail */}
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -286,9 +371,31 @@ const DoctorDailyWork = () => {
         </div>
 
         {selectedDaySummary && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-5">
-            {dayStats.map((s) => <StatCard key={s.label} {...s} />)}
-          </div>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-3">
+              {dayStats.map((s) => <StatCard key={s.label} {...s} />)}
+            </div>
+            {dayBreakdownCards.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-5">
+                {dayBreakdownCards.map((s) => <StatCard key={s.label} {...s} />)}
+                {selectedDaySummary?.commissionAmount > 0 && (
+                  <button onClick={() => setShowCommissionModal(true)} className="rounded-xl border bg-white p-3 shadow-sm hover:shadow-md transition-shadow text-left w-full group">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg bg-purple-100 p-2">
+                        <Percent className="h-4 w-4 text-purple-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 truncate">Your Share</p>
+                        <p className="mt-0.5 text-sm font-bold text-gray-900">{formatCurrency(selectedDaySummary.commissionAmount)}</p>
+                        <p className="text-[10px] text-red-500 font-medium mt-0.5">Click for details</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-gray-500 transition-colors shrink-0" />
+                    </div>
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         {loadingDay ? (
@@ -299,20 +406,26 @@ const DoctorDailyWork = () => {
           <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">No patient visits recorded</div>
         ) : (
           <div className="space-y-3">
-            {groupedSelectedVisits.map((visit, i) => (
+            {groupedSelectedVisits.map((visit, i) => {
+              const isExpanded = expandedPatients.has(visit.groupKey);
+              return (
               <div key={visit.groupKey} className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-                <div className="border-b border-gray-100 bg-gray-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Patient {i + 1}</p>
-                    <p className="font-semibold text-gray-900">{visit.patientName}</p>
-                    <p className="text-xs text-gray-500">{visit.patientId} · {visit.visitRefs.join(', ')}</p>
+                <button onClick={() => {
+                  const next = new Set(expandedPatients);
+                  isExpanded ? next.delete(visit.groupKey) : next.add(visit.groupKey);
+                  setExpandedPatients(next);
+                }} className="w-full text-left border-b border-gray-100 bg-gray-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-100 transition-colors">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Patient {i + 1} {isExpanded ? '▲' : '▼'}</p>
+                    <p className="font-semibold text-gray-900 truncate">{visit.patientName}</p>
+                    <p className="text-xs text-gray-500 truncate">{visit.patientId} · {visit.visitRefs.join(', ')}</p>
                   </div>
-                  <div className="flex gap-3 text-xs">
+                  <div className="flex gap-3 text-xs shrink-0">
                     <span className="rounded-lg bg-emerald-50 px-2.5 py-1.5 font-semibold text-emerald-700">Billed {formatCurrency(visit.billedAmount)}</span>
                     <span className="rounded-lg bg-green-50 px-2.5 py-1.5 font-semibold text-green-700">Paid {formatCurrency(visit.paidAmountByVisitDate)}</span>
                   </div>
-                </div>
-                {(visit.services || []).length > 0 && (
+                </button>
+                {isExpanded && (visit.services || []).length > 0 && (
                   <div className="divide-y divide-gray-100">
                     {visit.services.map((svc, j) => (
                       <div key={`${visit.groupKey}-${j}`} className="px-4 py-2.5 flex items-center justify-between gap-4">
@@ -333,11 +446,54 @@ const DoctorDailyWork = () => {
                     ))}
                   </div>
                 )}
+                {isExpanded && (!visit.services || visit.services.length === 0) && (
+                  <div className="px-4 py-3 text-xs text-gray-400">No service details</div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
+      {showCommissionModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={() => setShowCommissionModal(false)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Your Share Breakdown</h3>
+              <button onClick={() => setShowCommissionModal(false)} className="p-1 rounded-lg hover:bg-gray-100">
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            {(() => {
+              const breakdown = selectedDaySummary?.commissionBreakdown || monthlySummary?.commissionBreakdown || {};
+              const entries = Object.entries(breakdown).filter(([, v]) => v > 0);
+              const source = selectedDaySummary?.commissionBreakdown ? 'day' : 'month';
+              const total = source === 'day' ? selectedDaySummary?.commissionAmount : monthlySummary?.commissionAmount;
+              return (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500">Commission from services where you have a share percentage set by admin.</p>
+                  {entries.length === 0 ? (
+                    <p className="text-sm text-gray-400">No commission breakdown available.</p>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {entries.map(([cat, amt]) => (
+                        <div key={cat} className="flex items-center justify-between py-2">
+                          <span className="text-sm font-medium text-gray-700">{CATEGORY_LABELS[cat] || formatCategory(cat)}</span>
+                          <span className="text-sm font-bold text-purple-700">{formatCurrency(amt)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between py-2 pt-3">
+                        <span className="text-sm font-bold text-gray-900">Total</span>
+                        <span className="text-sm font-bold text-purple-700">{formatCurrency(total)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

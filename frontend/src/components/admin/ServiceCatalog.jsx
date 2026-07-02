@@ -23,6 +23,8 @@ const ServiceCatalog = () => {
     maxPrice: '',
     procedureGroup: '',
     labGroup: '',
+    labCategory: '',
+    labGroupId: '',
     radiologyGroup: ''
   });
   const [codeGenerated, setCodeGenerated] = useState(false);
@@ -30,6 +32,11 @@ const ServiceCatalog = () => {
   const [labPricingLoading, setLabPricingLoading] = useState(false);
   const [expandedPanels, setExpandedPanels] = useState(new Set());
   const [editingPrice, setEditingPrice] = useState(null); // { type: 'panel'|'test', id, currentValue }
+  const [labCategories, setLabCategories] = useState([]);
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [showNewGroupInput, setShowNewGroupInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newGroupName, setNewGroupName] = useState('');
 
   const categories = [
     { value: 'ENTRY', label: 'Entry Fee' },
@@ -58,7 +65,17 @@ const ServiceCatalog = () => {
 
   useEffect(() => {
     fetchServices();
+    fetchLabTestCategories();
   }, []);
+
+  const fetchLabTestCategories = async () => {
+    try {
+      const res = await api.get('/admin/lab-test-categories');
+      setLabCategories(res.data.categories || []);
+    } catch (e) {
+      console.error('Failed to fetch lab categories:', e);
+    }
+  };
 
   // Helper function to generate service code
   const generateCodeForService = useCallback(async () => {
@@ -204,7 +221,9 @@ const ServiceCatalog = () => {
         minPrice: formData.isVariablePrice ? parseFloat(formData.minPrice) : null,
         maxPrice: formData.isVariablePrice ? parseFloat(formData.maxPrice) : null,
         procedureGroup: formData.procedureGroup || null,
-        labGroup: formData.labGroup || null,
+        labGroup: formData.labGroup || formData.labCategory || null,
+        labCategory: formData.labCategory || null,
+        labGroupId: formData.labGroupId || null,
         radiologyGroup: formData.radiologyGroup || null,
       };
 
@@ -231,8 +250,14 @@ const ServiceCatalog = () => {
         maxPrice: '',
         procedureGroup: '',
         labGroup: '',
+        labCategory: '',
+        labGroupId: '',
         radiologyGroup: ''
       });
+      setShowNewCategoryInput(false);
+      setShowNewGroupInput(false);
+      setNewCategoryName('');
+      setNewGroupName('');
       fetchServices();
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to save service');
@@ -255,6 +280,8 @@ const ServiceCatalog = () => {
                     maxPrice: service.maxPrice?.toString() || '',
                     procedureGroup: service.procedureGroup || '',
                     labGroup: service.labGroup || '',
+                    labCategory: service.labCategory || '',
+                    labGroupId: service.labGroupId || '',
                     radiologyGroup: service.radiologyGroup || ''
     });
     setShowModal(true);
@@ -320,8 +347,14 @@ const ServiceCatalog = () => {
               maxPrice: '',
               procedureGroup: '',
               labGroup: '',
+              labCategory: '',
+              labGroupId: '',
               radiologyGroup: ''
             });
+            setShowNewCategoryInput(false);
+            setShowNewGroupInput(false);
+            setNewCategoryName('');
+            setNewGroupName('');
             setShowModal(true);
             setCodeGenerated(true);
             setTimeout(() => {
@@ -659,24 +692,121 @@ const ServiceCatalog = () => {
                     </div>
                   )}
                   {formData.category === 'LAB' && (
-                    <div>
-                      <label className="label text-base sm:text-lg">Lab Group</label>
-                      <select
-                        className="input text-base sm:text-lg w-full"
-                        value={formData.labGroup}
-                        onChange={(e) => setFormData({ ...formData, labGroup: e.target.value })}
-                      >
-                        <option value="">Select group...</option>
-                        <option value="HEMATOLOGY">Hematology</option>
-                        <option value="COAGULATION">Coagulation</option>
-                        <option value="CHEMISTRY">Chemistry</option>
-                        <option value="SEROLOGY">Serology</option>
-                        <option value="MICROBIOLOGY">Microbiology</option>
-                        <option value="URINALYSIS">Urinalysis</option>
-                        <option value="PARASITOLOGY">Parasitology</option>
-                        <option value="OTHER">Other</option>
-                      </select>
-                    </div>
+                    <>
+                      <div>
+                        <label className="label text-base sm:text-lg">Lab Category</label>
+                        {showNewCategoryInput ? (
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              className="input text-base sm:text-lg flex-1"
+                              value={newCategoryName}
+                              onChange={e => setNewCategoryName(e.target.value)}
+                              placeholder="Enter new category name"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              className="px-3 py-2 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200"
+                              onClick={() => {
+                                if (newCategoryName.trim()) {
+                                  const name = newCategoryName.trim();
+                                  setFormData(prev => ({ ...prev, labCategory: name, labGroupId: '', labGroup: name }));
+                                  setShowNewCategoryInput(false);
+                                  setShowNewGroupInput(false);
+                                  setNewCategoryName('');
+                                }
+                              }}
+                            >Set</button>
+                            <button
+                              type="button"
+                              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                              onClick={() => { setShowNewCategoryInput(false); setNewCategoryName(''); }}
+                            >Cancel</button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <select
+                              className="input text-base sm:text-lg flex-1"
+                              value={formData.labCategory}
+                              onChange={e => {
+                                const val = e.target.value;
+                                if (val === '__ADD_NEW__') {
+                                  setShowNewCategoryInput(true);
+                                } else {
+                                  setFormData(prev => ({ ...prev, labCategory: val, labGroupId: '', labGroup: val }));
+                                  setShowNewGroupInput(false);
+                                }
+                              }}
+                            >
+                              <option value="">Select category...</option>
+                              {labCategories.map(cat => (
+                                <option key={cat.name} value={cat.name}>{cat.name}</option>
+                              ))}
+                              <option value="__ADD_NEW__">+ Add New Category</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                      {formData.labCategory && !showNewCategoryInput && (
+                        <div>
+                          <label className="label text-base sm:text-lg">Panel / Group</label>
+                          {showNewGroupInput ? (
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                className="input text-base sm:text-lg flex-1"
+                                value={newGroupName}
+                                onChange={e => setNewGroupName(e.target.value)}
+                                placeholder="Enter new panel name"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                className="px-3 py-2 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200"
+                                onClick={() => {
+                                  if (newGroupName.trim()) {
+                                    setFormData(prev => ({ ...prev, labGroup: newGroupName.trim() }));
+                                    setShowNewGroupInput(false);
+                                    setNewGroupName('');
+                                  }
+                                }}
+                              >Set</button>
+                              <button
+                                type="button"
+                                className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                                onClick={() => { setShowNewGroupInput(false); setNewGroupName(''); }}
+                              >Cancel</button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <select
+                                className="input text-base sm:text-lg flex-1"
+                                value={formData.labGroupId}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  if (val === '__ADD_NEW__') {
+                                    setShowNewGroupInput(true);
+                                  } else {
+                                    const cat = labCategories.find(c => c.name === formData.labCategory);
+                                    const group = cat?.groups?.find(g => g.id === val);
+                                    setFormData(prev => ({ ...prev, labGroupId: val, labGroup: group?.name || val }));
+                                  }
+                                }}
+                              >
+                                <option value="">No panel (standalone)</option>
+                                {labCategories
+                                  .find(c => c.name === formData.labCategory)
+                                  ?.groups?.map(g => (
+                                    <option key={g.id} value={g.id}>{g.name}</option>
+                                ))}
+                                <option value="__ADD_NEW__">+ Add New Panel</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                   {formData.category === 'RADIOLOGY' && (
                     <div>
@@ -800,8 +930,14 @@ const ServiceCatalog = () => {
                         maxPrice: '',
                         procedureGroup: '',
                         labGroup: '',
+                        labCategory: '',
+                        labGroupId: '',
                         radiologyGroup: ''
                       });
+                      setShowNewCategoryInput(false);
+                      setShowNewGroupInput(false);
+                      setNewCategoryName('');
+                      setNewGroupName('');
                     }}
                     className="btn btn-secondary text-lg px-6 py-2"
                   >

@@ -2,7 +2,7 @@ const prisma = require('../config/database');
 const { z } = require('zod');
 const bcrypt = require('bcryptjs');
 const { getDefaultClinicName } = require('../utils/pdfGenerator');
-const { buildCardBucketEntries, getCardProducts, extractSlugFromServiceCode } = require('../utils/cardBucketHelper');
+const { buildCardBucketEntries, getCardProducts, extractSlugFromServiceCode, isCardRegistration, isCardActivation } = require('../utils/cardBucketHelper');
 
 const STATIC_SERVICE_BUCKETS = {
   LAB: 'Lab',
@@ -383,6 +383,8 @@ const createServiceSchema = z.object({
   maxPrice: z.number().nonnegative().optional().nullable(),
   procedureGroup: z.string().optional().nullable(),
   labGroup: z.string().optional().nullable(),
+  labCategory: z.string().optional().nullable(),
+  labGroupId: z.string().optional().nullable(),
   radiologyGroup: z.string().optional().nullable(),
 });
 
@@ -774,9 +776,10 @@ exports.createService = async (req, res) => {
       });
     }
 
+    const { labCategory, labGroupId, ...serviceCreateData } = data;
     const service = await prisma.service.create({
       data: {
-        ...data,
+        ...serviceCreateData,
         code: serviceCode
       }
     });
@@ -852,13 +855,13 @@ exports.createService = async (req, res) => {
             data: {
               code: labTestCode,
               name: service.name,
-              category: data.labGroup || 'OTHER',
+              category: data.labCategory || data.labGroup || 'OTHER',
               description: service.description || `Lab test: ${service.name}`,
               price: service.price,
               unit: service.unit || 'UNIT',
-              isActive: service.isActive !== false, // Default to true
+              isActive: service.isActive !== false,
               serviceId: service.id,
-              groupId: null, // Standalone by default
+              groupId: data.labGroupId || null,
               displayOrder: 0
             }
           });
@@ -2912,7 +2915,7 @@ exports.getDoctorPerformanceStats = async (req, res) => {
     const PROCEDURE_CATEGORIES = ['PROCEDURE', 'DENTAL', 'TREATMENT'];
     const LAB_CATEGORIES = ['LAB'];
     const EMERGENCY_MEDICATION_CATEGORIES = ['EMERGENCY_DRUG'];
-    const DOCTOR_REPORT_CATEGORIES = [...PROCEDURE_CATEGORIES, ...LAB_CATEGORIES, ...EMERGENCY_MEDICATION_CATEGORIES];
+    const DOCTOR_REPORT_CATEGORIES = ['PROCEDURE', 'DENTAL', 'TREATMENT', 'LAB', 'RADIOLOGY', 'EMERGENCY_DRUG', 'CONSULTATION', 'NURSE', 'DOCTOR_WALKIN'];
 
     // Calculate date range based on period
     const now = new Date();
@@ -3195,7 +3198,7 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
     const PROCEDURE_CATEGORIES = ['PROCEDURE', 'DENTAL', 'TREATMENT'];
     const LAB_CATEGORIES = ['LAB'];
     const EMERGENCY_MEDICATION_CATEGORIES = ['EMERGENCY_DRUG'];
-    const DOCTOR_REPORT_CATEGORIES = [...PROCEDURE_CATEGORIES, ...LAB_CATEGORIES, ...EMERGENCY_MEDICATION_CATEGORIES];
+    const ALL_REPORT_CATEGORIES = ['PROCEDURE', 'DENTAL', 'TREATMENT', 'LAB', 'RADIOLOGY', 'EMERGENCY_DRUG', 'CONSULTATION', 'NURSE', 'DOCTOR_WALKIN'];
 
     if (!doctorId) {
       return res.status(400).json({ error: 'Doctor ID is required' });
@@ -3300,7 +3303,7 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
             lte: dayEnd
           },
           service: {
-            category: { in: DOCTOR_REPORT_CATEGORIES }
+            category: { in: ALL_REPORT_CATEGORIES }
           },
           billing: {
             visit: assignmentIds.length > 0
@@ -3320,8 +3323,7 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
             select: {
               id: true,
               visitId: true,
-              status: true
-              ,
+              status: true,
               visit: {
                 select: {
                   id: true,
@@ -3334,10 +3336,17 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
                 }
               }
             }
+          },
+          service: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              category: true
+            }
           }
         }
       });
-
       const sectionStats = {
         procedures: { revenue: 0, orders: 0, patientIds: new Set() },
         labs: { revenue: 0, orders: 0, patientIds: new Set() },
@@ -3436,7 +3445,8 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
     const PROCEDURE_CATEGORIES = ['PROCEDURE', 'DENTAL', 'TREATMENT'];
     const LAB_CATEGORIES = ['LAB'];
     const EMERGENCY_MEDICATION_CATEGORIES = ['EMERGENCY_DRUG'];
-    const DOCTOR_REPORT_CATEGORIES = [...PROCEDURE_CATEGORIES, ...LAB_CATEGORIES, ...EMERGENCY_MEDICATION_CATEGORIES];
+    const ALL_REPORT_CATEGORIES = ['PROCEDURE', 'DENTAL', 'TREATMENT', 'LAB', 'RADIOLOGY', 'EMERGENCY_DRUG', 'CONSULTATION', 'NURSE', 'DOCTOR_WALKIN'];
+    const DOCTOR_REPORT_CATEGORIES = ['PROCEDURE', 'DENTAL', 'TREATMENT', 'LAB', 'RADIOLOGY', 'EMERGENCY_DRUG', 'CONSULTATION', 'NURSE', 'DOCTOR_WALKIN'];
 
     if (!doctorId) {
       return res.status(400).json({ error: 'Doctor ID is required' });
@@ -3469,7 +3479,7 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
           lte: dayEnd
         },
         service: {
-          category: { in: DOCTOR_REPORT_CATEGORIES }
+          category: { in: ALL_REPORT_CATEGORIES }
         },
         billing: {
           visit: assignmentIds.length > 0
@@ -3516,6 +3526,46 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
         createdAt: 'desc'
       }
     });
+
+    // Build full category breakdown from all lines
+    const categoryBreakdown = {};
+    let cardOpened = { count: 0, revenue: 0 };
+    let cardActivation = { count: 0, revenue: 0 };
+    let commissionAmount = 0;
+    const commissionBreakdown = {};
+
+    // Query doctor commission percentages
+    const commissions = await prisma.doctorCommission.findMany({
+      where: { doctorId, percentage: { gt: 0 } }
+    });
+    const doctorCommissionMap = {};
+    for (const c of commissions) {
+      doctorCommissionMap[c.serviceCategory] = c.percentage;
+    }
+
+    for (const line of procedureLines) {
+      const cat = line.service?.category || 'OTHER';
+      if (!categoryBreakdown[cat]) categoryBreakdown[cat] = { count: 0, revenue: 0 };
+      categoryBreakdown[cat].count += line.quantity || 1;
+      categoryBreakdown[cat].revenue += line.totalPrice || 0;
+
+      const code = (line.service?.code || '').toUpperCase();
+      const name = (line.service?.name || '').toUpperCase();
+      if (isCardRegistration(code, name)) {
+        cardOpened.count += line.quantity || 1;
+        cardOpened.revenue += line.totalPrice || 0;
+      } else if (isCardActivation(code, name)) {
+        cardActivation.count += line.quantity || 1;
+        cardActivation.revenue += line.totalPrice || 0;
+      }
+
+      const commPct = doctorCommissionMap[cat];
+      if (commPct) {
+        const comm = (line.totalPrice || 0) * (commPct / 100);
+        commissionAmount += comm;
+        commissionBreakdown[cat] = (commissionBreakdown[cat] || 0) + comm;
+      }
+    }
 
     const SECTION_CONFIG = {
       procedures: {
@@ -3647,12 +3697,22 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
       totalOrders: procedureSection.orders + labSection.orders + emergencyMedicationSection.orders,
       medicalTreatedByDermatology: await getDermatologyMedicalTreatedCount(dayStart, dayEnd, [doctorId]),
       patients: allPatients.size,
-      visits: allDetails.length
+      visits: allDetails.length,
+      categoryBreakdown,
+      cardOpened,
+      cardActivation,
+      commissionAmount,
+      commissionBreakdown
     };
 
     res.json({
       date,
       summary,
+      categoryBreakdown,
+      cardOpened,
+      cardActivation,
+      commissionAmount,
+      commissionBreakdown,
       sections: {
         procedures: procedureSection,
         labs: labSection,
@@ -4799,6 +4859,42 @@ exports.createLabTestGroup = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating lab test group:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getLabTestCategories = async (req, res) => {
+  try {
+    const categories = await prisma.labTest.findMany({
+      where: { category: { not: '' } },
+      distinct: ['category'],
+      select: { category: true }
+    });
+
+    // Normalize: group by lowercased name, pick the properly-cased version
+    const catMap = new Map();
+    for (const { category } of categories) {
+      const key = category.toLowerCase();
+      if (!catMap.has(key) || category !== category.toUpperCase()) {
+        catMap.set(key, category);
+      }
+    }
+    const uniqueCategories = [...catMap.values()].sort();
+
+    const groups = await prisma.labTestGroup.findMany({
+      where: { category: { not: '' } },
+      orderBy: { displayOrder: 'asc' },
+      select: { id: true, name: true, category: true }
+    });
+
+    const result = uniqueCategories.map(name => ({
+      name,
+      groups: groups.filter(g => g.category?.toLowerCase() === name.toLowerCase())
+    }));
+
+    res.json({ categories: result });
+  } catch (error) {
+    console.error('Error fetching lab test categories:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -6008,6 +6104,7 @@ exports.getDepartments = async (req, res) => {
 exports.getCardProducts = async (req, res) => {
   try {
     const cardProducts = await prisma.cardProduct.findMany({
+      where: { isActive: true },
       orderBy: { name: 'asc' }
     });
     res.json({ cardProducts });
