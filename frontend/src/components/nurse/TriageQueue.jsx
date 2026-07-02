@@ -899,7 +899,21 @@ const TriageQueue = () => {
                     </button>
                   )}
                   {isSectionVisible('assignment') && (
-                    <button type="button" onClick={() => setActiveSection('assignment')}
+                    <button type="button" onClick={() => {
+                      const tempOk = parseFloat(vitalsData.temperature) > 0;
+                      const hrOk = parseInt(vitalsData.heartRate) > 0;
+                      const o2Ok = parseInt(vitalsData.oxygenSaturation) > 0;
+                      if (!tempOk || !hrOk || !o2Ok) {
+                        const missing = [];
+                        if (!tempOk) missing.push('Temperature');
+                        if (!hrOk) missing.push('Heart Rate');
+                        if (!o2Ok) missing.push('Oxygen Saturation');
+                        toast.error(`Please fill mandatory vitals first: ${missing.join(', ')}`);
+                        setActiveSection('vitals');
+                        return;
+                      }
+                      setActiveSection('assignment');
+                    }}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border flex items-center ${activeSection === 'assignment'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                           : sectionCompletion.assignment ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200'
@@ -917,7 +931,7 @@ const TriageQueue = () => {
                     <div className="border border-gray-200 rounded-lg p-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="label">Blood Pressure *</label>
+                          <label className="label">Blood Pressure</label>
                           <input
                             type="text"
                             className="input"

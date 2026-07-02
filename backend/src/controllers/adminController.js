@@ -997,9 +997,10 @@ exports.updateService = async (req, res) => {
       return res.status(404).json({ error: 'Service not found' });
     }
 
+    const { labCategory: updateLabCategory, labGroupId: updateLabGroupId, ...serviceUpdateData } = data;
     const service = await prisma.service.update({
       where: { id },
-      data
+      data: serviceUpdateData
     });
 
     // Auto-create InvestigationType if category is RADIOLOGY

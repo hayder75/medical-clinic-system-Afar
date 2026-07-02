@@ -823,7 +823,7 @@ const BillingQueue = () => {
                 <div>
                   <p className="text-sm text-gray-500">Doctor</p>
                   <p className="text-sm font-medium text-gray-900">
-                    {billing.visit?.assignment?.doctor?.name || billing.visit?.suggestedDoctor?.name || '—'}
+                    {billing.visit?.assignment?.doctor?.fullname || billing.visit?.suggestedDoctor?.fullname || '—'}
                   </p>
                 </div>
               </div>
