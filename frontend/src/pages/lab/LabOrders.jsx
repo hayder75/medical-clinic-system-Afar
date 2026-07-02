@@ -52,6 +52,7 @@ const LabOrders = () => {
   const [labImages, setLabImages] = useState({});
   const [panelGroupData, setPanelGroupData] = useState({});
   const [savingResults, setSavingResults] = useState(false);
+  const [reopeningOrders, setReopeningOrders] = useState([]);
   const [savingPanel, setSavingPanel] = useState(false);
 
   useEffect(() => {
@@ -1723,7 +1724,8 @@ const LabOrders = () => {
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
-                      setSavingResults(true);
+                      const orderId = order.id || order._orderId;
+                      setReopeningOrders(prev => [...prev, orderId]);
                       try {
                         for (const o of order.orders || [order]) {
                           const r = o.results?.[0];
@@ -1742,14 +1744,14 @@ const LabOrders = () => {
                       } catch (err) {
                         toast.error('Failed to reopen: ' + (err.response?.data?.error || err.message));
                       } finally {
-                        setSavingResults(false);
+                        setReopeningOrders(prev => prev.filter(id => id !== orderId));
                       }
                     }}
-                    disabled={savingResults}
+                    disabled={reopeningOrders.includes(order.id || order._orderId)}
                     className="px-3 py-1.5 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors text-sm flex items-center gap-1.5 disabled:bg-amber-400 disabled:cursor-not-allowed"
                   >
-                    {savingResults ? <Loader className="h-4 w-4 animate-spin" /> : <Edit className="h-4 w-4" />}
-                    {savingResults ? 'Reopening...' : 'Edit'}
+                    {reopeningOrders.includes(order.id || order._orderId) ? <Loader className="h-4 w-4 animate-spin" /> : <Edit className="h-4 w-4" />}
+                    {reopeningOrders.includes(order.id || order._orderId) ? 'Reopening...' : 'Edit'}
                   </button>
                   <button
                     onClick={(e) => handlePrintResults(e, order)}
@@ -1944,7 +1946,8 @@ const LabOrders = () => {
                 <>
                   <button
                     onClick={async () => {
-                      setSavingResults(true);
+                      const oid = selectedOrder?.id || selectedOrder?._orderId;
+                      setReopeningOrders(prev => [...prev, oid]);
                       try {
                         // Reopen all results in the order
                         const ids = Object.keys(testResults);
@@ -1967,14 +1970,14 @@ const LabOrders = () => {
                       } catch (e) {
                         toast.error('Failed to reopen order: ' + (e.response?.data?.error || e.message));
                       } finally {
-                        setSavingResults(false);
+                        setReopeningOrders(prev => prev.filter(id => id !== oid));
                       }
                     }}
-                    disabled={savingResults}
+                    disabled={reopeningOrders.includes(selectedOrder?.id || selectedOrder?._orderId)}
                     className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors disabled:bg-amber-400 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {savingResults ? <Loader className="h-4 w-4 animate-spin" /> : <Edit className="h-4 w-4" />}
-                    {savingResults ? 'Reopening...' : 'Edit Results'}
+                    {reopeningOrders.includes(selectedOrder?.id || selectedOrder?._orderId) ? <Loader className="h-4 w-4 animate-spin" /> : <Edit className="h-4 w-4" />}
+                    {reopeningOrders.includes(selectedOrder?.id || selectedOrder?._orderId) ? 'Reopening...' : 'Edit Results'}
                   </button>
                   <button
                     onClick={() => handlePrintResults()}
