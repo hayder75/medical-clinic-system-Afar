@@ -1579,7 +1579,7 @@ const LabOrders = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`px-4 py-2.5 border-2 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 text-base ${statusFilter === 'PENDING' ? 'border-gray-300 bg-white text-gray-700' : statusFilter === 'COMPLETED' ? 'border-red-400 bg-red-50 text-red-700' : 'border-blue-300 bg-blue-50 text-blue-700'}`}
           >
             <option value="PENDING">Pending Orders</option>
             <option value="COMPLETED">Completed Orders</option>
