@@ -405,7 +405,7 @@ const LabOrders = () => {
           parsedResults = defaultResults;
         }
 
-        const isCompleted = existingResult ? existingResult.status === 'COMPLETED' : (labOrder.status === 'COMPLETED');
+        const isCompleted = order.status !== 'IN_PROGRESS' && (existingResult ? existingResult.status === 'COMPLETED' : (labOrder.status === 'COMPLETED'));
 
         // Initialize with resultFields from labTest
         initialResults[orderId] = {
@@ -1691,23 +1691,22 @@ const LabOrders = () => {
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
-                      const ordersToReopen = order.orders || [order];
                       setSavingResults(true);
                       try {
-                        for (const o of ordersToReopen) {
-                          const r = o.labTestResult || o.result;
+                        for (const o of order.orders || [order]) {
+                          const r = o.results?.[0];
                           if (r && r.id) {
                             await api.post('/labs/results/lab-test', {
-                              orderId: r.orderId || o.id,
-                              labTestId: r.labTestId || o.labTestId,
+                              orderId: o.id,
+                              labTestId: o.labTestId,
                               results: r.results || {},
                               additionalNotes: r.additionalNotes || '',
                               reopen: true
                             });
                           }
                         }
-                        await fetchOrders();
-                        await handleOrderClick(order);
+                        fetchOrders();
+                        handleOrderClick({ ...order, status: 'IN_PROGRESS' });
                       } catch (err) {
                         toast.error('Failed to reopen: ' + (err.response?.data?.error || err.message));
                       } finally {
