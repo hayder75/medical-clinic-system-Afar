@@ -405,9 +405,7 @@ const LabOrders = () => {
           parsedResults = defaultResults;
         }
 
-        // Mark as completed only if result has actual data or status is COMPLETED
-        const hasActualResults = existingResult?.results && Object.keys(existingResult.results).some(k => k !== '_images' && existingResult.results[k] && String(existingResult.results[k]).trim() !== '');
-        const isCompleted = existingResult ? (existingResult.status === 'COMPLETED' || hasActualResults) : (labOrder.status === 'COMPLETED');
+        const isCompleted = existingResult ? existingResult.status === 'COMPLETED' : (labOrder.status === 'COMPLETED');
 
         // Initialize with resultFields from labTest
         initialResults[orderId] = {
@@ -1891,9 +1889,8 @@ const LabOrders = () => {
                           }
                         }
                         toast.success('Order reopened for editing');
+                        setSelectedOrder(prev => ({ ...prev, status: 'IN_PROGRESS' }));
                         fetchOrders();
-                        setShowTemplateForm(false);
-                        setSelectedOrder(null);
                       } catch (e) {
                         toast.error('Failed to reopen order: ' + (e.response?.data?.error || e.message));
                       } finally {
