@@ -683,18 +683,14 @@ const PatientConsultationPage = () => {
     const labTestOrders = visit?.labTestOrders || [];
     const extOrders = visit?.externalDiagnosticOrders || [];
     const hasOrders = labBatchOrders.length > 0 || labTestOrders.length > 0 || extOrders.length > 0;
-    setLabSubTab(hasOrders ? 'results' : 'order');
+    setLabSubTab('results');
     labDefaultSet.current = true;
   }, [visit]);
 
   // Set default radiology sub-tab
   useEffect(() => {
     if (radiologyDefaultSet.current || !visit) return;
-    const radBatchOrders = visit?.batchOrders?.filter(order => order.type === 'RADIOLOGY') || [];
-    const radOrders = visit?.radiologyOrders || [];
-    const radExtOrders = visit?.externalDiagnosticOrders?.filter(o => o.type === 'RADIOLOGY') || [];
-    const hasOrders = radBatchOrders.length > 0 || radOrders.length > 0 || radExtOrders.length > 0;
-    setRadiologySubTab(hasOrders ? 'results' : 'order');
+    setRadiologySubTab('results');
     radiologyDefaultSet.current = true;
   }, [visit]);
 
@@ -1850,7 +1846,7 @@ const PatientConsultationPage = () => {
               <ArrowLeft className="h-5 w-5 mt-0.5 text-purple-700" />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-purple-900">
-                  Transferred from {visit.parentVisit.createdBy?.fullname || 'Unknown'}
+                  Transferred from {visit.parentVisit.transfersFrom?.[0]?.fromDoctor?.fullname || visit.parentVisit.createdBy?.fullname || 'Unknown'}
                 </p>
                 <p className="text-sm text-purple-800 mt-1">
                   {visit.parentVisit.notes}
@@ -4106,41 +4102,73 @@ const PatientConsultationPage = () => {
                   {/* Previous visit lab results (transferred from another doctor) */}
                   {visit.parentVisit && (() => {
                     const parentLabTestOrders = visit.parentVisit.labTestOrders || [];
-                    const parentBatchOrders = (visit.parentVisit.batchOrders || []).filter(o => o.type === 'LAB');
-                    const parentLabOrders = visit.parentVisit.labOrders || [];
-                    const hasParentLabs = parentLabTestOrders.length > 0 || parentBatchOrders.length > 0 || parentLabOrders.length > 0;
-                    if (!hasParentLabs) return null;
+                    if (parentLabTestOrders.length === 0) return null;
+                    const parentCompletedOrders = parentLabTestOrders.filter(o => o.results && o.results.length > 0);
+                    const parentPendingOrders = parentLabTestOrders.filter(o => !o.results || o.results.length === 0);
+                    if (parentCompletedOrders.length === 0 && parentPendingOrders.length === 0) return null;
                     return (
                       <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
                         <div className="flex items-center gap-2 mb-3">
                           <ArrowLeft className="h-4 w-4 text-purple-700" />
                           <h4 className="font-semibold text-purple-900">
-                            Previous Orders from {visit.parentVisit.createdBy?.fullname || 'Dr. Previous'}
+                            Previous Orders from {visit.parentVisit.transfersFrom?.[0]?.fromDoctor?.fullname || visit.parentVisit.createdBy?.fullname || 'Dr. Previous'}
                           </h4>
                         </div>
-                        <div className="space-y-2">
-                          {parentLabTestOrders.map(o => (
-                            <div key={o.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-purple-100">
-                              <span className="text-sm font-medium text-gray-800">{o.labTest?.name || 'Lab Test'}</span>
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${o.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                {o.status || 'PENDING'}
-                              </span>
-                            </div>
-                          ))}
-                          {parentBatchOrders.map(o => (
-                            <div key={o.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-purple-100">
-                              <span className="text-sm font-medium text-gray-800">Batch Lab Order #{o.id}</span>
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${o.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                {o.status || 'PENDING'}
-                              </span>
-                            </div>
-                          ))}
-                          {parentLabOrders.map(o => (
-                            <div key={o.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-purple-100">
-                              <span className="text-sm font-medium text-gray-800">{o.type?.name || 'Lab'}</span>
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${o.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                {o.status || 'PENDING'}
-                              </span>
+                        <div className="space-y-3">
+                          {parentCompletedOrders.map(order => {
+                            const latestResult = order.results[0];
+                            return (
+                              <div key={order.id} className="p-4 border rounded-lg border-indigo-200 bg-indigo-50">
+                                <div className="flex justify-between items-start mb-3">
+                                  <div>
+                                    <p className="font-medium text-indigo-800">{order.labTest?.name || 'Lab Test'}</p>
+                                    <p className="text-sm text-indigo-600">Completed: {latestResult?.createdAt ? new Date(latestResult.createdAt).toLocaleDateString() : ''}</p>
+                                  </div>
+                                  <span className="px-2 py-1 text-xs font-medium text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
+                                </div>
+                                {order.labTest?.resultFields && order.labTest.resultFields.length > 0 && latestResult?.results && (
+                                  <div className="mb-3">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                      {order.labTest.resultFields.map(field => {
+                                        const fv = getStructuredFieldValue(latestResult.results, field);
+                                        if (fv === undefined) return null;
+                                        const rc = checkValueInNormalRange(fv, field.normalRange);
+                                        return (
+                                          <div key={field.id} className={'p-2 rounded text-sm ' + (!rc.inRange ? 'bg-red-50 border border-red-200' : 'bg-white')}>
+                                            <div className="font-medium text-gray-800">{field.label}</div>
+                                            <div className={!rc.inRange ? 'text-red-600 font-semibold' : 'text-gray-600'}>{fv} {field.unit || ''}</div>
+                                            {!rc.inRange && rc.message && <div className="text-xs text-red-500 mt-1">{rc.message}</div>}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                                {latestResult?.additionalNotes && (
+                                  <div className="mt-3">
+                                    <p className="text-sm font-medium text-gray-700 mb-1">Additional Notes:</p>
+                                    <p className="text-sm text-gray-600 bg-white p-2 rounded">{latestResult.additionalNotes}</p>
+                                  </div>
+                                )}
+                                {(latestResult?.results?._images && latestResult.results._images.length > 0) && (
+                                  <div className="mt-3 pt-3 border-t border-indigo-200">
+                                    <p className="text-sm font-medium text-gray-700 mb-2">Attached Images:</p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {latestResult.results._images.map((img, idx) => (
+                                        <div key={idx} className="relative">
+                                          <img src={img.url ? getImageUrl(img.url) : (img.data || img)} alt={"Lab "+(idx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.url ? getImageUrl(img.url) : (img.data || img),"_blank")} />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {parentPendingOrders.map(order => (
+                            <div key={order.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-purple-100">
+                              <span className="text-sm font-medium text-gray-800">{order.labTest?.name || 'Lab Test'}</span>
+                              <span className="text-xs font-medium px-2 py-0.5 rounded bg-yellow-100 text-yellow-700">{order.status || 'PENDING'}</span>
                             </div>
                           ))}
                         </div>
@@ -4831,21 +4859,44 @@ const PatientConsultationPage = () => {
                   {visit.parentVisit && (() => {
                     const parentRadOrders = visit.parentVisit.radiologyOrders || [];
                     if (parentRadOrders.length === 0) return null;
+                    const parentRadWithResults = parentRadOrders.filter(o => o.radiologyResults && o.radiologyResults.length > 0);
+                    const parentRadPending = parentRadOrders.filter(o => !o.radiologyResults || o.radiologyResults.length === 0);
                     return (
                       <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
                         <div className="flex items-center gap-2 mb-3">
                           <ArrowLeft className="h-4 w-4 text-purple-700" />
                           <h4 className="font-semibold text-purple-900">
-                            Previous Radiology Orders from {visit.parentVisit.createdBy?.fullname || 'Dr. Previous'}
+                            Previous Radiology Orders from {visit.parentVisit.transfersFrom?.[0]?.fromDoctor?.fullname || visit.parentVisit.createdBy?.fullname || 'Dr. Previous'}
                           </h4>
                         </div>
-                        <div className="space-y-2">
-                          {parentRadOrders.map(o => (
+                        <div className="space-y-3">
+                          {parentRadWithResults.map(order => (
+                            <div key={order.id} className="p-4 border rounded-lg border-purple-200 bg-purple-50">
+                              <div className="flex justify-between items-start mb-3">
+                                <div>
+                                  <p className="font-medium text-purple-800">{order.type?.name || 'Radiology'}</p>
+                                  {order.radiologyResults.map((r, i) => (
+                                    <div key={r.id || i} className="mt-2 space-y-1">
+                                      {r.resultText && <p className="text-sm text-gray-700 bg-white p-2 rounded">{r.resultText}</p>}
+                                      {r.findings && <p className="text-xs text-gray-600"><strong>Findings:</strong> {r.findings}</p>}
+                                      {r.conclusion && <p className="text-xs text-gray-600"><strong>Conclusion:</strong> {r.conclusion}</p>}
+                                      {r.additionalNotes && <p className="text-xs text-gray-500">{r.additionalNotes}</p>}
+                                      {r.attachments && r.attachments.length > 0 && r.attachments.map((att, ai) => (
+                                        <button key={ai} onClick={() => window.open(getImageUrl(att.fileUrl), '_blank')} className="mt-1 text-xs text-blue-600 hover:text-blue-800 underline block">
+                                          View Attachment{att.fileName ? `: ${att.fileName}` : ''}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ))}
+                                </div>
+                                <span className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full">COMPLETED</span>
+                              </div>
+                            </div>
+                          ))}
+                          {parentRadPending.map(o => (
                             <div key={o.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-purple-100">
                               <span className="text-sm font-medium text-gray-800">{o.type?.name || 'Radiology'}</span>
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${o.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                {o.status || 'PENDING'}
-                              </span>
+                              <span className="text-xs font-medium px-2 py-0.5 rounded bg-yellow-100 text-yellow-700">{o.status || 'PENDING'}</span>
                             </div>
                           ))}
                         </div>
