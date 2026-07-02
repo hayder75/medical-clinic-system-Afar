@@ -43,10 +43,10 @@ exports.transferPatient = async (req, res) => {
     ]);
     const hasOrders = labOrders > 0 || radiologyOrders > 0 || medicationOrders > 0 || batchOrders > 0;
 
-    // Mark original visit as COMPLETED
+    // Mark original visit as TRANSFERRED (keeps it accessible for history/referencing)
     await prisma.visit.update({
       where: { id: visitId },
-      data: { status: 'COMPLETED', completedAt: new Date() }
+      data: { status: 'TRANSFERRED' }
     });
 
     // Determine if consultation fee is needed

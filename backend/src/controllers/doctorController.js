@@ -2647,6 +2647,7 @@ exports.getVisitDetails = async (req, res) => {
         createdAt: true,
         createdBy: { select: { id: true, fullname: true } },
         labOrders: { take: 20, orderBy: { createdAt: 'desc' }, include: { type: { select: { id: true, name: true } }, labResults: { take: 3, include: { testType: { select: { id: true, name: true } }, attachments: { select: { id: true, fileUrl: true, fileName: true } } } } } },
+        labTestOrders: { take: 20, orderBy: { createdAt: 'desc' }, include: { labTest: { select: { id: true, name: true, category: true } }, results: { take: 3, select: { id: true, status: true, results: true, additionalNotes: true } } } },
         radiologyOrders: { take: 20, orderBy: { createdAt: 'desc' }, include: { type: { select: { id: true, name: true } }, attachments: { select: { id: true, path: true } } } },
         medicationOrders: { take: 20, orderBy: { createdAt: 'desc' }, include: { doctor: { select: { id: true, fullname: true } }, medicationCatalog: { select: { id: true, name: true, genericName: true, unitPrice: true } } } },
         batchOrders: { take: 20, orderBy: { createdAt: 'desc' }, include: { services: { include: { investigationType: true, service: true } } } },

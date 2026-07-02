@@ -4103,6 +4103,52 @@ const PatientConsultationPage = () => {
                     </div>
                   </div>
 
+                  {/* Previous visit lab results (transferred from another doctor) */}
+                  {visit.parentVisit && (() => {
+                    const parentLabTestOrders = visit.parentVisit.labTestOrders || [];
+                    const parentBatchOrders = (visit.parentVisit.batchOrders || []).filter(o => o.type === 'LAB');
+                    const parentLabOrders = visit.parentVisit.labOrders || [];
+                    const hasParentLabs = parentLabTestOrders.length > 0 || parentBatchOrders.length > 0 || parentLabOrders.length > 0;
+                    if (!hasParentLabs) return null;
+                    return (
+                      <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <ArrowLeft className="h-4 w-4 text-purple-700" />
+                          <h4 className="font-semibold text-purple-900">
+                            Previous Orders from {visit.parentVisit.createdBy?.fullname || 'Dr. Previous'}
+                          </h4>
+                        </div>
+                        <div className="space-y-2">
+                          {parentLabTestOrders.map(o => (
+                            <div key={o.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-purple-100">
+                              <span className="text-sm font-medium text-gray-800">{o.labTest?.name || 'Lab Test'}</span>
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${o.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {o.status || 'PENDING'}
+                              </span>
+                            </div>
+                          ))}
+                          {parentBatchOrders.map(o => (
+                            <div key={o.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-purple-100">
+                              <span className="text-sm font-medium text-gray-800">Batch Lab Order #{o.id}</span>
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${o.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {o.status || 'PENDING'}
+                              </span>
+                            </div>
+                          ))}
+                          {parentLabOrders.map(o => (
+                            <div key={o.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-purple-100">
+                              <span className="text-sm font-medium text-gray-800">{o.type?.name || 'Lab'}</span>
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${o.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {o.status || 'PENDING'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-purple-600 mt-2">These are from the original visit. Results remain visible in patient history.</p>
+                      </div>
+                    );
+                  })()}
+
                   {/* Lab Results Section - Show results when available */}
                   {(() => {
                     // Check old system (batchOrders)
@@ -4780,6 +4826,33 @@ const PatientConsultationPage = () => {
                       <p className="text-sm text-gray-500 mt-0.5">View completed results and pending radiology orders for this visit</p>
                     </div>
                   </div>
+
+                  {/* Previous visit radiology orders (transferred from another doctor) */}
+                  {visit.parentVisit && (() => {
+                    const parentRadOrders = visit.parentVisit.radiologyOrders || [];
+                    if (parentRadOrders.length === 0) return null;
+                    return (
+                      <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <ArrowLeft className="h-4 w-4 text-purple-700" />
+                          <h4 className="font-semibold text-purple-900">
+                            Previous Radiology Orders from {visit.parentVisit.createdBy?.fullname || 'Dr. Previous'}
+                          </h4>
+                        </div>
+                        <div className="space-y-2">
+                          {parentRadOrders.map(o => (
+                            <div key={o.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-purple-100">
+                              <span className="text-sm font-medium text-gray-800">{o.type?.name || 'Radiology'}</span>
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${o.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {o.status || 'PENDING'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-purple-600 mt-2">From the original visit — results remain visible in patient history.</p>
+                      </div>
+                    );
+                  })()}
 
                   {(() => {
                     const radBatchOrders = visit?.batchOrders?.filter(order => order.type === 'RADIOLOGY') || [];
