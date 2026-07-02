@@ -7423,6 +7423,20 @@ const dwDateKey = (dateValue) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+const { isCardRegistration, isCardActivation } = require('../utils/cardBucketHelper');
+
+const getLabServiceToGroupMap = async () => {
+  const labTests = await prisma.labTest.findMany({
+    where: { serviceId: { not: null }, isActive: true },
+    select: { serviceId: true, id: true, groupId: true }
+  });
+  const map = new Map();
+  for (const lt of labTests) {
+    map.set(lt.serviceId, { labTestId: lt.id, groupId: lt.groupId });
+  }
+  return map;
+};
+
 const dwRelevantTotals = (billing) => {
   const allServices = Array.isArray(billing?.services) ? billing.services : [];
   const relevantServices = allServices.filter((item) => DW_INCLUDED_CATEGORIES.has(item?.service?.category));
@@ -7458,12 +7472,13 @@ exports.getDailyWorkMonthly = async (req, res) => {
 
     const assignmentIds = await dwAssignmentIds(doctorId);
     const visitWhere = dwVisitWhere(doctorId, assignmentIds);
+    const labServiceMap = await getLabServiceToGroupMap();
 
     const visits = await prisma.visit.findMany({
       where: { createdAt: { gte: startDate, lte: endDate }, ...visitWhere },
       include: {
         patient: { select: { id: true, name: true } },
-        bills: { include: { services: { include: { service: { select: { id: true, name: true, category: true } } } } } }
+        bills: { include: { services: { include: { service: { select: { id: true, name: true, category: true, code: true } } } } } }
       }
     });
 
@@ -7504,6 +7519,10 @@ exports.getDailyWorkMonthly = async (req, res) => {
         insuranceCollectedByPaymentDate: 0,
         charityCollectedByPaymentDate: 0,
         commissionAmount: 0,
+        commissionBreakdown: {},
+        categoryBreakdown: {},
+        cardOpened: { count: 0, revenue: 0 },
+        cardActivation: { count: 0, revenue: 0 },
         _patientIds: new Set()
       });
     }
@@ -7520,12 +7539,47 @@ exports.getDailyWorkMonthly = async (req, res) => {
         const totals = dwRelevantTotals(billing);
         bucket.billedAmount += totals.billedRelevant;
         bucket.paidAmountByVisitDate += totals.paidRelevant;
-        if (hasCommission) {
-          totals.relevantServices.forEach((item) => {
-            const pct = commissionMap[item.service?.category];
-            if (pct) bucket.commissionAmount += (item.totalPrice || 0) * (pct / 100);
-          });
-        }
+
+        totals.relevantServices.forEach((item) => {
+          const cat = item.service?.category || 'OTHER';
+          if (!bucket.categoryBreakdown[cat]) bucket.categoryBreakdown[cat] = { count: 0, revenue: 0 };
+          let effectiveCount = item.quantity || 1;
+          if (cat === 'LAB') {
+            const labInfo = labServiceMap.get(item.service?.id);
+            if (labInfo?.groupId) {
+              const dedupKey = `${billing.id}_${labInfo.groupId}`;
+              if (!bucket._labPanelSeen) bucket._labPanelSeen = new Set();
+              if (bucket._labPanelSeen.has(dedupKey)) {
+                effectiveCount = 0;
+              } else {
+                bucket._labPanelSeen.add(dedupKey);
+                effectiveCount = 1;
+              }
+            }
+          }
+          bucket.categoryBreakdown[cat].count += effectiveCount;
+          bucket.categoryBreakdown[cat].revenue += item.totalPrice || 0;
+
+          const code = (item.service?.code || '').toUpperCase();
+          const name = (item.service?.name || '').toUpperCase();
+          if (isCardRegistration(code, name)) {
+            bucket.cardOpened.count += item.quantity || 1;
+            bucket.cardOpened.revenue += item.totalPrice || 0;
+          } else if (isCardActivation(code, name)) {
+            bucket.cardActivation.count += item.quantity || 1;
+            bucket.cardActivation.revenue += item.totalPrice || 0;
+          }
+
+          if (hasCommission) {
+            const pct = commissionMap[cat];
+            if (pct) {
+              const comm = (item.totalPrice || 0) * (pct / 100);
+              bucket.commissionAmount += comm;
+              if (!bucket.commissionBreakdown[cat]) bucket.commissionBreakdown[cat] = 0;
+              bucket.commissionBreakdown[cat] += comm;
+            }
+          }
+        });
       });
     });
 
@@ -7559,6 +7613,22 @@ exports.getDailyWorkMonthly = async (req, res) => {
       acc.insuranceCollectedByPaymentDate += item.insuranceCollectedByPaymentDate;
       acc.charityCollectedByPaymentDate += item.charityCollectedByPaymentDate;
       acc.commissionAmount += item.commissionAmount;
+
+      Object.entries(item.categoryBreakdown || {}).forEach(([cat, val]) => {
+        if (!acc.categoryBreakdown[cat]) acc.categoryBreakdown[cat] = { count: 0, revenue: 0 };
+        acc.categoryBreakdown[cat].count += val.count;
+        acc.categoryBreakdown[cat].revenue += val.revenue;
+      });
+
+      Object.entries(item.commissionBreakdown || {}).forEach(([cat, val]) => {
+        acc.commissionBreakdown[cat] = (acc.commissionBreakdown[cat] || 0) + val;
+      });
+
+      acc.cardOpened.count += item.cardOpened?.count || 0;
+      acc.cardOpened.revenue += item.cardOpened?.revenue || 0;
+      acc.cardActivation.count += item.cardActivation?.count || 0;
+      acc.cardActivation.revenue += item.cardActivation?.revenue || 0;
+
       return acc;
     }, {
       visits: 0,
@@ -7570,7 +7640,11 @@ exports.getDailyWorkMonthly = async (req, res) => {
       bankCollectedByPaymentDate: 0,
       insuranceCollectedByPaymentDate: 0,
       charityCollectedByPaymentDate: 0,
-      commissionAmount: 0
+      commissionAmount: 0,
+      commissionBreakdown: {},
+      categoryBreakdown: {},
+      cardOpened: { count: 0, revenue: 0 },
+      cardActivation: { count: 0, revenue: 0 }
     });
 
     return res.json({ year, month: normalizedMonth, summary, dailyData, hasCommission });
@@ -7602,12 +7676,13 @@ exports.getDailyWorkDayDetails = async (req, res) => {
 
     const commissionMap = await dwCommissionMap(doctorId);
     const hasCommission = Object.keys(commissionMap).length > 0;
+    const labServiceMap = await getLabServiceToGroupMap();
 
     const visits = await prisma.visit.findMany({
       where: { createdAt: { gte: dayStart, lte: dayEnd }, ...visitWhere },
       include: {
         patient: { select: { id: true, name: true, gender: true, age: true } },
-        bills: { include: { services: { include: { service: { select: { id: true, name: true, category: true } } } } } }
+        bills: { include: { services: { include: { service: { select: { id: true, name: true, category: true, code: true } } } } } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -7649,6 +7724,7 @@ exports.getDailyWorkDayDetails = async (req, res) => {
             billingId: billing.id,
             serviceId: serviceItem.service?.id,
             serviceName: serviceItem.service?.name,
+            serviceCode: serviceItem.service?.code || '',
             category: cat,
             quantity: serviceItem.quantity,
             unitPrice: serviceItem.unitPrice,
@@ -7694,6 +7770,49 @@ exports.getDailyWorkDayDetails = async (req, res) => {
     });
 
     const uniquePatients = new Set(visitDetails.map((item) => item.patientId).filter(Boolean));
+
+    const categoryBreakdown = {};
+    const commissionBreakdown = {};
+    let cardOpened = { count: 0, revenue: 0 };
+    let cardActivation = { count: 0, revenue: 0 };
+    const labPanelSeen = new Set();
+
+    visitDetails.forEach((v) => {
+      (v.services || []).forEach((svc) => {
+        const cat = svc.category || 'OTHER';
+        if (!categoryBreakdown[cat]) categoryBreakdown[cat] = { count: 0, revenue: 0 };
+        let effectiveCount = svc.quantity || 1;
+        if (cat === 'LAB') {
+          const labInfo = labServiceMap.get(svc.serviceId);
+          if (labInfo?.groupId) {
+            const dedupKey = `${svc.billingId}_${labInfo.groupId}`;
+            if (labPanelSeen.has(dedupKey)) {
+              effectiveCount = 0;
+            } else {
+              labPanelSeen.add(dedupKey);
+              effectiveCount = 1;
+            }
+          }
+        }
+        categoryBreakdown[cat].count += effectiveCount;
+        categoryBreakdown[cat].revenue += svc.totalPrice || 0;
+
+        if (svc.commissionPct > 0) {
+          commissionBreakdown[cat] = (commissionBreakdown[cat] || 0) + (svc.commissionAmount || 0);
+        }
+
+        const code = (svc.serviceCode || '').toUpperCase();
+        const name = (svc.serviceName || '').toUpperCase();
+        if (isCardRegistration(code, name)) {
+          cardOpened.count += svc.quantity || 1;
+          cardOpened.revenue += svc.totalPrice || 0;
+        } else if (isCardActivation(code, name)) {
+          cardActivation.count += svc.quantity || 1;
+          cardActivation.revenue += svc.totalPrice || 0;
+        }
+      });
+    });
+
     const summary = {
       date,
       visits: visitDetails.length,
@@ -7706,6 +7825,10 @@ exports.getDailyWorkDayDetails = async (req, res) => {
       insuranceCollectedByPaymentDate: paymentDetails.filter((item) => item.paymentType === 'INSURANCE').reduce((sum, item) => sum + item.relevantAmount, 0),
       charityCollectedByPaymentDate: paymentDetails.filter((item) => item.paymentType === 'CHARITY').reduce((sum, item) => sum + item.relevantAmount, 0),
       commissionAmount: visitDetails.reduce((sum, item) => sum + item.commissionAmount, 0),
+      commissionBreakdown,
+      categoryBreakdown,
+      cardOpened,
+      cardActivation
     };
 
     return res.json({ date, summary, visits: visitDetails, paymentsOnDate: paymentDetails, hasCommission });

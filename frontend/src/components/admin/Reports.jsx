@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Calendar, TrendingUp, Users, CreditCard, ChevronLeft, ChevronRight, BarChart3, PieChart as PieChartIcon, DollarSign, Activity, Stethoscope } from 'lucide-react';
+import { Download, Calendar, TrendingUp, Users, CreditCard, ChevronLeft, ChevronRight, BarChart3, PieChart as PieChartIcon, DollarSign, Activity, Stethoscope, X, Percent } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
@@ -32,6 +32,7 @@ const Reports = ({ revenueTypeOverride }) => {
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [popupDayData, setPopupDayData] = useState(null);
   const [cardProducts, setCardProducts] = useState([]);
+  const [showCommissionModal, setShowCommissionModal] = useState(false);
 
   useEffect(() => {
     api.get('/admin/card-products')
@@ -1445,35 +1446,46 @@ const Reports = ({ revenueTypeOverride }) => {
                 <div className="text-sm text-gray-500">Loading doctor orders for selected day...</div>
               ) : selectedDoctorDayDetails ? (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div className="p-3 rounded-lg border bg-indigo-50">
-                      <p className="text-sm text-indigo-700">Procedures</p>
-                      <p className="text-lg font-semibold text-indigo-900">
-                        {formatCurrency(selectedDoctorDayDetails.summary?.procedureRevenue || 0)}
-                      </p>
-                      <p className="text-xs text-indigo-700 mt-1">{selectedDoctorDayDetails.summary?.procedureOrders || 0} orders</p>
-                    </div>
-                    <div className="p-3 rounded-lg border bg-cyan-50">
-                      <p className="text-sm text-cyan-700">Lab Ordered</p>
-                      <p className="text-lg font-semibold text-cyan-900">
-                        {formatCurrency(selectedDoctorDayDetails.summary?.labRevenue || 0)}
-                      </p>
-                      <p className="text-xs text-cyan-700 mt-1">{selectedDoctorDayDetails.summary?.labOrders || 0} orders</p>
-                    </div>
-                    <div className="p-3 rounded-lg border bg-rose-50">
-                      <p className="text-sm text-rose-700">Emergency Medication</p>
-                      <p className="text-lg font-semibold text-rose-900">
-                        {formatCurrency(selectedDoctorDayDetails.summary?.emergencyMedicationRevenue || 0)}
-                      </p>
-                      <p className="text-xs text-rose-700 mt-1">{selectedDoctorDayDetails.summary?.emergencyMedicationOrders || 0} orders</p>
-                    </div>
-                    <div className="p-3 rounded-lg border bg-teal-50">
-                      <p className="text-sm text-teal-700">Medical Treated (Dermatology)</p>
-                      <p className="text-lg font-semibold text-teal-900">
-                        {selectedDoctorDayDetails.summary?.medicalTreatedByDermatology || 0}
-                      </p>
-                      <p className="text-xs text-teal-700 mt-1">marked completions</p>
-                    </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {(function() {
+                      const CATEGORY_STYLES = {
+                        LAB: { bg: 'bg-cyan-50', text: 'text-cyan-700', label: 'Lab Ordered' },
+                        RADIOLOGY: { bg: 'bg-indigo-50', text: 'text-indigo-700', label: 'Radiology' },
+                        PROCEDURE: { bg: 'bg-orange-50', text: 'text-orange-700', label: 'Procedures' },
+                        DENTAL: { bg: 'bg-pink-50', text: 'text-pink-700', label: 'Dental' },
+                        TREATMENT: { bg: 'bg-rose-50', text: 'text-rose-700', label: 'Treatment' },
+                        EMERGENCY_DRUG: { bg: 'bg-red-50', text: 'text-red-700', label: 'Emergency Med' },
+                        CONSULTATION: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Consultation' },
+                        NURSE: { bg: 'bg-teal-50', text: 'text-teal-700', label: 'Nurse Service' },
+                        DOCTOR_WALKIN: { bg: 'bg-purple-50', text: 'text-purple-700', label: 'Doctor Walk-in' },
+                      };
+                      const breakdown = selectedDoctorDayDetails.categoryBreakdown || {};
+                      const cOpened = selectedDoctorDayDetails.cardOpened;
+                      const cAct = selectedDoctorDayDetails.cardActivation;
+                      const cards = [];
+                      Object.entries(breakdown).forEach(([cat, data]) => {
+                        if (data.count > 0) {
+                          const style = CATEGORY_STYLES[cat] || { bg: 'bg-gray-50', text: 'text-gray-700', label: cat };
+                          cards.push({ ...style, cat, count: data.count, revenue: data.revenue });
+                        }
+                      });
+                      if (cOpened?.count > 0) cards.push({ bg: 'bg-yellow-50', text: 'text-yellow-700', label: 'Cards Opened', cat: 'CARD_OPENED', count: cOpened.count, revenue: cOpened.revenue });
+                      if (cAct?.count > 0) cards.push({ bg: 'bg-green-50', text: 'text-green-700', label: 'Cards Activated', cat: 'CARD_ACT', count: cAct.count, revenue: cAct.revenue });
+                      return cards.map(c => (
+                        <div key={c.cat} className={`p-3 rounded-lg border ${c.bg}`}>
+                          <p className={`text-sm ${c.text}`}>{c.label}</p>
+                          <p className={`text-lg font-semibold ${c.text}`}>{formatCurrency(c.revenue || 0)}</p>
+                          <p className={`text-xs ${c.text} mt-1`}>{c.count} orders</p>
+                        </div>
+                      ));
+                    })()}
+                    {selectedDoctorDayDetails?.commissionAmount > 0 && (
+                      <button onClick={() => setShowCommissionModal(true)} className="p-3 rounded-lg border bg-purple-50 text-left w-full group hover:shadow-md transition-shadow">
+                        <p className="text-sm text-purple-700">Share</p>
+                        <p className="text-lg font-semibold text-purple-700">{formatCurrency(selectedDoctorDayDetails.commissionAmount)}</p>
+                        <p className="text-xs text-purple-600 mt-1 flex items-center gap-1">Click for details <ChevronRight className="h-3 w-3 inline group-hover:translate-x-0.5 transition-transform" /></p>
+                      </button>
+                    )}
                   </div>
 
                   <div className="space-y-4">
@@ -1500,6 +1512,50 @@ const Reports = ({ revenueTypeOverride }) => {
               ) : (
                 <div className="text-sm text-gray-500">No doctor orders found for this day.</div>
               )}
+            </div>
+          )}
+
+          {showCommissionModal && (
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={() => setShowCommissionModal(false)}>
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900">{selectedDoctor?.doctorName || 'Doctor'}'s Share Breakdown</h3>
+                  <button onClick={() => setShowCommissionModal(false)} className="p-1 rounded-lg hover:bg-gray-100">
+                    <X className="h-5 w-5 text-gray-500" />
+                  </button>
+                </div>
+                {(() => {
+                  const breakdown = selectedDoctorDayDetails?.commissionBreakdown || {};
+                  const entries = Object.entries(breakdown).filter(([, v]) => v > 0);
+                  const total = selectedDoctorDayDetails?.commissionAmount || 0;
+                  const CATEGORY_LABELS = {
+                    LAB: 'Lab', RADIOLOGY: 'Radiology', PROCEDURE: 'Procedure', DENTAL: 'Dental',
+                    TREATMENT: 'Treatment', EMERGENCY_DRUG: 'Emergency Med', CONSULTATION: 'Consultation',
+                    NURSE: 'Nurse Service', DOCTOR_WALKIN: 'Doctor Walk-in',
+                  };
+                  return (
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-500">Commission from services where this doctor has a share percentage set by admin.</p>
+                      {entries.length === 0 ? (
+                        <p className="text-sm text-gray-400">No commission breakdown available.</p>
+                      ) : (
+                        <div className="divide-y divide-gray-100">
+                          {entries.map(([cat, amt]) => (
+                            <div key={cat} className="flex items-center justify-between py-2">
+                              <span className="text-sm font-medium text-gray-700">{CATEGORY_LABELS[cat] || cat}</span>
+                              <span className="text-sm font-bold text-purple-700">{formatCurrency(amt)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="border-t border-gray-200 pt-3 flex items-center justify-between">
+                        <span className="text-sm font-semibold text-gray-800">Total Share</span>
+                        <span className="text-base font-bold text-purple-700">{formatCurrency(total)}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           )}
 

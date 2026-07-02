@@ -38,6 +38,7 @@ router.post('/investigation-types', roleGuard(['ADMIN']), adminController.create
 router.get('/investigation-types', roleGuard(['ADMIN']), adminController.getInvestigationTypes);
 
 // Lab Test Management (New System)
+router.get('/lab-test-categories', roleGuard(['ADMIN']), adminController.getLabTestCategories);
 router.post('/lab-test-groups', roleGuard(['ADMIN']), adminController.createLabTestGroup);
 router.get('/lab-test-groups', roleGuard(['ADMIN']), adminController.getLabTestGroups);
 router.put('/lab-test-groups/:id', roleGuard(['ADMIN']), adminController.updateLabTestGroup);
