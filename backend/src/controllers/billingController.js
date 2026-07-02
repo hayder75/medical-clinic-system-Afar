@@ -1998,7 +1998,13 @@ exports.getBillings = async (req, res) => {
             id: true,
             visitUid: true,
             status: true,
-            isEmergency: true
+            isEmergency: true,
+            assignment: {
+              select: {
+                doctor: { select: { fullname: true } }
+              }
+            },
+            suggestedDoctor: { select: { fullname: true } }
           }
         },
         insurance: {

@@ -1891,9 +1891,8 @@ const LabOrders = () => {
                           }
                         }
                         toast.success('Order reopened for editing');
-                        // Refresh the order data
-                        if (typeof fetchOrders === 'function') fetchOrders();
-                        setShowTemplate(false);
+                        fetchOrders();
+                        setShowTemplateForm(false);
                         setSelectedOrder(null);
                       } catch (e) {
                         toast.error('Failed to reopen order: ' + (e.response?.data?.error || e.message));
