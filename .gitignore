@@ -12,3 +12,4 @@ backend/dist
 *.png
 *.jpeg
 *.gif
+backend/uploads/receipt-*.pdf
