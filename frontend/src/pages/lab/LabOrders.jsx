@@ -1679,13 +1679,53 @@ const LabOrders = () => {
                 </div>
               </div>
 
-              {(order.status === 'QUEUED' || order.status === 'COMPLETED') && (
-                <div className={`mt-3 sm:mt-4 p-2 sm:p-3 rounded-lg ${order.status === 'QUEUED' ? 'bg-yellow-50' : 'bg-green-50'
-                  }`}>
-                  <p className={`text-xs sm:text-base font-semibold ${order.status === 'QUEUED' ? 'text-yellow-800' : 'text-green-800'
-                    }`}>
-                    {order.status === 'QUEUED' ? 'Click to process tests' : 'Click to view results'}
+              {order.status === 'QUEUED' && (
+                <div className="mt-3 sm:mt-4 p-2 sm:p-3 rounded-lg bg-yellow-50">
+                  <p className="text-xs sm:text-base font-semibold text-yellow-800">
+                    Click to process tests
                   </p>
+                </div>
+              )}
+              {order.status === 'COMPLETED' && (
+                <div className="mt-3 sm:mt-4 flex gap-2">
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const ordersToReopen = order.orders || [order];
+                      setSavingResults(true);
+                      try {
+                        for (const o of ordersToReopen) {
+                          const r = o.labTestResult || o.result;
+                          if (r && r.id) {
+                            await api.post('/labs/results/lab-test', {
+                              orderId: r.orderId || o.id,
+                              labTestId: r.labTestId || o.labTestId,
+                              results: r.results || {},
+                              additionalNotes: r.additionalNotes || '',
+                              reopen: true
+                            });
+                          }
+                        }
+                        await fetchOrders();
+                        await handleOrderClick(order);
+                      } catch (err) {
+                        toast.error('Failed to reopen: ' + (err.response?.data?.error || err.message));
+                      } finally {
+                        setSavingResults(false);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors text-sm flex items-center gap-1.5"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={(e) => handlePrintResults(e, order)}
+                    className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center gap-1.5"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Print
+                  </button>
                 </div>
               )}
 
@@ -1805,7 +1845,7 @@ const LabOrders = () => {
                                   {everyFully ? 'Completed' : hasSome ? 'Partial' : 'Pending'}
                                 </span>
                                 <button onClick={() => handleServiceClick(p.panel.id, true)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${allDone ? 'bg-gray-600 text-white hover:bg-gray-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
-                                  {allDone ? 'View Results' : hasSome ? 'Edit Results' : 'Fill Results'}
+                                  {allDone ? 'Edit' : hasSome ? 'Edit Results' : 'Fill Results'}
                                 </button>
                               </div>
                             </div>
@@ -1889,8 +1929,9 @@ const LabOrders = () => {
                           }
                         }
                         toast.success('Order reopened for editing');
-                        setSelectedOrder(prev => ({ ...prev, status: 'IN_PROGRESS' }));
-                        fetchOrders();
+                        setShowTemplateForm(false);
+                        await fetchOrders();
+                        handleOrderClick(selectedOrder);
                       } catch (e) {
                         toast.error('Failed to reopen order: ' + (e.response?.data?.error || e.message));
                       } finally {
