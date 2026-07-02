@@ -68,6 +68,7 @@ model User {
   nurseAssignments           NurseServiceAssignment[]    @relation("NurseAssignments")
   nurseWalkInOrders          NurseWalkInOrder[]          @relation("NurseWalkInOrders")
   doctorWalkInOrders         DoctorWalkInOrder[]         @relation("DoctorWalkInOrders")
+  suggestedDoctorVisits      Visit[]                     @relation("SuggestedDoctorVisit")
   verifiedAccounts           PatientAccount[]            @relation("VerifiedAccounts")
   attachedImages             PatientAttachedImage[]
   galleryUploads             PatientGallery[]
@@ -279,6 +280,8 @@ model Visit {
   galleryImages              PatientGallery[]
   pharmacyInvoices           PharmacyInvoice[]
   radiologyOrders            RadiologyOrder[]
+  assignment                 Assignment?                 @relation(fields: [assignmentId], references: [id])
+  suggestedDoctor            User?                       @relation("SuggestedDoctorVisit", fields: [suggestedDoctorId], references: [id])
   createdBy                  User?                       @relation(fields: [createdById], references: [id])
   patient                    Patient                     @relation(fields: [patientId], references: [id])
   vitals                     VitalSign[]
@@ -1156,6 +1159,7 @@ model Assignment {
   updatedAt DateTime @updatedAt
   doctor    User     @relation(fields: [doctorId], references: [id])
   patient   Patient  @relation(fields: [patientId], references: [id])
+  visits    Visit[]
 }
 
 model DoctorCommission {

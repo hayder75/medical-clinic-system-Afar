@@ -803,7 +803,7 @@ const BillingQueue = () => {
               </div>
 
               {/* Billing Details */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div>
                   <p className="text-sm text-gray-500">Billing ID</p>
                   <p className="font-mono text-sm">{billing.id}</p>
@@ -818,6 +818,12 @@ const BillingQueue = () => {
                   <p className="text-sm text-gray-500">Services</p>
                   <p className="text-sm text-gray-900">
                     {billing.services?.length || 0} service(s)
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Doctor</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {billing.visit?.assignment?.doctor?.name || billing.visit?.suggestedDoctor?.name || '—'}
                   </p>
                 </div>
               </div>
