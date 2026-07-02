@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TestTube, Clock, CheckCircle, AlertTriangle, FileText, User, Calendar, Stethoscope, X, Eye, Edit } from 'lucide-react';
+import { TestTube, Clock, CheckCircle, AlertTriangle, FileText, User, Calendar, Stethoscope, X, Eye, Edit, Loader } from 'lucide-react';
 import ImageUpload from '../../components/lab/ImageUpload';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -1745,10 +1745,11 @@ const LabOrders = () => {
                         setSavingResults(false);
                       }
                     }}
-                    className="px-3 py-1.5 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors text-sm flex items-center gap-1.5"
+                    disabled={savingResults}
+                    className="px-3 py-1.5 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors text-sm flex items-center gap-1.5 disabled:bg-amber-400 disabled:cursor-not-allowed"
                   >
-                    <Edit className="h-4 w-4" />
-                    Edit
+                    {savingResults ? <Loader className="h-4 w-4 animate-spin" /> : <Edit className="h-4 w-4" />}
+                    {savingResults ? 'Reopening...' : 'Edit'}
                   </button>
                   <button
                     onClick={(e) => handlePrintResults(e, order)}
@@ -1972,8 +1973,8 @@ const LabOrders = () => {
                     disabled={savingResults}
                     className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors disabled:bg-amber-400 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    <Edit className="h-4 w-4" />
-                    Edit Results
+                    {savingResults ? <Loader className="h-4 w-4 animate-spin" /> : <Edit className="h-4 w-4" />}
+                    {savingResults ? 'Reopening...' : 'Edit Results'}
                   </button>
                   <button
                     onClick={() => handlePrintResults()}
