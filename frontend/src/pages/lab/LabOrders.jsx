@@ -41,6 +41,8 @@ const LabOrders = () => {
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [testResults, setTestResults] = useState({});
   const [statusFilter, setStatusFilter] = useState('PENDING');
+  const today = new Date().toISOString().split('T')[0];
+  const [dateFilter, setDateFilter] = useState(today);
   const [searchTerm, setSearchTerm] = useState('');
   const [templates, setTemplates] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
@@ -55,13 +57,13 @@ const LabOrders = () => {
   useEffect(() => {
     fetchOrders();
     fetchTemplates();
-  }, [statusFilter]);
+  }, [statusFilter, dateFilter]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
       const response = await api.get('/labs/orders', {
-        params: { status: statusFilter }
+        params: { status: statusFilter, date: dateFilter }
       });
       console.log('📋 [fetchOrders] Raw response:', {
         batchOrders: response.data.batchOrders?.length || 0,
@@ -696,10 +698,31 @@ const LabOrders = () => {
       let resultsToPrint = testResults;
       let orderData = orderToPrint;
 
-      // If we don't have results in state, fetch from API
-      if (Object.keys(resultsToPrint).length === 0 || order) {
+      // For new system labTest orders, results are local — extract directly
+      const orderItems = orderToPrint.orders || [orderToPrint];
+      const hasLocalResults = orderItems.some(o => o.results && o.results.length > 0);
+      if (hasLocalResults) {
+        resultsToPrint = {};
+        orderItems.forEach(o => {
+          const r = o.results?.[0];
+          if (r && r.results) {
+            const sid = o.id || o.labTestId || r.id;
+            resultsToPrint[sid] = {
+              results: typeof r.results === 'object' ? r.results : {},
+              additionalNotes: r.additionalNotes || '',
+              serviceName: o.labTest?.name || 'Lab Test',
+              template: {},
+              resultFields: o.labTest?.resultFields || [],
+              labTest: o.labTest || null,
+              verifiedByUser: r.verifiedByUser || null
+            };
+          }
+        });
+      }
+
+      // If we don't have results in state, fetch from API (old system batch/walk-in orders)
+      if (Object.keys(resultsToPrint).length === 0) {
         try {
-          // Try to fetch results from API - use detailed-results endpoint
           const response = await api.get(`/labs/orders/${orderToPrint.id}/detailed-results`);
           const apiResults = response.data?.detailedResults || response.data?.results || [];
 
@@ -1575,6 +1598,15 @@ const LabOrders = () => {
           />
         </div>
         <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-gray-500" />
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
           <label className="text-sm font-medium text-gray-700">Filter by Status:</label>
           <select
             value={statusFilter}

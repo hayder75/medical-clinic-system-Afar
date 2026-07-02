@@ -21,22 +21,18 @@ const api = axios.create({
   withCredentials: true,
 });
 
-const getStoredToken = () => sessionStorage.getItem('token') || localStorage.getItem('token');
-const getStoredRefreshToken = () => sessionStorage.getItem('refreshToken') || localStorage.getItem('refreshToken');
+const getStoredToken = () => sessionStorage.getItem('token');
+const getStoredRefreshToken = () => sessionStorage.getItem('refreshToken');
 
 const persistToken = (token) => {
   if (!token) return;
   sessionStorage.setItem('token', token);
-  localStorage.setItem('token', token);
 };
 
 const clearStoredAuth = () => {
   sessionStorage.removeItem('token');
   sessionStorage.removeItem('refreshToken');
   sessionStorage.removeItem('user');
-  localStorage.removeItem('token');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('user');
 };
 
 // Request interceptor to add auth token
