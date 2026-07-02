@@ -670,7 +670,8 @@ const saveLabTestResult = async (req, res) => {
 
     const hasImages = incomingResults._images && incomingResults._images.length > 0;
 
-    const shouldFinalize = requestedFinalize || existingResult?.status === 'COMPLETED';
+    const reopen = req.body.reopen === true || req.body.reopen === 'true';
+    const shouldFinalize = reopen ? false : (requestedFinalize || existingResult?.status === 'COMPLETED');
     const targetStatus = shouldFinalize ? 'COMPLETED' : 'IN_PROGRESS';
 
     let result;
@@ -709,6 +710,8 @@ const saveLabTestResult = async (req, res) => {
       if (order.visitId) {
         await checkAndUpdateVisitStatus(order.visitId);
       }
+    } else if (reopen) {
+      await prisma.labTestOrder.update({ where: { id: orderId }, data: { status: 'IN_PROGRESS' } });
     } else if (order.status !== 'COMPLETED') {
       await prisma.labTestOrder.update({ where: { id: orderId }, data: { status: 'IN_PROGRESS' } });
     }

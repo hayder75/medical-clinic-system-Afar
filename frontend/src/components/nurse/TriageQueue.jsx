@@ -340,8 +340,14 @@ const TriageQueue = () => {
       vitalsData.bloodType
     );
 
+    // Mandatory vitals: temperature, heart rate, oxygen saturation
+    const tempOk = parseFloat(vitalsData.temperature) > 0;
+    const hrOk = parseInt(vitalsData.heartRate) > 0;
+    const o2Ok = parseInt(vitalsData.oxygenSaturation) > 0;
+    const mandatoryVitalsOk = tempOk && hrOk && o2Ok;
+
     const completion = {
-      vitals: hasVitalsData, // Only true if at least one vital is recorded
+      vitals: hasVitalsData && mandatoryVitalsOk, // Only true if mandatory vitals are filled
       complaint: !!(vitalsData.chiefComplaint || vitalsData.historyOfPresentIllness),
       examination: !!(
         vitalsData.generalAppearance ||
@@ -981,13 +987,14 @@ const TriageQueue = () => {
                         </div>
 
                         <div>
-                          <label className="label">Oxygen Saturation (%)</label>
+                          <label className="label">Oxygen Saturation (%) *</label>
                           <input
                             type="number"
                             className="input"
                             placeholder="98"
                             value={vitalsData.oxygenSaturation}
                             onChange={(e) => setVitalsData({ ...vitalsData, oxygenSaturation: e.target.value })}
+                            required
                           />
                           {getVitalWarning('oxygenSaturation', vitalsData.oxygenSaturation) && (
                             <p className="text-xs text-red-600 mt-1 font-medium">

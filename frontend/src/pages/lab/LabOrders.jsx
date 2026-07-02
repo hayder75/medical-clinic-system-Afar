@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TestTube, Clock, CheckCircle, AlertTriangle, FileText, User, Calendar, Stethoscope, X, Eye } from 'lucide-react';
+import { TestTube, Clock, CheckCircle, AlertTriangle, FileText, User, Calendar, Stethoscope, X, Eye, Edit } from 'lucide-react';
 import ImageUpload from '../../components/lab/ImageUpload';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -1872,6 +1872,41 @@ const LabOrders = () => {
             <div className="flex justify-end mt-6 pt-4 border-t gap-2">
               {selectedOrder.status === 'COMPLETED' ? (
                 <>
+                  <button
+                    onClick={async () => {
+                      setSavingResults(true);
+                      try {
+                        // Reopen all results in the order
+                        const ids = Object.keys(testResults);
+                        for (const oid of ids) {
+                          const r = testResults[oid];
+                          if (r && r.orderId && r.labTestId) {
+                            await api.post('/labs/results/lab-test', {
+                              orderId: r.orderId,
+                              labTestId: r.labTestId,
+                              results: r.results || {},
+                              additionalNotes: r.additionalNotes || '',
+                              reopen: true
+                            });
+                          }
+                        }
+                        toast.success('Order reopened for editing');
+                        // Refresh the order data
+                        if (typeof fetchOrders === 'function') fetchOrders();
+                        setShowTemplate(false);
+                        setSelectedOrder(null);
+                      } catch (e) {
+                        toast.error('Failed to reopen order: ' + (e.response?.data?.error || e.message));
+                      } finally {
+                        setSavingResults(false);
+                      }
+                    }}
+                    disabled={savingResults}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors disabled:bg-amber-400 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Edit Results
+                  </button>
                   <button
                     onClick={() => handlePrintResults()}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
