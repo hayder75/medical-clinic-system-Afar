@@ -431,7 +431,7 @@ exports.getQueue = async (req, res) => {
     // Include ALL statuses except COMPLETED and CANCELLED
     // Patient stays in queue until main "Complete Visit" button is clicked
     const statusFilter = {
-      notIn: ['COMPLETED', 'CANCELLED']
+      notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED']
     };
 
     // Apply specific filter if provided
@@ -836,7 +836,7 @@ exports.getDoctorsQueueStatus = async (req, res) => {
               in: assignmentIds
             },
             status: {
-              notIn: ['COMPLETED', 'CANCELLED']
+              notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED']
             }
           }
         });
@@ -922,7 +922,7 @@ exports.getDashboardStats = async (req, res) => {
     const mainQueueVisits = await prisma.visit.findMany({
       where: {
         status: {
-          notIn: ['COMPLETED', 'CANCELLED', ...sentStatuses, ...returnedStatuses]
+          notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED', ...sentStatuses, ...returnedStatuses]
         },
         AND: [
           {
@@ -1275,7 +1275,7 @@ exports.getPatientAssignments = async (req, res) => {
         visits: {
           where: {
             status: {
-              notIn: ['COMPLETED', 'CANCELLED']
+              notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED']
             }
           },
           select: {
@@ -1375,13 +1375,13 @@ exports.getUnifiedQueue = async (req, res) => {
 
     // Build status filter based on queue type
     let statusFilter = {
-      notIn: ['COMPLETED', 'CANCELLED']
+      notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED']
     };
 
     if (queueFilter === 'main') {
       // Main queue: exclude patients sent to lab/radiology/nurse AND those with results ready
       statusFilter = {
-        notIn: ['COMPLETED', 'CANCELLED', ...sentStatuses, ...returnedStatuses]
+        notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED', ...sentStatuses, ...returnedStatuses]
       };
       console.log('🔍 Main queue filter: excluding', [...sentStatuses, ...returnedStatuses]);
     } else if (queueFilter === 'sent') {
@@ -1399,7 +1399,7 @@ exports.getUnifiedQueue = async (req, res) => {
     } else if (queueFilter === 'all') {
       // All queue for searching: include all active statuses
       statusFilter = {
-        notIn: ['COMPLETED', 'CANCELLED']
+        notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED']
       };
       console.log('🔍 All queue filter: including all active statuses');
     }
@@ -2107,7 +2107,7 @@ exports.getUnifiedQueue = async (req, res) => {
       where: {
         id: { in: appointmentVisitIds },
         status: {
-          notIn: ['COMPLETED', 'CANCELLED']
+          notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED']
         },
         assignmentId: null // Missing assignment link
       },
@@ -2358,7 +2358,7 @@ exports.getUnifiedQueue = async (req, res) => {
     const allQualifyingVisits = await prisma.visit.findMany({
       where: {
         status: {
-          notIn: ['COMPLETED', 'CANCELLED'] // Only exclude completed/cancelled
+          notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED'] // Only exclude completed/cancelled
         },
         AND: [
           {
@@ -7861,7 +7861,7 @@ exports.bulkCompleteActiveVisits = async (req, res) => {
           { suggestedDoctorId: doctorId },
           { assignmentId: { in: assignmentIds } }
         ],
-        status: { notIn: ['COMPLETED', 'CANCELLED'] }
+        status: { notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED'] }
       },
       select: { id: true, visitUid: true, status: true, patientId: true }
     });
