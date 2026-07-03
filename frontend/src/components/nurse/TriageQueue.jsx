@@ -931,18 +931,6 @@ const TriageQueue = () => {
                     <div className="border border-gray-200 rounded-lg p-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="label">Blood Pressure</label>
-                          <input
-                            type="text"
-                            className="input"
-                            placeholder="120/80"
-                            value={vitalsData.bloodPressure}
-                            onChange={(e) => setVitalsData({ ...vitalsData, bloodPressure: e.target.value })}
-                            required
-                          />
-                        </div>
-
-                        <div>
                           <label className="label">Temperature (°C) *</label>
                           <input
                             type="number"
@@ -978,6 +966,34 @@ const TriageQueue = () => {
                         </div>
 
                         <div>
+                          <label className="label">Oxygen Saturation (%) *</label>
+                          <input
+                            type="number"
+                            className="input"
+                            placeholder="98"
+                            value={vitalsData.oxygenSaturation}
+                            onChange={(e) => setVitalsData({ ...vitalsData, oxygenSaturation: e.target.value })}
+                            required
+                          />
+                          {getVitalWarning('oxygenSaturation', vitalsData.oxygenSaturation) && (
+                            <p className="text-xs text-red-600 mt-1 font-medium">
+                              ⚠️ {getVitalWarning('oxygenSaturation', vitalsData.oxygenSaturation)}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="label">Blood Pressure</label>
+                          <input
+                            type="text"
+                            className="input"
+                            placeholder="120/80"
+                            value={vitalsData.bloodPressure}
+                            onChange={(e) => setVitalsData({ ...vitalsData, bloodPressure: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
                           <label className="label">Height (cm)</label>
                           <input
                             type="number"
@@ -998,23 +1014,6 @@ const TriageQueue = () => {
                             value={vitalsData.weight}
                             onChange={(e) => setVitalsData({ ...vitalsData, weight: e.target.value })}
                           />
-                        </div>
-
-                        <div>
-                          <label className="label">Oxygen Saturation (%) *</label>
-                          <input
-                            type="number"
-                            className="input"
-                            placeholder="98"
-                            value={vitalsData.oxygenSaturation}
-                            onChange={(e) => setVitalsData({ ...vitalsData, oxygenSaturation: e.target.value })}
-                            required
-                          />
-                          {getVitalWarning('oxygenSaturation', vitalsData.oxygenSaturation) && (
-                            <p className="text-xs text-red-600 mt-1 font-medium">
-                              ⚠️ {getVitalWarning('oxygenSaturation', vitalsData.oxygenSaturation)}
-                            </p>
-                          )}
                         </div>
 
                         <div>
