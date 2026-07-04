@@ -828,6 +828,7 @@ exports.createService = async (req, res) => {
             data: {
               name: service.name,
               category: 'RADIOLOGY',
+              isActive: service.isActive,
               price: service.price,
               service: {
                 connect: { id: service.id }
@@ -1031,6 +1032,7 @@ exports.updateService = async (req, res) => {
             data: {
               name: service.name,
               category: 'RADIOLOGY',
+              isActive: service.isActive,
               price: service.price,
               service: { connect: { id: service.id } },
               ...(radId ? { radiologyCategoryId: radId } : {})
@@ -1039,7 +1041,7 @@ exports.updateService = async (req, res) => {
           console.log(`✅ Auto-created InvestigationType for updated RADIOLOGY service: ${service.name}`);
         } else {
           // Update existing InvestigationType
-          const updateData = { name: service.name, price: service.price };
+          const updateData = { name: service.name, price: service.price, isActive: service.isActive };
           const rg = service.radiologyGroup;
           if (rg) {
             const radiologyGroupMap = {
