@@ -257,7 +257,9 @@ const PatientConsultationPage = () => {
   const [labSubTab, setLabSubTab] = useState(null);
   const [expandedLabPanels, setExpandedLabPanels] = useState({});
   const labDefaultSet = useRef(false);
+  const [radiologySubTab, setRadiologySubTab] = useState(null);
   const radiologyDefaultSet = useRef(false);
+  const [dentalRecord, setDentalRecord] = useState(null);
   const triagePrefilled = useRef(false);
   const dentalChartRef = useRef(null);
   const [workspaceConfig, setWorkspaceConfig] = useState(DEFAULT_DOCTOR_WORKSPACE_CONFIG);

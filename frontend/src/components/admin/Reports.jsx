@@ -1455,7 +1455,7 @@ const Reports = ({ revenueTypeOverride }) => {
                         DENTAL: { bg: 'bg-pink-50', text: 'text-pink-700', label: 'Dental' },
                         TREATMENT: { bg: 'bg-rose-50', text: 'text-rose-700', label: 'Treatment' },
                         EMERGENCY_DRUG: { bg: 'bg-red-50', text: 'text-red-700', label: 'Emergency Med' },
-
+                        // CONSULTATION is the same as Cards Opened — hidden per client request
                         NURSE: { bg: 'bg-teal-50', text: 'text-teal-700', label: 'Nurse Service' },
                         DOCTOR_WALKIN: { bg: 'bg-purple-50', text: 'text-purple-700', label: 'Doctor Walk-in' },
                       };
@@ -1464,6 +1464,7 @@ const Reports = ({ revenueTypeOverride }) => {
                       const cAct = selectedDoctorDayDetails.cardActivation;
                       const cards = [];
                       Object.entries(breakdown).forEach(([cat, data]) => {
+                        if (cat === 'CONSULTATION') return; // same as Cards Opened, hidden per client request
                         if (data.count > 0) {
                           const style = CATEGORY_STYLES[cat] || { bg: 'bg-gray-50', text: 'text-gray-700', label: cat };
                           cards.push({ ...style, cat, count: data.count, revenue: data.revenue });
