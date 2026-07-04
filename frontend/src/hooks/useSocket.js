@@ -51,6 +51,12 @@ export default function useSocket(eventHandlers = {}) {
       }
     });
 
+    socket.on('billing:update', (data) => {
+      if (handlersRef.current.onBillingUpdate) {
+        handlersRef.current.onBillingUpdate(data);
+      }
+    });
+
     socketRef.current = socket;
 
     return () => {

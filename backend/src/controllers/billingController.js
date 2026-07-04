@@ -975,6 +975,15 @@ exports.processPayment = async (req, res) => {
     const totalPaid = billing.payments.reduce((sum, p) => sum + p.amount, 0);
     let remainingBalance = billing.totalAmount - totalPaid;
 
+    // If this is a partial payment that should be converted to debt
+    const convertToDebt = req.body.convertToDebt || billing.isDeferred;
+
+    // If convertToDebt is false, the payment amount must match the remaining balance of the bill.
+    // This prevents race conditions where the doctor added services while the cashier had the payment form open.
+    if (!convertToDebt && Math.abs(numericAmount - remainingBalance) > 0.01) {
+      return res.status(409).json({ error: "The bill total has changed because the doctor added new services. Please refresh the bill." });
+    }
+
     // Validate payment amount - allow 0 for converting full amount to debt
     if (numericAmount > remainingBalance) {
       return res.status(400).json({ error: `Payment exceeds remaining balance of ${remainingBalance} ETB` });
@@ -994,9 +1003,6 @@ exports.processPayment = async (req, res) => {
       amountFromAccount = Math.min(numericAmount, patientAccount.balance);
       amountFromCash = numericAmount - amountFromAccount;
     }
-
-    // If this is a partial payment that should be converted to debt
-    const convertToDebt = req.body.convertToDebt || billing.isDeferred;
 
     // Create patient account automatically if it doesn't exist and we need to handle debt
     if (convertToDebt && !patientAccount) {

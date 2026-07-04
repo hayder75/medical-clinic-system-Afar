@@ -34,6 +34,32 @@ const BillingQueue = () => {
   useSocket({
     onVisitUpdate: () => setRefreshKey(k => k + 1),
     onNewVisit: () => setRefreshKey(k => k + 1),
+    onBillingUpdate: (data) => {
+      setRefreshKey(k => k + 1);
+      if (selectedBilling && data && data.billingId === selectedBilling.id) {
+        toast.info("The doctor has updated this bill with new services. Reloading...", { autoClose: 3000 });
+        api.get('/billing', {
+          params: {
+            page: 1,
+            limit: 50,
+            status: statusFilter,
+            search: selectedBilling.patient?.id || ""
+          }
+        }).then(res => {
+          const updated = res.data.billings?.find(b => b.id === selectedBilling.id);
+          if (updated) {
+            setSelectedBilling(updated);
+            const remaining = updated.totalAmount - (updated.paidAmount || 0);
+            setPaymentForm(prev => ({
+              ...prev,
+              amount: prev.waiveRegistrationForOldPatient ? "0" : remaining.toString()
+            }));
+          }
+        }).catch(err => {
+          console.error("Error reloading active billing:", err);
+        });
+      }
+    }
   });
 
   // Clean payment form state
@@ -1277,12 +1303,9 @@ const BillingQueue = () => {
                       selectedBilling.totalAmount -
                       (selectedBilling.paidAmount || 0)
                     }
-                    className={`input ${formErrors.amount ? "border-red-500" : ""}`}
+                    className={`input bg-gray-100 cursor-not-allowed ${formErrors.amount ? "border-red-500" : ""}`}
                     value={paymentForm.amount}
-                    onChange={(e) =>
-                      setPaymentForm({ ...paymentForm, amount: e.target.value })
-                    }
-                    disabled={paymentForm.waiveRegistrationForOldPatient}
+                    readOnly={true}
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">

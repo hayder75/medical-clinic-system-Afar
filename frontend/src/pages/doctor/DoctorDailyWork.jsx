@@ -67,7 +67,7 @@ const DoctorDailyWork = () => {
       { label: 'Total Visits', value: monthlySummary.visits || 0, icon: Activity, color: { bg: 'bg-blue-100', text: 'text-blue-700' } },
       { label: 'Billed (Visit Date)', value: formatCurrency(monthlySummary.billedAmount || 0), icon: DollarSign, color: { bg: 'bg-emerald-100', text: 'text-emerald-700' } },
       { label: 'Paid (Visit Date)', value: formatCurrency(monthlySummary.paidAmountByVisitDate || 0), icon: TrendingUp, color: { bg: 'bg-green-100', text: 'text-green-700' } },
-      { label: 'Collected (Payment Date)', value: formatCurrency(monthlySummary.collectedAmountByPaymentDate || 0), icon: BanknoteIcon, color: { bg: 'bg-amber-100', text: 'text-amber-700' } },
+      // { label: 'Collected (Payment Date)', value: formatCurrency(monthlySummary.collectedAmountByPaymentDate || 0), icon: BanknoteIcon, color: { bg: 'bg-amber-100', text: 'text-amber-700' } },
     ];
     if (monthlySummary.commissionAmount > 0) {
       base.push({ label: 'Your Share', value: formatCurrency(monthlySummary.commissionAmount || 0), icon: TrendingUp, color: { bg: 'bg-purple-100', text: 'text-purple-700' } });
@@ -91,7 +91,7 @@ const DoctorDailyWork = () => {
       { label: 'Visits', value: selectedDaySummary.visits || 0, icon: Users, color: { bg: 'bg-blue-100', text: 'text-blue-700' } },
       { label: 'Billed', value: formatCurrency(selectedDaySummary.billedAmount || 0), icon: DollarSign, color: { bg: 'bg-emerald-100', text: 'text-emerald-700' } },
       { label: 'Paid', value: formatCurrency(selectedDaySummary.paidAmountByVisitDate || 0), icon: TrendingUp, color: { bg: 'bg-green-100', text: 'text-green-700' } },
-      { label: 'Collected', value: formatCurrency(selectedDaySummary.collectedAmountByPaymentDate || 0), icon: BanknoteIcon, color: { bg: 'bg-amber-100', text: 'text-amber-700' } },
+      // { label: 'Collected', value: formatCurrency(selectedDaySummary.collectedAmountByPaymentDate || 0), icon: BanknoteIcon, color: { bg: 'bg-amber-100', text: 'text-amber-700' } },
     ];
     if (selectedDaySummary.commissionAmount > 0) {
       base.push({ label: 'Your Share', value: formatCurrency(selectedDaySummary.commissionAmount || 0), icon: TrendingUp, color: { bg: 'bg-purple-100', text: 'text-purple-700' } });
@@ -131,7 +131,7 @@ const DoctorDailyWork = () => {
     const cards = [];
     if (breakdown) {
       Object.entries(breakdown).forEach(([cat, data]) => {
-        if (data.count > 0) {
+        if (data.count > 0 && cat !== 'CONSULTATION') { // Skipped Consultation per request
           const iconDef = CATEGORY_ICONS[cat] || { icon: Activity, color: { bg: 'bg-gray-100', text: 'text-gray-700' } };
           cards.push({
             label: CATEGORY_LABELS[cat] || formatCategory(cat),
@@ -243,7 +243,7 @@ const DoctorDailyWork = () => {
       { label: 'Visits', val: selectedDaySummary.visits || 0 },
       { label: 'Billed', val: formatCurrency(selectedDaySummary.billedAmount || 0) },
       { label: 'Paid', val: formatCurrency(selectedDaySummary.paidAmountByVisitDate || 0) },
-      { label: 'Collected', val: formatCurrency(selectedDaySummary.collectedAmountByPaymentDate || 0) },
+      // { label: 'Collected', val: formatCurrency(selectedDaySummary.collectedAmountByPaymentDate || 0) },
       ...(selectedDaySummary.cardBreakdown ? Object.entries(selectedDaySummary.cardBreakdown).filter(([, a]) => a > 0).map(([s, a]) => ({ label: `Card (${formatCardSlug(s)})`, val: formatCurrency(a) })) : []),
     ];
     const summaryHtml = printStats.map((s) =>

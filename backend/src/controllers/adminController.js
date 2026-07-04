@@ -833,7 +833,7 @@ exports.createService = async (req, res) => {
               service: {
                 connect: { id: service.id }
               },
-              ...(radiologyCategoryId ? { radiologyCategoryId } : {})
+              ...(radiologyCategoryId ? { radiologyCategory: { connect: { id: radiologyCategoryId } } } : {})
             }
           });
           autoCreated.investigationType = true;
@@ -1035,34 +1035,32 @@ exports.updateService = async (req, res) => {
               isActive: service.isActive,
               price: service.price,
               service: { connect: { id: service.id } },
-              ...(radId ? { radiologyCategoryId: radId } : {})
+              ...(radId ? { radiologyCategory: { connect: { id: radId } } } : {})
             }
           });
           console.log(`✅ Auto-created InvestigationType for updated RADIOLOGY service: ${service.name}`);
         } else {
           // Update existing InvestigationType
-          const updateData = { name: service.name, price: service.price, isActive: service.isActive };
           const rg = service.radiologyGroup;
+          const radiologyGroupMap = {
+            XRAY: 'X-Ray', ULTRASOUND: 'Ultrasound',
+            CT_SCAN: 'CT Scan', MRI: 'MRI',
+            MAMMOGRAPHY: 'Mammography', FLUOROSCOPY: 'Fluoroscopy',
+            OTHER: 'Other'
+          };
+          let catId = null;
           if (rg) {
-            const radiologyGroupMap = {
-              XRAY: 'X-Ray', ULTRASOUND: 'Ultrasound',
-              CT_SCAN: 'CT Scan', MRI: 'MRI',
-              MAMMOGRAPHY: 'Mammography', FLUOROSCOPY: 'Fluoroscopy',
-              OTHER: 'Other'
-            };
             const cName = radiologyGroupMap[rg] || rg;
             let rc = await prisma.radiologyCategory.findFirst({ where: { name: cName } });
             if (!rc) {
               rc = await prisma.radiologyCategory.create({ data: { name: cName, displayOrder: 999, isActive: true } });
             }
-            updateData.radiologyCategoryId = rc.id;
-          } else {
-            updateData.radiologyCategoryId = null;
+            catId = rc.id;
           }
-          await prisma.investigationType.updateMany({
-            where: { serviceId: service.id },
-            data: updateData
-          });
+          await prisma.$executeRawUnsafe(
+            'UPDATE "InvestigationType" SET name = $1, price = $2, "isActive" = $3, "radiologyCategoryId" = $4 WHERE "serviceId" = $5',
+            service.name, service.price, service.isActive, catId, service.id
+          );
         }
       } catch (error) {
         console.error(`⚠️  Warning: Failed to auto-create/update InvestigationType for service ${service.name}:`, error.message);

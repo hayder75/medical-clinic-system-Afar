@@ -3507,6 +3507,14 @@ exports.createLabOrder = async (req, res) => {
       }
     });
 
+    if (billing && billing.id) {
+      try {
+        getIO().emit('billing:update', { billingId: billing.id });
+      } catch (err) {
+        console.error('Failed to emit billing:update socket event:', err.message);
+      }
+    }
+
     res.json({
       message: 'Lab order created successfully',
       order,
@@ -3802,6 +3810,14 @@ exports.createRadiologyOrder = async (req, res) => {
       data: { status: newStatus }
     });
 
+    if (billing && billing.id) {
+      try {
+        getIO().emit('billing:update', { billingId: billing.id });
+      } catch (err) {
+        console.error('Failed to emit billing:update socket event:', err.message);
+      }
+    }
+
     res.json({
       message: 'Radiology order created successfully',
       order,
@@ -4048,6 +4064,15 @@ exports.createMultipleRadiologyOrders = async (req, res) => {
     await prisma.visit.update({
       where: { id: visitId },
       data: { status: 'SENT_TO_RADIOLOGY' }
+    });
+
+    // Emit billing updates
+    billings.forEach(b => {
+      try {
+        getIO().emit('billing:update', { billingId: b.id });
+      } catch (err) {
+        console.error('Failed to emit billing:update socket event:', err.message);
+      }
     });
 
     res.json({
