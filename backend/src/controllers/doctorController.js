@@ -7617,7 +7617,7 @@ exports.getDailyWorkMonthly = async (req, res) => {
 
       const totals = dwRelevantTotals(payment.billing);
       const relevantPaymentAmount = (payment.amount || 0) * (totals.ratio || 0);
-      bucket.collectedAmountByPaymentDate += relevantPaymentAmount;
+      if (payment.type !== 'CHARITY') bucket.collectedAmountByPaymentDate += relevantPaymentAmount;
 
       if (payment.type === 'CASH') bucket.cashCollectedByPaymentDate += relevantPaymentAmount;
       if (payment.type === 'BANK') bucket.bankCollectedByPaymentDate += relevantPaymentAmount;

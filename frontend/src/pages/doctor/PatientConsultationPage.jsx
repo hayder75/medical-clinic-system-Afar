@@ -257,9 +257,8 @@ const PatientConsultationPage = () => {
   const [labSubTab, setLabSubTab] = useState(null);
   const [expandedLabPanels, setExpandedLabPanels] = useState({});
   const labDefaultSet = useRef(false);
-  const [radiologySubTab, setRadiologySubTab] = useState(null);
   const radiologyDefaultSet = useRef(false);
-  const [dentalRecord, setDentalRecord] = useState(null);
+  const triagePrefilled = useRef(false);
   const dentalChartRef = useRef(null);
   const [workspaceConfig, setWorkspaceConfig] = useState(DEFAULT_DOCTOR_WORKSPACE_CONFIG);
   const [workspaceProfile, setWorkspaceProfile] = useState('general');
@@ -694,11 +693,12 @@ const PatientConsultationPage = () => {
     radiologyDefaultSet.current = true;
   }, [visit]);
 
-  // Pre-fill triage form when triage tab is clicked (only then, not on page load)
-  // Pre-fill with nurse vitals so doctor can see what was recorded
+  // Pre-fill triage form ONCE when triage tab is first opened
   useEffect(() => {
-    if (activeTab === 'triage' && nurseVitals) {
-      // Pre-fill form with nurse vitals for reference
+    if (activeTab !== 'triage' || triagePrefilled.current) return;
+    triagePrefilled.current = true;
+
+    if (nurseVitals) {
       setTriageForm({
         ...createInitialDoctorTriageForm(),
         bloodPressure: nurseVitals.bloodPressure || '',
@@ -717,11 +717,10 @@ const PatientConsultationPage = () => {
         extremities: nurseVitals.extremities || '',
         neurologicalExam: nurseVitals.neurologicalExam || ''
       });
-    } else if (activeTab === 'triage' && !nurseVitals) {
-      // Reset form if no nurse vitals exist
+    } else {
       setTriageForm(createInitialDoctorTriageForm());
     }
-  }, [activeTab, nurseVitals]);
+  }, [activeTab]);
 
   // Fetch patient history when patient-history tab is clicked
   useEffect(() => {
@@ -1075,10 +1074,8 @@ const PatientConsultationPage = () => {
 
     // If any orders are actively being processed, block completion
     return pendingBatchLabOrders.length > 0 ||
-      pendingBatchRadiologyOrders.length > 0 ||
       pendingBatchProcedureOrders.length > 0 ||
       pendingLabOrders.length > 0 ||
-      pendingRadiologyOrders.length > 0 ||
       pendingLabTestOrders.length > 0;
   }, [visit]);
 

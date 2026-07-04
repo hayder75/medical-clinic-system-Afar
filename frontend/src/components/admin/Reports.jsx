@@ -1455,7 +1455,7 @@ const Reports = ({ revenueTypeOverride }) => {
                         DENTAL: { bg: 'bg-pink-50', text: 'text-pink-700', label: 'Dental' },
                         TREATMENT: { bg: 'bg-rose-50', text: 'text-rose-700', label: 'Treatment' },
                         EMERGENCY_DRUG: { bg: 'bg-red-50', text: 'text-red-700', label: 'Emergency Med' },
-                        CONSULTATION: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Consultation' },
+
                         NURSE: { bg: 'bg-teal-50', text: 'text-teal-700', label: 'Nurse Service' },
                         DOCTOR_WALKIN: { bg: 'bg-purple-50', text: 'text-purple-700', label: 'Doctor Walk-in' },
                       };
@@ -1506,6 +1506,30 @@ const Reports = ({ revenueTypeOverride }) => {
                       'Emergency Medication Orders',
                       'No emergency medication orders for this doctor on this day.',
                       'bg-rose-50 text-rose-700 border-rose-100'
+                    )}
+                    {renderDoctorSectionTable(
+                      selectedDoctorDayDetails.sections?.radiology,
+                      'Radiology Orders',
+                      'No radiology orders for this doctor on this day.',
+                      'bg-indigo-50 text-indigo-700 border-indigo-100'
+                    )}
+                    {renderDoctorSectionTable(
+                      selectedDoctorDayDetails.sections?.consultation,
+                      'Consultation Orders',
+                      'No consultation orders for this doctor on this day.',
+                      'bg-blue-50 text-blue-700 border-blue-100'
+                    )}
+                    {renderDoctorSectionTable(
+                      selectedDoctorDayDetails.sections?.nurse,
+                      'Nurse Service Orders',
+                      'No nurse service orders for this doctor on this day.',
+                      'bg-teal-50 text-teal-700 border-teal-100'
+                    )}
+                    {renderDoctorSectionTable(
+                      selectedDoctorDayDetails.sections?.doctorWalkin,
+                      'Doctor Walk-in Orders',
+                      'No doctor walk-in orders for this doctor on this day.',
+                      'bg-purple-50 text-purple-700 border-purple-100'
                     )}
                   </div>
                 </div>

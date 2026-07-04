@@ -116,6 +116,13 @@ const BillingQueue = () => {
       setShowInstConfirm(true);
       return;
     }
+    if (newType === "CHARITY") {
+      const remaining = selectedBilling
+        ? (selectedBilling.totalAmount - (selectedBilling.paidAmount || 0)).toString()
+        : "0";
+      setPaymentForm({ ...paymentForm, type: "CHARITY", amount: remaining, institutionId: "" });
+      return;
+    }
     setPaymentForm({ ...paymentForm, type: newType, institutionId: "" });
   };
 

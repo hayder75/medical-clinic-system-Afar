@@ -3079,7 +3079,11 @@ exports.getDoctorPerformanceStats = async (req, res) => {
       const sectionStats = {
         procedures: { revenue: 0, orders: 0, patientIds: new Set() },
         labs: { revenue: 0, orders: 0, patientIds: new Set() },
-        emergencyMedications: { revenue: 0, orders: 0, patientIds: new Set() }
+        emergencyMedications: { revenue: 0, orders: 0, patientIds: new Set() },
+        radiology: { revenue: 0, orders: 0, patientIds: new Set() },
+        consultation: { revenue: 0, orders: 0, patientIds: new Set() },
+        nurse: { revenue: 0, orders: 0, patientIds: new Set() },
+        doctorWalkin: { revenue: 0, orders: 0, patientIds: new Set() }
       };
 
       procedureLines.forEach((line) => {
@@ -3094,6 +3098,14 @@ exports.getDoctorPerformanceStats = async (req, res) => {
           targetSection = sectionStats.labs;
         } else if (EMERGENCY_MEDICATION_CATEGORIES.includes(category)) {
           targetSection = sectionStats.emergencyMedications;
+        } else if (category === 'RADIOLOGY') {
+          targetSection = sectionStats.radiology;
+        } else if (category === 'CONSULTATION') {
+          targetSection = sectionStats.consultation;
+        } else if (category === 'NURSE') {
+          targetSection = sectionStats.nurse;
+        } else if (category === 'DOCTOR_WALKIN') {
+          targetSection = sectionStats.doctorWalkin;
         }
 
         if (!targetSection) return;
@@ -3108,13 +3120,21 @@ exports.getDoctorPerformanceStats = async (req, res) => {
       const allPatientIds = new Set([
         ...sectionStats.procedures.patientIds,
         ...sectionStats.labs.patientIds,
-        ...sectionStats.emergencyMedications.patientIds
+        ...sectionStats.emergencyMedications.patientIds,
+        ...sectionStats.radiology.patientIds,
+        ...sectionStats.consultation.patientIds,
+        ...sectionStats.nurse.patientIds,
+        ...sectionStats.doctorWalkin.patientIds
       ]);
 
       const procedureRevenue = sectionStats.procedures.revenue;
       const labRevenue = sectionStats.labs.revenue;
       const emergencyMedicationRevenue = sectionStats.emergencyMedications.revenue;
-      const totalRevenue = procedureRevenue + labRevenue + emergencyMedicationRevenue;
+      const radiologyRevenue = sectionStats.radiology.revenue;
+      const consultationRevenue = sectionStats.consultation.revenue;
+      const nurseRevenue = sectionStats.nurse.revenue;
+      const doctorWalkinRevenue = sectionStats.doctorWalkin.revenue;
+      const totalRevenue = procedureRevenue + labRevenue + emergencyMedicationRevenue + radiologyRevenue + consultationRevenue + nurseRevenue + doctorWalkinRevenue;
       const avgPerPatient = totalPatients > 0 ? totalRevenue / totalPatients : 0;
 
       console.log(`   - Procedure Revenue: ${procedureRevenue}`);
@@ -3351,7 +3371,11 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
       const sectionStats = {
         procedures: { revenue: 0, orders: 0, patientIds: new Set() },
         labs: { revenue: 0, orders: 0, patientIds: new Set() },
-        emergencyMedications: { revenue: 0, orders: 0, patientIds: new Set() }
+        emergencyMedications: { revenue: 0, orders: 0, patientIds: new Set() },
+        radiology: { revenue: 0, orders: 0, patientIds: new Set() },
+        consultation: { revenue: 0, orders: 0, patientIds: new Set() },
+        nurse: { revenue: 0, orders: 0, patientIds: new Set() },
+        doctorWalkin: { revenue: 0, orders: 0, patientIds: new Set() }
       };
       const detailsByVisit = new Map();
 
@@ -3380,6 +3404,14 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
           targetSection = sectionStats.labs;
         } else if (EMERGENCY_MEDICATION_CATEGORIES.includes(category)) {
           targetSection = sectionStats.emergencyMedications;
+        } else if (category === 'RADIOLOGY') {
+          targetSection = sectionStats.radiology;
+        } else if (category === 'CONSULTATION') {
+          targetSection = sectionStats.consultation;
+        } else if (category === 'NURSE') {
+          targetSection = sectionStats.nurse;
+        } else if (category === 'DOCTOR_WALKIN') {
+          targetSection = sectionStats.doctorWalkin;
         }
 
         if (targetSection) {
@@ -3399,16 +3431,28 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
       const treatedPatientCount = new Set([
         ...sectionStats.procedures.patientIds,
         ...sectionStats.labs.patientIds,
-        ...sectionStats.emergencyMedications.patientIds
+        ...sectionStats.emergencyMedications.patientIds,
+        ...sectionStats.radiology.patientIds,
+        ...sectionStats.consultation.patientIds,
+        ...sectionStats.nurse.patientIds,
+        ...sectionStats.doctorWalkin.patientIds
       ]).size;
       const procedurePatientCount = sectionStats.procedures.patientIds.size;
       const labPatientCount = sectionStats.labs.patientIds.size;
       const emergencyMedicationPatientCount = sectionStats.emergencyMedications.patientIds.size;
+      const radiologyPatientCount = sectionStats.radiology.patientIds.size;
+      const consultationPatientCount = sectionStats.consultation.patientIds.size;
+      const nursePatientCount = sectionStats.nurse.patientIds.size;
+      const doctorWalkinPatientCount = sectionStats.doctorWalkin.patientIds.size;
       const procedureRevenue = sectionStats.procedures.revenue;
       const labRevenue = sectionStats.labs.revenue;
       const emergencyMedicationRevenue = sectionStats.emergencyMedications.revenue;
-      const totalRevenue = procedureRevenue + labRevenue + emergencyMedicationRevenue;
-      const totalOrders = sectionStats.procedures.orders + sectionStats.labs.orders + sectionStats.emergencyMedications.orders;
+      const radiologyRevenue = sectionStats.radiology.revenue;
+      const consultationRevenue = sectionStats.consultation.revenue;
+      const nurseRevenue = sectionStats.nurse.revenue;
+      const doctorWalkinRevenue = sectionStats.doctorWalkin.revenue;
+      const totalRevenue = procedureRevenue + labRevenue + emergencyMedicationRevenue + radiologyRevenue + consultationRevenue + nurseRevenue + doctorWalkinRevenue;
+      const totalOrders = sectionStats.procedures.orders + sectionStats.labs.orders + sectionStats.emergencyMedications.orders + sectionStats.radiology.orders + sectionStats.consultation.orders + sectionStats.nurse.orders + sectionStats.doctorWalkin.orders;
 
       dailyData.push({
         date: `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
@@ -3580,19 +3624,43 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
       emergencyMedications: {
         categories: EMERGENCY_MEDICATION_CATEGORIES,
         defaultServiceName: 'Emergency Medication'
+      },
+      radiology: {
+        categories: ['RADIOLOGY'],
+        defaultServiceName: 'Radiology'
+      },
+      consultation: {
+        categories: ['CONSULTATION'],
+        defaultServiceName: 'Consultation'
+      },
+      nurse: {
+        categories: ['NURSE'],
+        defaultServiceName: 'Nurse Service'
+      },
+      doctorWalkin: {
+        categories: ['DOCTOR_WALKIN'],
+        defaultServiceName: 'Doctor Walk-in'
       }
     };
 
     const sectionAccumulator = {
       procedures: { detailsByVisit: new Map(), topItemsByName: new Map(), revenue: 0, orders: 0, patientIds: new Set() },
       labs: { detailsByVisit: new Map(), topItemsByName: new Map(), revenue: 0, orders: 0, patientIds: new Set() },
-      emergencyMedications: { detailsByVisit: new Map(), topItemsByName: new Map(), revenue: 0, orders: 0, patientIds: new Set() }
+      emergencyMedications: { detailsByVisit: new Map(), topItemsByName: new Map(), revenue: 0, orders: 0, patientIds: new Set() },
+      radiology: { detailsByVisit: new Map(), topItemsByName: new Map(), revenue: 0, orders: 0, patientIds: new Set() },
+      consultation: { detailsByVisit: new Map(), topItemsByName: new Map(), revenue: 0, orders: 0, patientIds: new Set() },
+      nurse: { detailsByVisit: new Map(), topItemsByName: new Map(), revenue: 0, orders: 0, patientIds: new Set() },
+      doctorWalkin: { detailsByVisit: new Map(), topItemsByName: new Map(), revenue: 0, orders: 0, patientIds: new Set() }
     };
 
     const detectSection = (category) => {
       if (SECTION_CONFIG.procedures.categories.includes(category)) return 'procedures';
       if (SECTION_CONFIG.labs.categories.includes(category)) return 'labs';
       if (SECTION_CONFIG.emergencyMedications.categories.includes(category)) return 'emergencyMedications';
+      if (SECTION_CONFIG.radiology.categories.includes(category)) return 'radiology';
+      if (SECTION_CONFIG.consultation.categories.includes(category)) return 'consultation';
+      if (SECTION_CONFIG.nurse.categories.includes(category)) return 'nurse';
+      if (SECTION_CONFIG.doctorWalkin.categories.includes(category)) return 'doctorWalkin';
       return null;
     };
 
@@ -3679,12 +3747,20 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
     const procedureSection = buildSectionResponse('procedures');
     const labSection = buildSectionResponse('labs');
     const emergencyMedicationSection = buildSectionResponse('emergencyMedications');
-    const allDetails = [...procedureSection.details, ...labSection.details, ...emergencyMedicationSection.details]
+    const radiologySection = buildSectionResponse('radiology');
+    const consultationSection = buildSectionResponse('consultation');
+    const nurseSection = buildSectionResponse('nurse');
+    const doctorWalkinSection = buildSectionResponse('doctorWalkin');
+    const allDetails = [...procedureSection.details, ...labSection.details, ...emergencyMedicationSection.details, ...radiologySection.details, ...consultationSection.details, ...nurseSection.details, ...doctorWalkinSection.details]
       .sort((a, b) => b.amount - a.amount);
     const allPatients = new Set([
       ...sectionAccumulator.procedures.patientIds,
       ...sectionAccumulator.labs.patientIds,
-      ...sectionAccumulator.emergencyMedications.patientIds
+      ...sectionAccumulator.emergencyMedications.patientIds,
+      ...sectionAccumulator.radiology.patientIds,
+      ...sectionAccumulator.consultation.patientIds,
+      ...sectionAccumulator.nurse.patientIds,
+      ...sectionAccumulator.doctorWalkin.patientIds
     ]);
 
     const summary = {
@@ -3694,8 +3770,16 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
       labOrders: labSection.orders,
       emergencyMedicationRevenue: emergencyMedicationSection.revenue,
       emergencyMedicationOrders: emergencyMedicationSection.orders,
-      totalRevenue: procedureSection.revenue + labSection.revenue + emergencyMedicationSection.revenue,
-      totalOrders: procedureSection.orders + labSection.orders + emergencyMedicationSection.orders,
+      radiologyRevenue: radiologySection.revenue,
+      radiologyOrders: radiologySection.orders,
+      consultationRevenue: consultationSection.revenue,
+      consultationOrders: consultationSection.orders,
+      nurseRevenue: nurseSection.revenue,
+      nurseOrders: nurseSection.orders,
+      doctorWalkinRevenue: doctorWalkinSection.revenue,
+      doctorWalkinOrders: doctorWalkinSection.orders,
+      totalRevenue: procedureSection.revenue + labSection.revenue + emergencyMedicationSection.revenue + radiologySection.revenue + consultationSection.revenue + nurseSection.revenue + doctorWalkinSection.revenue,
+      totalOrders: procedureSection.orders + labSection.orders + emergencyMedicationSection.orders + radiologySection.orders + consultationSection.orders + nurseSection.orders + doctorWalkinSection.orders,
       medicalTreatedByDermatology: await getDermatologyMedicalTreatedCount(dayStart, dayEnd, [doctorId]),
       patients: allPatients.size,
       visits: allDetails.length,
@@ -3717,7 +3801,11 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
       sections: {
         procedures: procedureSection,
         labs: labSection,
-        emergencyMedications: emergencyMedicationSection
+        emergencyMedications: emergencyMedicationSection,
+        radiology: radiologySection,
+        consultation: consultationSection,
+        nurse: nurseSection,
+        doctorWalkin: doctorWalkinSection
       },
       topProcedures: procedureSection.topItems,
       details: procedureSection.details
