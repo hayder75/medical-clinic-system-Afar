@@ -2119,8 +2119,11 @@ exports.getBillingDashboardStats = async (req, res) => {
       if (!statsByType[payment.type]) statsByType[payment.type] = { count: 0, amount: 0 };
       statsByType[payment.type].count += 1;
       statsByType[payment.type].amount += payment.amount;
-      totalAmount += payment.amount;
-      totalCount += 1;
+      // CHARITY is a write-off — not actual revenue, don't count in totals
+      if (payment.type !== 'CHARITY') {
+        totalAmount += payment.amount;
+        totalCount += 1;
+      }
     });
 
     // Get account deposits (ADVANCE - prepayments) processed by this user

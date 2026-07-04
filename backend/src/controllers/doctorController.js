@@ -7530,6 +7530,15 @@ exports.getDailyWorkMonthly = async (req, res) => {
     const commissionMap = await dwCommissionMap(doctorId);
     const hasCommission = Object.keys(commissionMap).length > 0;
 
+    // Build a map of billingId → total CHARITY payment amount
+    const charityByBilling = new Map();
+    payments.forEach((p) => {
+      if (p.type === 'CHARITY') {
+        charityByBilling.set(p.billingId, (charityByBilling.get(p.billingId) || 0) + p.amount);
+      }
+    });
+    const charityBillingIds = new Set(charityByBilling.keys());
+
     const dayMap = new Map();
     for (let day = 1; day <= daysInMonth; day += 1) {
       const key = `${year}-${String(normalizedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -7565,7 +7574,14 @@ exports.getDailyWorkMonthly = async (req, res) => {
       (visit.bills || []).forEach((billing) => {
         const totals = dwRelevantTotals(billing);
         bucket.billedAmount += totals.billedRelevant;
-        bucket.paidAmountByVisitDate += totals.paidRelevant;
+
+        // Deduct CHARITY proportion from paidAmountByVisitDate (charity is a write-off)
+        const charityPaid = charityByBilling.get(billing.id) || 0;
+        const charityRelevant = charityPaid * totals.ratio;
+        bucket.paidAmountByVisitDate += totals.paidRelevant - charityRelevant;
+
+        // Skip category breakdown for fully-charity billings (write-offs don't count as doctor revenue)
+        if (charityBillingIds.has(billing.id) && charityPaid >= (billing.paidAmount || 0)) return;
 
         totals.relevantServices.forEach((item) => {
           const cat = item.service?.category || 'OTHER';
@@ -7731,6 +7747,16 @@ exports.getDailyWorkDayDetails = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
+    // Build charity billing map for this date range
+    const charityByBilling = new Map();
+    const charityBillingIds = new Set();
+    paymentsOnDate.forEach((p) => {
+      if (p.type === 'CHARITY') {
+        charityByBilling.set(p.billingId, (charityByBilling.get(p.billingId) || 0) + p.amount);
+        charityBillingIds.add(p.billingId);
+      }
+    });
+
     const visitDetails = visits.map((visit) => {
       const relevantServices = [];
       let billedAmount = 0;
@@ -7740,7 +7766,14 @@ exports.getDailyWorkDayDetails = async (req, res) => {
       (visit.bills || []).forEach((billing) => {
         const totals = dwRelevantTotals(billing);
         billedAmount += totals.billedRelevant;
-        paidAmountByVisitDate += totals.paidRelevant;
+
+        // Deduct CHARITY proportion from paidAmountByVisitDate
+        const charityPaid = charityByBilling.get(billing.id) || 0;
+        const charityRelevant = charityPaid * totals.ratio;
+        paidAmountByVisitDate += totals.paidRelevant - charityRelevant;
+
+        // Skip service details for fully-charity billings (write-offs don't count as revenue)
+        if (charityBillingIds.has(billing.id) && charityPaid >= (billing.paidAmount || 0)) return;
 
         totals.relevantServices.forEach((serviceItem) => {
           const cat = serviceItem.service?.category;
