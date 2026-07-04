@@ -670,6 +670,9 @@ const PatientConsultationPage = () => {
   useEffect(() => {
     console.debug('[Consultation] useEffect 3 - tab validation - currentUser:', currentUser?.username, 'activeTab:', activeTab, 'tabs:', tabs.map(t => t.id));
 
+    // Always allow triage tab (Add Doctor Vitals button uses it even if not in workspace config)
+    if (activeTab === 'triage') return;
+
     // Always call this effect, but only act when we have the necessary data
     if (currentUser && tabs.length > 0 && !tabs.find(tab => tab.id === activeTab)) {
       console.debug('[Consultation] Switching activeTab from', activeTab, 'to', tabs[0].id);
