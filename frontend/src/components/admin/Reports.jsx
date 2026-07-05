@@ -185,10 +185,12 @@ const Reports = ({ revenueTypeOverride }) => {
         ? selectedDate
         : null;
 
+      const activeDay = dailyData.find((d) => (d.totalOrders || d.procedureOrders || 0) > 0 || (d.totalRevenue || d.revenue || 0) > 0 || (d.patients || 0) > 0 || (d.treatedPatients || 0) > 0);
       const initialDay =
         dailyData.find((d) => d.date === selectedDateInMonth) ||
+        activeDay ||
         dailyData.find((d) => d.date === todayKey) ||
-        dailyData.find((d) => (d.totalOrders || d.procedureOrders || 0) > 0 || (d.totalRevenue || d.revenue || 0) > 0 || (d.patients || 0) > 0) ||
+        dailyData[0] ||
         null;
 
       setSelectedDoctorDay(initialDay);
@@ -252,9 +254,30 @@ const Reports = ({ revenueTypeOverride }) => {
 
     try {
       const response = await api.get(`/admin/reports/billing-daily-breakdown?userId=${userId}&year=${selectedYear}&month=${selectedMonth}`);
-      setBillingDailyBreakdown(response.data.dailyData || []);
-      setSelectedBillingDay(null);
+      const dailyData = response.data.dailyData || [];
+      setBillingDailyBreakdown(dailyData);
+
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const selectedDateInMonth = selectedDate?.startsWith(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-`)
+        ? selectedDate
+        : null;
+
+      const activeDay = dailyData.find((d) => (d.revenue || 0) > 0 || (d.transactions || 0) > 0);
+      const initialDay =
+        dailyData.find((d) => d.date === selectedDateInMonth) ||
+        activeDay ||
+        dailyData.find((d) => d.date === todayKey) ||
+        dailyData[0] ||
+        null;
+
+      setSelectedBillingDay(initialDay);
       setSelectedBillingDayDetails(null);
+
+      if (initialDay?.date) {
+        setSelectedDate(initialDay.date);
+        fetchBillingDayDetails(userId, initialDay.date);
+      }
     } catch (error) {
       console.error('Error fetching billing daily breakdown:', error);
       toast.error('Failed to fetch billing daily breakdown');
@@ -344,17 +367,23 @@ const Reports = ({ revenueTypeOverride }) => {
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       let revenue = 0;
+      let carryOverRevenue = 0;
+      let sameDayRevenue = 0;
       let patients = 0;
       let procedureOrders = 0;
 
       if (revenueType === 'doctors') {
         const dayData = doctorDailyBreakdown.find((d) => d.date === dateStr);
         revenue = dayData?.totalRevenue || dayData?.revenue || dayData?.procedureRevenue || 0;
+        carryOverRevenue = dayData?.carryOverRevenue || 0;
+        sameDayRevenue = dayData?.sameDayRevenue || 0;
         patients = dayData?.patients || 0;
         procedureOrders = dayData?.totalOrders || dayData?.procedureOrders || 0;
       } else if (revenueType === 'billing') {
         const dayData = billingDailyBreakdown.find((d) => d.date === dateStr);
         revenue = dayData?.revenue || 0;
+        carryOverRevenue = dayData?.carryOverRevenue || 0;
+        sameDayRevenue = dayData?.sameDayRevenue || 0;
         patients = dayData?.transactions || 0;
       } else {
         const dayData = dailyBreakdown.find(d => d.date === dateStr);
@@ -368,6 +397,8 @@ const Reports = ({ revenueTypeOverride }) => {
         day,
         date: dateStr,
         revenue,
+        carryOverRevenue,
+        sameDayRevenue,
         patients,
         procedureOrders,
         isEmpty: false
@@ -1279,7 +1310,7 @@ const Reports = ({ revenueTypeOverride }) => {
                   {revenueType === 'doctors'
                     ? getDoctorDayLabel()
                     : revenueType === 'billing'
-                      ? `Selected Billing User Processed Revenue (${getMonthName(selectedMonth)})`
+                      ? `Selected Billing User Processed Revenue - Ethiopian Time EAT (${getMonthName(selectedMonth)})`
                     : `Monthly ${revenueType === 'combined' ? 'Total' : revenueType} Revenue`}
                 </p>
                 <p className={`${isBillingCalendar ? 'text-xl' : 'text-2xl'} font-bold text-green-600`}>
@@ -1396,9 +1427,16 @@ const Reports = ({ revenueTypeOverride }) => {
                       <div className={`${isBillingCalendar ? 'text-[10px]' : 'text-xs'} ${revenueStyle.text} ${day.revenue > 0 ? '' : ''
                         }`}>
                         {day.revenue > 0 ? (
-                          <span className="inline-flex items-center">
-                            ETB {day.revenue.toLocaleString()}
-                          </span>
+                          <div className="flex flex-col">
+                            <span className="inline-flex items-center">
+                              ETB {day.revenue.toLocaleString()}
+                            </span>
+                            {day.carryOverRevenue > 0 && (
+                              <span className="text-[9px] font-normal text-amber-700 bg-amber-50 px-1 rounded mt-0.5" title="Includes previous shift carry-over">
+                                🌙 Carry: ETB {day.carryOverRevenue.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
                         ) : isToday ? (
                           <span className="text-blue-600 text-[10px] font-medium">Today</span>
                         ) : (
@@ -1430,15 +1468,15 @@ const Reports = ({ revenueTypeOverride }) => {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900">
-                    {selectedDoctor?.doctorName || 'Doctor'} - {new Date(selectedDoctorDay.date).toLocaleDateString()}
+                    {selectedDoctor?.doctorName || 'Doctor'} - {new Date((selectedDoctorDayDetails?.date || selectedDoctorDay.date) + 'T00:00:00').toLocaleDateString()}
                   </h4>
                   <p className="text-sm text-gray-600 mt-1">
-                    Treated Patients: {selectedDoctorDay.patients || 0} | Total Orders: {selectedDoctorDay.totalOrders || selectedDoctorDay.procedureOrders || 0}
+                    Treated Patients: {selectedDoctorDayDetails?.summary?.patients ?? selectedDoctorDay.patients ?? 0} | Total Orders: {selectedDoctorDayDetails?.summary?.totalOrders ?? selectedDoctorDay.totalOrders ?? selectedDoctorDay.procedureOrders ?? 0}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-gray-500">Total Revenue</p>
-                  <p className="text-xl font-bold text-emerald-600">{formatCurrency(selectedDoctorDay.totalRevenue || selectedDoctorDay.revenue || 0)}</p>
+                  <p className="text-xl font-bold text-emerald-600">{formatCurrency(selectedDoctorDayDetails?.summary?.totalRevenue ?? selectedDoctorDay.totalRevenue ?? selectedDoctorDay.revenue ?? 0)}</p>
                 </div>
               </div>
 
@@ -1589,15 +1627,25 @@ const Reports = ({ revenueTypeOverride }) => {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900">
-                    {selectedBillingUser?.userName || 'Billing User'} - {new Date(selectedBillingDay.date).toLocaleDateString()}
+                    {selectedBillingUser?.userName || 'Billing User'} - {new Date((selectedBillingDayDetails?.summary?.date || selectedBillingDayDetails?.date || selectedBillingDay.date) + 'T00:00:00').toLocaleDateString()}
                   </h4>
                   <p className="text-sm text-gray-600 mt-1">
-                    Transactions: {selectedBillingDay.transactions || 0}
+                    Transactions: {selectedBillingDayDetails?.summary?.transactions ?? selectedBillingDay.transactions ?? 0}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Processed Amount</p>
-                  <p className="text-xl font-bold text-amber-700">{formatCurrency(selectedBillingDay.revenue || 0)}</p>
+                <div className="flex items-center space-x-4">
+                  {selectedBillingDayDetails?.summary?.carryOverRevenue > 0 && (
+                    <div className="text-right bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
+                      <p className="text-[10px] font-semibold text-amber-800">🌙 Prev Shift Carry-Over</p>
+                      <p className="text-sm font-bold text-amber-700">
+                        {formatCurrency(selectedBillingDayDetails.summary.carryOverRevenue)}
+                      </p>
+                    </div>
+                  )}
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Total Register Cash</p>
+                    <p className="text-xl font-bold text-amber-700">{formatCurrency(selectedBillingDayDetails?.summary?.processedAmount ?? selectedBillingDayDetails?.summary?.totalRevenue ?? selectedBillingDay.revenue ?? 0)}</p>
+                  </div>
                 </div>
               </div>
 

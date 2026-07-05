@@ -1,3 +1,4 @@
+const { getEthiopianDateRange, getEthiopianMonthRange, format12HourEAT } = require('../utils/dateUtils');
 const prisma = require('../config/database');
 const { z } = require('zod');
 const bcrypt = require('bcryptjs');
@@ -2902,7 +2903,7 @@ exports.getDailyBreakdown = async (req, res) => {
 // Get doctor performance statistics
 exports.getDoctorPerformanceStats = async (req, res) => {
   try {
-    const { period = 'daily', doctorId } = req.query;
+    const { period = 'daily', doctorId, date } = req.query;
     const DOCTOR_REPORT_QUALIFICATIONS = [
       'DERMATOLOGY',
       'DERMATOLOGIST',
@@ -2923,8 +2924,9 @@ exports.getDoctorPerformanceStats = async (req, res) => {
     let startDate, endDate;
 
     if (period === 'daily') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      const { startOfDayUTC, endOfDayUTC } = getEthiopianDateRange(date || new Date());
+      startDate = startOfDayUTC;
+      endDate = endOfDayUTC;
     } else if (period === 'weekly') {
       startDate = new Date(now);
       startDate.setDate(now.getDate() - now.getDay());
@@ -3219,7 +3221,7 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
     const PROCEDURE_CATEGORIES = ['PROCEDURE', 'DENTAL', 'TREATMENT'];
     const LAB_CATEGORIES = ['LAB'];
     const EMERGENCY_MEDICATION_CATEGORIES = ['EMERGENCY_DRUG'];
-    const ALL_REPORT_CATEGORIES = ['PROCEDURE', 'DENTAL', 'TREATMENT', 'LAB', 'RADIOLOGY', 'EMERGENCY_DRUG', 'CONSULTATION', 'NURSE', 'DOCTOR_WALKIN'];
+    const ALL_REPORT_CATEGORIES = ['CONSULTATION', 'LAB', 'RADIOLOGY', 'MEDICATION', 'PROCEDURE', 'NURSE', 'NURSE_WALKIN', 'DOCTOR_WALKIN', 'DENTAL', 'CONTINUOUS_INFUSION', 'EMERGENCY', 'EMERGENCY_DRUG', 'MATERIAL_NEEDS', 'DIAGNOSTIC', 'TREATMENT', 'OTHER', 'ACCOMMODATION'];
 
     if (!doctorId) {
       return res.status(400).json({ error: 'Doctor ID is required' });
@@ -3267,30 +3269,10 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
     console.log(`   - Month: ${m + 1}, Year: ${y}`);
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const dayStart = new Date(y, m, day);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(y, m, day);
-      dayEnd.setHours(23, 59, 59, 999);
+      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const { startOfDayUTC: dayStart, endOfDayUTC: dayEnd } = getEthiopianDateRange(dateStr);
 
-      // Get assignments created on this day for this doctor
-      const dayAssignments = await prisma.assignment.findMany({
-        where: {
-          doctorId: doctorId,
-          createdAt: {
-            gte: dayStart,
-            lte: dayEnd
-          }
-        },
-        select: {
-          id: true,
-          patientId: true
-        }
-      });
-      
-      const dayAssignmentIds = dayAssignments.map(a => a.id);
-      const assignedPatientIdsFromDayAssignments = new Set(dayAssignments.map(a => a.patientId).filter(Boolean));
-
-      // Get visits created on this day with doctor assignment
+      // Get visits created on this day with doctor assignment (using doctor assignmentIds)
       const dayVisits = await prisma.visit.findMany({
         where: {
           createdAt: {
@@ -3299,7 +3281,7 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
           },
           OR: [
             { suggestedDoctorId: doctorId },
-            ...(dayAssignmentIds.length > 0 ? [{ assignmentId: { in: dayAssignmentIds } }] : [])
+            ...(assignmentIds.length > 0 ? [{ assignmentId: { in: assignmentIds } }] : [])
           ]
         },
         select: {
@@ -3308,35 +3290,34 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
         }
       });
       
-      // Combine patient IDs from both assignments and visits for this day
-      const dayAssignedPatientIds = new Set([
-        ...assignedPatientIdsFromDayAssignments,
-        ...dayVisits.map(v => v.patientId).filter(Boolean)
-      ]);
+      // Combine patient IDs from visits for this day
+      const dayAssignedPatientIds = new Set(
+        dayVisits.map(v => v.patientId).filter(Boolean)
+      );
       
       const assignedPatientsCount = dayAssignedPatientIds.size;
 
       // Use procedure lines created on this day, then attribute them to the doctor via visit linkage.
       const procedureLines = await prisma.billingService.findMany({
         where: {
-          createdAt: {
-            gte: dayStart,
-            lte: dayEnd
+          billing: {
+            visit: {
+              createdAt: {
+                gte: dayStart,
+                lte: dayEnd
+              },
+              ...(assignmentIds.length > 0
+                ? {
+                    OR: [
+                      { suggestedDoctorId: doctorId },
+                      { assignmentId: { in: assignmentIds } }
+                    ]
+                  }
+                : { suggestedDoctorId: doctorId })
+            }
           },
           service: {
             category: { in: ALL_REPORT_CATEGORIES }
-          },
-          billing: {
-            visit: assignmentIds.length > 0
-              ? {
-                OR: [
-                  { suggestedDoctorId: doctorId },
-                  { assignmentId: { in: assignmentIds } }
-                ]
-              }
-              : {
-                suggestedDoctorId: doctorId
-              }
           }
         },
         include: {
@@ -3454,11 +3435,24 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
       const totalRevenue = procedureRevenue + labRevenue + emergencyMedicationRevenue + radiologyRevenue + consultationRevenue + nurseRevenue + doctorWalkinRevenue;
       const totalOrders = sectionStats.procedures.orders + sectionStats.labs.orders + sectionStats.emergencyMedications.orders + sectionStats.radiology.orders + sectionStats.consultation.orders + sectionStats.nurse.orders + sectionStats.doctorWalkin.orders;
 
+      let docSameDayRev = 0;
+      let docCarryOverRev = 0;
+      procedureLines.forEach((line) => {
+        const vDate = line.billing?.visit?.createdAt;
+        if (vDate && new Date(vDate) < dayStart) {
+          docCarryOverRev += (line.totalPrice || 0);
+        } else {
+          docSameDayRev += (line.totalPrice || 0);
+        }
+      });
+
       dailyData.push({
         date: `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
         day,
         revenue: totalRevenue,
         totalRevenue,
+        sameDayRevenue: docSameDayRev,
+        carryOverRevenue: docCarryOverRev,
         procedureRevenue,
         labRevenue,
         emergencyMedicationRevenue,
@@ -3506,10 +3500,7 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
     }
 
-    const dayStart = new Date(parsedDate);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(parsedDate);
-    dayEnd.setHours(23, 59, 59, 999);
+    const { startOfDayUTC: dayStart, endOfDayUTC: dayEnd } = getEthiopianDateRange(date);
 
     const assignments = await prisma.assignment.findMany({
       where: { doctorId },
@@ -3519,24 +3510,24 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
 
     const procedureLines = await prisma.billingService.findMany({
       where: {
-        createdAt: {
-          gte: dayStart,
-          lte: dayEnd
+        billing: {
+          visit: {
+            createdAt: {
+              gte: dayStart,
+              lte: dayEnd
+            },
+            ...(assignmentIds.length > 0
+              ? {
+                  OR: [
+                    { suggestedDoctorId: doctorId },
+                    { assignmentId: { in: assignmentIds } }
+                  ]
+                }
+              : { suggestedDoctorId: doctorId })
+          }
         },
         service: {
           category: { in: ALL_REPORT_CATEGORIES }
-        },
-        billing: {
-          visit: assignmentIds.length > 0
-            ? {
-                OR: [
-                  { suggestedDoctorId: doctorId },
-                  { assignmentId: { in: assignmentIds } }
-                ]
-              }
-            : {
-                suggestedDoctorId: doctorId
-              }
         }
       },
       include: {
@@ -3630,8 +3621,8 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
         defaultServiceName: 'Radiology'
       },
       consultation: {
-        categories: ['CONSULTATION'],
-        defaultServiceName: 'Consultation'
+        categories: ['CONSULTATION', 'OTHER'],
+        defaultServiceName: 'Consultation / Card'
       },
       nurse: {
         categories: ['NURSE'],
@@ -3819,14 +3810,15 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
 // Get billing user performance statistics (all medical billing users)
 exports.getBillingPerformanceStats = async (req, res) => {
   try {
-    const { period = 'daily', userId } = req.query;
+    const { period = 'daily', userId, date } = req.query;
     const now = new Date();
     let startDate;
     let endDate;
 
     if (period === 'daily') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      const { startOfDayUTC, endOfDayUTC } = getEthiopianDateRange(date || new Date());
+      startDate = startOfDayUTC;
+      endDate = endOfDayUTC;
     } else if (period === 'weekly') {
       startDate = new Date(now);
       startDate.setDate(now.getDate() - now.getDay());
@@ -3968,10 +3960,8 @@ exports.getBillingUserDailyBreakdown = async (req, res) => {
     const dailyData = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const dayStart = new Date(y, m, day);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(y, m, day);
-      dayEnd.setHours(23, 59, 59, 999);
+      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const { startOfDayUTC: dayStart, endOfDayUTC: dayEnd } = getEthiopianDateRange(dateStr);
 
       const transactions = await prisma.cashTransaction.findMany({
         where: {
@@ -4011,10 +4001,23 @@ exports.getBillingUserDailyBreakdown = async (req, res) => {
         });
       });
 
+      let sameDayRev = 0;
+      let carryOverRev = 0;
+      transactions.forEach((tx) => {
+        const vDate = tx.billing?.visit?.createdAt;
+        if (vDate && new Date(vDate) < dayStart) {
+          carryOverRev += (tx.amount || 0);
+        } else {
+          sameDayRev += (tx.amount || 0);
+        }
+      });
+
       dailyData.push({
         date: `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
         day,
         revenue: transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0),
+        sameDayRevenue: sameDayRev,
+        carryOverRevenue: carryOverRev,
         transactions: transactions.length,
         categoryBreakdown
       });
