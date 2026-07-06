@@ -2190,6 +2190,12 @@ exports.getRevenueStats = async (req, res) => {
               include: {
                 service: true
               }
+            },
+            visit: {
+              select: {
+                id: true,
+                createdAt: true
+              }
             }
           }
         }
@@ -4049,10 +4055,7 @@ exports.getBillingUserDayDetails = async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
     }
 
-    const dayStart = new Date(parsedDate);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(parsedDate);
-    dayEnd.setHours(23, 59, 59, 999);
+    const { startOfDayUTC: dayStart, endOfDayUTC: dayEnd } = getEthiopianDateRange(date);
 
     const transactions = await prisma.cashTransaction.findMany({
       where: {
@@ -4079,6 +4082,12 @@ exports.getBillingUserDayDetails = async (req, res) => {
               include: {
                 service: true
               }
+            },
+            visit: {
+              select: {
+                id: true,
+                createdAt: true
+              }
             }
           }
         }
@@ -4103,17 +4112,36 @@ exports.getBillingUserDayDetails = async (req, res) => {
         paymentMethod: tx.paymentMethod,
         amount: tx.amount || 0,
         createdAt: tx.createdAt,
+        visitCreatedAt: tx.billing?.visit?.createdAt || null,
+        isCarryOver: tx.billing?.visit?.createdAt ? new Date(tx.billing.visit.createdAt) < dayStart : false,
         walkInFlags: walkInFlags || { labWalkIn: false, radiologyWalkIn: false, nurseWalkIn: false },
         categoryBreakdown: allocation
       };
     });
 
+    let sameDayRevenue = 0;
+    let carryOverRevenue = 0;
+    transactions.forEach((tx) => {
+      const vDate = tx.billing?.visit?.createdAt;
+      if (vDate && new Date(vDate) < dayStart) {
+        carryOverRevenue += (tx.amount || 0);
+      } else {
+        sameDayRevenue += (tx.amount || 0);
+      }
+    });
+
+    const totalRevenue = details.reduce((sum, item) => sum + item.amount, 0);
+
     res.json({
       date,
       buckets: await getCardBucketLabels().then(labels => ({ ...STATIC_SERVICE_BUCKETS, ...labels })),
       summary: {
-        revenue: details.reduce((sum, item) => sum + item.amount, 0),
+        revenue: totalRevenue,
         transactions: details.length,
+        totalRevenue,
+        processedAmount: totalRevenue,
+        sameDayRevenue,
+        carryOverRevenue,
         categoryBreakdown
       },
       details
