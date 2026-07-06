@@ -415,6 +415,22 @@ const Reports = ({ revenueTypeOverride }) => {
     }).format(amount);
   };
 
+  const format12HourEAT = (dateInput) => {
+    if (!dateInput) return 'N/A';
+    const d = new Date(dateInput);
+    if (Number.isNaN(d.getTime())) return 'N/A';
+    const eatTime = new Date(d.getTime() + (3 * 60 * 60 * 1000));
+    let hours = eatTime.getUTCHours();
+    const minutes = String(eatTime.getUTCMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[eatTime.getUTCMonth()];
+    const day = eatTime.getUTCDate();
+    return `${month} ${day}, ${String(hours).padStart(2, '0')}:${minutes} ${ampm} EAT`;
+  };
+
   const formatBucketLabel = (key) => {
     if (BUCKET_LABEL_OVERRIDES[key]) {
       return BUCKET_LABEL_OVERRIDES[key];
@@ -1634,6 +1650,14 @@ const Reports = ({ revenueTypeOverride }) => {
                   </p>
                 </div>
                 <div className="flex items-center space-x-4">
+                  {selectedBillingDayDetails?.summary?.sameDayRevenue > 0 && (
+                    <div className="text-right bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200">
+                      <p className="text-[10px] font-semibold text-blue-800">☀️ Same-Day Shift Cash</p>
+                      <p className="text-sm font-bold text-blue-700">
+                        {formatCurrency(selectedBillingDayDetails.summary.sameDayRevenue)}
+                      </p>
+                    </div>
+                  )}
                   {selectedBillingDayDetails?.summary?.carryOverRevenue > 0 && (
                     <div className="text-right bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
                       <p className="text-[10px] font-semibold text-amber-800">🌙 Prev Shift Carry-Over</p>
@@ -1688,6 +1712,7 @@ const Reports = ({ revenueTypeOverride }) => {
                       <thead>
                         <tr className="border-b text-left text-xs text-gray-500 uppercase">
                           <th className="py-2 pr-2">Patient</th>
+                          <th className="py-2 pr-2">Date/Time (EAT)</th>
                           <th className="py-2 pr-2">Billing ID</th>
                           <th className="py-2 pr-2">Method</th>
                           <th className="py-2 pr-2">Amount</th>
@@ -1697,6 +1722,14 @@ const Reports = ({ revenueTypeOverride }) => {
                         {(selectedBillingDayDetails.details || []).map((row, idx) => (
                           <tr key={`${row.transactionId}-${idx}`} className="border-b last:border-b-0">
                             <td className="py-3 pr-2 text-sm text-gray-800">{row.patientName}</td>
+                            <td className="py-3 pr-2 text-sm text-gray-600">
+                              <span>{format12HourEAT(row.createdAt)}</span>
+                              {row.isCarryOver && (
+                                <span className="ml-1 text-[10px] font-medium text-amber-700 bg-amber-50 px-1 rounded">
+                                  🌙 Carry-Over (Visit: {format12HourEAT(row.visitCreatedAt)})
+                                </span>
+                              )}
+                            </td>
                             <td className="py-3 pr-2 text-sm text-gray-600">{row.billingId || '-'}</td>
                             <td className="py-3 pr-2 text-sm text-gray-600">{row.paymentMethod}</td>
                             <td className="py-3 pr-2 text-sm font-semibold text-amber-700">{formatCurrency(row.amount || 0)}</td>
