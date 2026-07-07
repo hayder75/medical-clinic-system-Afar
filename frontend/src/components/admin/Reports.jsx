@@ -1008,7 +1008,8 @@ const Reports = ({ revenueTypeOverride }) => {
       </div>
       )}
 
-      {/* Financial Overview */}
+      {false && (
+      /* ── Financial Overview (commented out per client request 2026-07-07) ── */
       <div className={`grid ${revenueType === 'billing' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-6`}>
         <div className="card">
           <div className="flex items-center">
@@ -1270,6 +1271,7 @@ const Reports = ({ revenueTypeOverride }) => {
           </>
         )}
       </div>
+      )}
 
       {revenueType === 'medical' && (
         <div className="card">

@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const { z } = require('zod');
+const { getEthiopianDateRange, getEthiopianMonthRange } = require('../utils/dateUtils');
 const { checkMedicationOrderingAllowed } = require('../utils/investigationUtils');
 const { getIO } = require('../config/socket');
 
@@ -7447,7 +7448,8 @@ const dwCommissionMap = async (doctorId) => {
 
 const dwDateKey = (dateValue) => {
   const d = new Date(dateValue);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const eat = new Date(d.getTime() + (3 * 60 * 60 * 1000));
+  return `${eat.getUTCFullYear()}-${String(eat.getUTCMonth() + 1).padStart(2, '0')}-${String(eat.getUTCDate()).padStart(2, '0')}`;
 };
 
 const { isCardRegistration, isCardActivation } = require('../utils/cardBucketHelper');
@@ -7493,8 +7495,9 @@ exports.getDailyWorkMonthly = async (req, res) => {
     const month = Number.parseInt(req.query.month, 10);
     const normalizedMonth = Number.isInteger(month) ? month : new Date().getMonth();
 
-    const startDate = new Date(year, normalizedMonth, 1, 0, 0, 0, 0);
-    const endDate = new Date(year, normalizedMonth + 1, 0, 23, 59, 59, 999);
+    const monthRange = getEthiopianMonthRange(year, normalizedMonth);
+    const startDate = monthRange.startOfMonthUTC;
+    const endDate = monthRange.endOfMonthUTC;
     const daysInMonth = new Date(year, normalizedMonth + 1, 0).getDate();
 
     const assignmentIds = await dwAssignmentIds(doctorId);
@@ -7709,10 +7712,7 @@ exports.getDailyWorkDayDetails = async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
     }
 
-    const dayStart = new Date(parsedDate);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(parsedDate);
-    dayEnd.setHours(23, 59, 59, 999);
+    const { startOfDayUTC: dayStart, endOfDayUTC: dayEnd } = getEthiopianDateRange(date);
 
     const assignmentIds = await dwAssignmentIds(doctorId);
     const visitWhere = dwVisitWhere(doctorId, assignmentIds);
