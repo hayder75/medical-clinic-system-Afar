@@ -13,3 +13,4 @@ backend/dist
 *.jpeg
 *.gif
 backend/uploads/receipt-*.pdf
+TODAY_CHANGES_*.md
