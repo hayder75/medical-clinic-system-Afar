@@ -4,11 +4,50 @@ const validators = require('../utils/validators');
 
 exports.getPatients = async (req, res) => {
   try {
-    const patients = await prisma.patient.findMany({
-      where: { status: 'Active' },
-      select: { id: true, name: true, type: true, status: true },
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const search = (req.query.search || '').trim();
+    const skip = (page - 1) * limit;
+
+    const where = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { id: { contains: search, mode: 'insensitive' } },
+        { mobile: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [patients, total] = await Promise.all([
+      prisma.patient.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          mobile: true,
+          gender: true,
+          dob: true,
+          age: true,
+          bloodType: true,
+          status: true,
+          createdAt: true,
+        },
+        orderBy: { name: 'asc' },
+        skip,
+        take: limit,
+      }),
+      prisma.patient.count({ where }),
+    ]);
+
+    res.json({
+      patients,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     });
-    res.json(patients);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

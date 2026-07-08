@@ -247,4 +247,15 @@ router.post('/transfer', auth, roleGuard(DOCTOR_ROLES), transferController.trans
 router.get('/incoming-transfers', auth, roleGuard(DOCTOR_ROLES), transferController.getIncomingTransfers);
 
 
+
+
+// Patient history summary (lightweight, no heavy includes)
+router.get('/patient-history/:patientId/summary', auth, roleGuard(['DOCTOR', 'BILLING_OFFICER', 'ADMIN']), doctorController.getPatientHistorySummary);
+
+// Visit details (full data, images stripped from lab JSON)
+router.get('/visits/:visitId/details', auth, roleGuard(['DOCTOR', 'BILLING_OFFICER', 'ADMIN']), doctorController.getVisitDetails);
+
+// Visit images (on-demand)
+router.get('/visits/:visitId/images', auth, roleGuard(['DOCTOR', 'BILLING_OFFICER', 'ADMIN']), doctorController.getVisitImages);
+
 module.exports = router;

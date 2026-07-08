@@ -2776,10 +2776,10 @@ exports.getVisitDetails = async (req, res) => {
             include: {
               resultFields: {
                 orderBy: { displayOrder: 'asc' }
-              },
-              group: true
-            }
-          },
+                },
+                group: true
+              }
+            },
           results: {
             include: {
               attachments: true
@@ -4971,7 +4971,8 @@ exports.getPatientHistory = async (req, res) => {
               include: {
                 resultFields: {
                   orderBy: { displayOrder: 'asc' }
-                }
+                },
+                group: true
               }
             },
             results: {
@@ -8063,5 +8064,191 @@ exports.getExternalPrescriptions = async (req, res) => {
   } catch (error) {
     console.error('Error fetching external prescriptions:', error);
     res.status(500).json({ error: 'Failed to fetch external prescriptions' });
+  }
+};
+
+// ── All Patients Page: lightweight summary (patient + visit list, no heavy includes) ──
+exports.getPatientHistorySummary = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    const patient = await prisma.patient.findUnique({
+      where: { id: patientId },
+      select: {
+        id: true,
+        name: true,
+        mobile: true,
+        gender: true,
+        dob: true,
+        age: true,
+        bloodType: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    if (!patient) return res.status(404).json({ error: 'Patient not found' });
+
+    const visits = await prisma.visit.findMany({
+      where: { patientId },
+      select: {
+        id: true,
+        visitUid: true,
+        status: true,
+        diagnosis: true,
+        diagnosisDetails: true,
+        date: true,
+        createdAt: true,
+        completedAt: true,
+        createdBy: { select: { id: true, fullname: true, role: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    res.json({ patient, visits });
+  } catch (error) {
+    console.error('Error fetching patient history summary:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ── Visit Details: full data but with images stripped from lab JSON ──
+exports.getVisitDetails = async (req, res) => {
+  try {
+    const { visitId } = req.params;
+
+    const visit = await prisma.visit.findUnique({
+      where: { id: parseInt(visitId) },
+      include: {
+        createdBy: { select: { id: true, fullname: true, role: true } },
+        vitals: { orderBy: { createdAt: 'desc' } },
+        diagnosisNotes: { include: { doctor: { select: { id: true, fullname: true, role: true } } } },
+        patientDiagnoses: { include: { disease: true } },
+        bills: {
+          include: {
+            services: { include: { service: true } },
+            payments: true,
+          },
+        },
+        medicationOrders: {
+          include: {
+            medicationCatalog: { select: { id: true, name: true, genericName: true, dosageForm: true, strength: true } },
+            doctor: { select: { id: true, fullname: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        labOrders: {
+          include: { type: true },
+          orderBy: { createdAt: 'desc' },
+        },
+        labTestOrders: {
+          include: {
+            labTest: true,
+            results: {
+              include: { test: true, attachments: { select: { id: true, fileUrl: true, fileName: true } } },
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        batchOrders: {
+          include: {
+            services: { include: { investigationType: true, service: true } },
+            radiologyResults: {
+              include: {
+                testType: { select: { id: true, name: true } },
+                attachments: { select: { id: true, fileUrl: true, fileName: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        attachedImages: { select: { id: true, fileName: true, filePath: true, fileSize: true, uploadedAt: true } },
+        galleryImages: { select: { id: true, filePath: true, imageType: true, createdAt: true } },
+        dentalRecords: true,
+        dentalPhotos: true,
+        emergencyDrugOrders: { include: { service: true } },
+        materialNeedsOrders: { include: { service: true } },
+        nurseServiceAssignments: { include: { service: true } },
+        dentalProcedureCompletions: true,
+        compoundPrescriptions: true,
+      },
+    });
+
+    if (!visit) return res.status(404).json({ error: 'Visit not found' });
+
+    // Strip _images from lab JSON results to keep payload small
+    const cleanResults = (results) => {
+      if (!results) return results;
+      if (Array.isArray(results)) return results.map(r => cleanResults(r));
+      if (typeof results === 'object') {
+        const { _images, ...rest } = results;
+        const cleaned = {};
+        for (const [k, v] of Object.entries(rest)) {
+          cleaned[k] = cleanResults(v);
+        }
+        return cleaned;
+      }
+      return results;
+    };
+
+    // Strip images from labTestOrder results
+    const labTestOrders = (visit.labTestOrders || []).map(o => ({
+      ...o,
+      results: (o.results || []).map(r => ({
+        ...r,
+        results: cleanResults(r.results),
+      })),
+    }));
+
+    res.json({
+      ...visit,
+      labTestOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching visit details:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ── Visit Images: on-demand fetch for all image data ──
+exports.getVisitImages = async (req, res) => {
+  try {
+    const { visitId } = req.params;
+    const vid = parseInt(visitId);
+
+    const [attachedImages, galleryImages, labResultImages, labOrderAttachments] = await Promise.all([
+      prisma.patientAttachedImage.findMany({ where: { visitId: vid }, select: { id: true, fileName: true, filePath: true, fileSize: true, uploadedAt: true } }),
+      prisma.patientGallery.findMany({ where: { visitId: vid }, select: { id: true, filePath: true, imageType: true, createdAt: true } }),
+      prisma.labTestResultFile.findMany({
+        where: { result: { order: { visitId: vid } } },
+        select: { id: true, fileUrl: true, fileName: true, fileType: true, uploadedAt: true },
+      }),
+      prisma.labResultFile.findMany({
+        where: { result: { order: { visitId: vid } } },
+        select: { id: true, fileUrl: true, fileName: true, fileType: true, uploadedAt: true },
+      }),
+    ]);
+
+    // Also get _images from LabTestResult.results JSON
+    const labResultsWithImages = await prisma.labTestResult.findMany({
+      where: { order: { visitId: vid }, results: { path: ['_images'], not: null } },
+      select: { id: true, orderId: true, results: true },
+    });
+    const inlineImages = labResultsWithImages.flatMap(r => {
+      const imgs = r.results?._images || [];
+      return Array.isArray(imgs) ? imgs.map(img => ({ ...img, labTestResultId: r.id })) : [];
+    });
+
+    res.json({
+      attachedImages,
+      galleryImages,
+      labResultImages: [...labResultImages, ...labOrderAttachments],
+      inlineLabImages: inlineImages,
+    });
+  } catch (error) {
+    console.error('Error fetching visit images:', error);
+    res.status(500).json({ error: error.message });
   }
 };

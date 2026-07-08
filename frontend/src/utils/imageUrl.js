@@ -53,7 +53,7 @@ function getBaseUrl() {
  */
 export function getImageUrl(filePath) {
   if (!filePath) {
-    console.warn('[getImageUrl] Empty filePath provided');
+    // console.warn('[getImageUrl] Empty filePath provided');
     return '';
   }
 
@@ -87,7 +87,7 @@ export function getImageUrl(filePath) {
       // This happens if baseUrl ends with /uploads and path starts with /uploads
       // But based on logic above, baseUrl is just protocol://hostname:port
 
-      console.debug('[getImageUrl] Fixed localhost URL:', { original: filePath, finalUrl });
+      // console.debug('[getImageUrl] Fixed localhost URL:', { original: filePath, finalUrl });
       return finalUrl;
     }
     // Otherwise return as is
@@ -116,7 +116,7 @@ export function getImageUrl(filePath) {
   const encodedPath = normalizedPath.split("/").map(segment => encodeURIComponent(segment)).join("/");
   const finalUrl = `${baseUrl}/${encodedPath}`;
 
-  console.debug('[getImageUrl]', { original: filePath, normalized: normalizedPath, finalUrl });
+  // console.debug('[getImageUrl]', { original: filePath, normalized: normalizedPath, finalUrl });
   return finalUrl;
 }
 

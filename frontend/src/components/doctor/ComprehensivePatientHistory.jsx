@@ -11,13 +11,115 @@ import { useAuth } from '../../contexts/AuthContext';
 import DentalChartDisplay from '../common/DentalChartDisplay';
 import ImageViewer from '../common/ImageViewer';
 import { getImageUrl } from '../../utils/imageUrl';
+import { checkValueInNormalRange } from '../../utils/normalRangeParser';
 import { formatMedicationName, formatMedicationInstruction, formatEmergencyInstruction } from '../../utils/medicalStandards';
 
 const NON_CLINICAL_CUSTOM_NOTE = 'Custom medication - not in inventory';
 
+
+  const normalizeResultKey = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+  const parseStructuredResultObject = (value) => {
+    if (!value) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) return value;
+    if (typeof value !== 'string') return null;
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch { return null; }
+  };
+
+  const getResultValue = (resultObject, field) => {
+    const source = parseStructuredResultObject(resultObject);
+    if (!source) return undefined;
+    const keys = [field?.fieldName, field?.label,
+      String(field?.label || '').replace(/\s+/g, '_').toLowerCase(),
+      String(field?.label || '').replace(/\s+/g, '')].filter(Boolean);
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) return source[key];
+    }
+    const normalized = keys.map(normalizeResultKey).filter(Boolean);
+    if (!normalized.length) return undefined;
+    const entry = Object.entries(source).find(([k]) => normalized.includes(normalizeResultKey(k)));
+    return entry ? entry[1] : undefined;
+  };
+
+  const extractLabRows = (result) => {
+    // 1. Try detailedResults (already processed by backend)
+    const dr = result.detailedResults?.filter(d => d.result !== null && d.result !== undefined && d.result !== '') || [];
+    if (dr.length > 0) return dr;
+
+    // 2. Build from raw results JSON + resultFields
+    const testType = result.testType || result.labTest || {};
+    const resultFields = testType.resultFields || result.labTest?.resultFields || [];
+    const rawObj = (() => {
+      if (result.results && Array.isArray(result.results)) return result.results[0]?.results || result.results[0] || {};
+      if (result.results && typeof result.results === 'object') return result.results;
+      return null;
+    })();
+    if (!rawObj) return [];
+
+    // Try matching resultFields against the JSON keys
+    if (resultFields.length > 0) {
+      const rows = resultFields.map(f => {
+        const val = getResultValue(rawObj, f);
+        return val !== undefined && val !== null && val !== '' ? {
+          testName: f.label || f.fieldName,
+          result: String(val),
+          unit: f.unit || '',
+          referenceRange: f.referenceRange || ''
+        } : null;
+      }).filter(Boolean);
+      if (rows.length > 0) return rows;
+    }
+
+    // 3. Last resort: just show all JSON keys as rows
+    return Object.entries(rawObj)
+      .filter(([k]) => k !== '_images')
+      .map(([k, v]) => ({
+        testName: k.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase()),
+        result: typeof v === 'object' ? JSON.stringify(v) : String(v),
+        unit: '',
+        referenceRange: ''
+      }))
+      .filter(r => r.result && r.result !== '');
+  };
+
+  const extractLabImages = (result) => {
+    const images = [];
+    // From attachments relation
+    if (result.attachments) {
+      result.attachments.forEach(a => { if (a && !images.some(i => i.fileUrl === (a.fileUrl || a.url))) images.push(a); });
+    }
+    // From raw results[0].attachments
+    if (Array.isArray(result.results)) {
+      result.results.forEach(r => {
+        if (r.attachments) {
+          r.attachments.forEach(a => { if (a && !images.some(i => i.fileUrl === (a.fileUrl || a.url))) images.push(a); });
+        }
+        if (r.results?._images) {
+          (Array.isArray(r.results._images) ? r.results._images : [r.results._images]).forEach(img => {
+            const url = img.fileUrl || img.url || img;
+            if (url && !images.some(i => i.fileUrl === url)) images.push(typeof img === 'string' ? { fileUrl: img } : img);
+          });
+        }
+      });
+    }
+    // From results._images (processed format)
+    if (result.results?._images && !Array.isArray(result.results)) {
+      (Array.isArray(result.results._images) ? result.results._images : [result.results._images]).forEach(img => {
+        const url = img.fileUrl || img.url || img;
+        if (url && !images.some(i => i.fileUrl === url)) images.push(typeof img === 'string' ? { fileUrl: img } : img);
+      });
+    }
+    return images;
+  };
+
 const ComprehensivePatientHistory = () => {
   const { user: currentUser } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [patientHistory, setPatientHistory] = useState(null);
@@ -32,6 +134,10 @@ const ComprehensivePatientHistory = () => {
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingNoteData, setEditingNoteData] = useState({});
   const [isSavingNote, setIsSavingNote] = useState(false);
+  const [loadingVisitDetails, setLoadingVisitDetails] = useState(false);
+  const [patientSummary, setPatientSummary] = useState(null);
+  const [selectedHistoryVisitId, setSelectedHistoryVisitId] = useState(null);
+  const [visitDetailTab, setVisitDetailTab] = useState('summary');
 
   const stripHtml = (html) => {
     if (!html) return '';
@@ -136,27 +242,26 @@ const ComprehensivePatientHistory = () => {
     );
   };
 
-  const searchPatients = async () => {
-    if (!searchTerm.trim()) return;
-
+  const fetchPatients = async (pageNum = 1) => {
     try {
       setLoading(true);
-      console.log('🔍 Frontend: Searching for:', searchTerm);
-      const response = await api.get(`/patients/search?query=${encodeURIComponent(searchTerm)}`);
-      console.log('🔍 Frontend: Search response:', response.data);
-      console.log('🔍 Frontend: Patients found:', response.data.patients?.length || 0);
+      const params = new URLSearchParams({ page: pageNum, limit: '20' });
+      if (searchQuery.trim()) params.append('search', searchQuery.trim());
+      const response = await api.get(`/patients?${params}`);
       setPatients(response.data.patients || []);
-      if (response.data.patients?.length === 0) {
-        console.warn('⚠️ Frontend: No patients found for search term:', searchTerm);
-      }
+      setPage(pageNum);
+      setTotalPages(response.data.pagination?.totalPages || 1);
     } catch (error) {
-      console.error('❌ Frontend: Search error:', error);
-      console.error('❌ Frontend: Error response:', error.response?.data);
-      toast.error('Failed to search patients');
+      toast.error('Failed to fetch patients');
     } finally {
       setLoading(false);
     }
   };
+
+  // Load patients on mount
+  useEffect(() => {
+    fetchPatients(1);
+  }, []);
 
   const fetchPatientHistory = async (patientId) => {
     try {
@@ -178,8 +283,6 @@ const ComprehensivePatientHistory = () => {
     setSelectedPatient(patient);
     setSelectedVisitId(null);
     setActiveTab('vitals');
-    setPatients([]); // Clear search results
-    setSearchTerm(''); // Clear search term
     fetchPatientHistory(patient.id);
   };
 
@@ -188,6 +291,7 @@ const ComprehensivePatientHistory = () => {
     setPatientHistory(null);
     setSelectedVisitId(null);
     setActiveTab('vitals');
+    fetchPatients(1);
   };
 
   const openImageViewer = (images, currentIndex = 0) => {
@@ -1634,91 +1738,129 @@ const ComprehensivePatientHistory = () => {
     `;
   };
 
-  // Define tabs based on available data
-  const tabs = selectedVisit ? [
-    { id: 'vitals', label: 'Vitals & History', icon: Activity, show: true },
-    { id: 'attachedImages', label: 'Attached Images', icon: Image, show: selectedVisit.attachedImages?.length > 0 },
-    { id: 'gallery', label: 'Before & After Gallery', icon: Image, show: selectedVisit.galleryImages?.length > 0 },
-    { id: 'labResults', label: 'Lab Orders', icon: TestTube, show: ((selectedVisit.labResults && selectedVisit.labResults.length > 0) || (selectedVisit.labOrders && selectedVisit.labOrders.length > 0) || (selectedVisit.batchOrders && selectedVisit.batchOrders.some(bo => bo.type === 'LAB')) || (selectedVisit.labTestOrders && selectedVisit.labTestOrders.length > 0)) },
-    { id: 'radiologyResults', label: 'Radiology Orders', icon: Scan, show: (selectedVisit.radiologyResults?.length > 0 || selectedVisit.radiologyOrders?.length > 0) },
-    { id: 'medications', label: 'Medications', icon: Pill, show: ((selectedVisit.medications?.length > 0) || (selectedVisit.medicationOrders?.length > 0)) },
-    { id: 'compoundPrescriptions', label: 'Compound Rx', icon: Beaker, show: (selectedVisit.compoundPrescriptions?.length > 0) },
-    { id: 'emergencyOrders', label: 'Emergency Orders', icon: AlertTriangle, show: (selectedVisit.emergencyOrders?.length > 0) },
-    { id: 'materialNeeds', label: 'Material Needs', icon: Package, show: (selectedVisit.materialNeeds?.length > 0) },
-    { id: 'diagnosisNotes', label: 'Diagnosis & Notes', icon: FileText, show: (selectedVisit.diagnosisNotes?.length > 0 || selectedVisit.diagnoses?.length > 0) },
-    { id: 'procedures', label: 'Procedures', icon: Activity, show: (selectedVisit.procedures?.length > 0) },
-    { id: 'nurseServices', label: 'Nurse Services', icon: UserCog, show: selectedVisit.nurseServices?.length > 0 },
-    { id: 'dentalServices', label: 'Dental Services', icon: Smile, show: selectedVisit.dentalServices?.length > 0 },
-    { id: 'dentalChart', label: 'Dental Chart', icon: Stethoscope, show: selectedVisit.dentalRecords?.length > 0 },
-    { id: 'bills', label: 'Bills & Payments', icon: Receipt, show: true },
-    { id: 'registers', label: 'Registers', icon: FileText, show: (selectedVisit.abortionCareRecords?.length > 0 || selectedVisit.familyPlanningRecords?.length > 0) },
-  ].filter(tab => tab.show) : [];
+;
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#FFFFFF' }}>
 
-      {/* Search Section */}
+      {/* Patient List */}
       {!selectedPatient && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-white rounded-lg shadow-sm p-6 border" style={{ borderColor: '#E5E7EB' }}>
-            <h2 className="text-2xl font-bold mb-4" style={{ color: '#0C0E0B' }}>
-              Patient History Search
-            </h2>
-            <div className="flex gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: '#6B7280' }} />
+          <div className="bg-white rounded-lg shadow-sm border" style={{ borderColor: '#E5E7EB' }}>
+            <div className="p-6 border-b flex items-center justify-between" style={{ borderColor: '#E5E7EB' }}>
+              <h2 className="text-2xl font-bold" style={{ color: '#0C0E0B' }}>
+                Patient History
+              </h2>
+              <div className="flex gap-2">
                 <input
                   type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && searchPatients()}
-                  placeholder="Search by name, ID, or phone number..."
-                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                  style={{ borderColor: '#E5E7EB', focusRingColor: '#2e13d1' }}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchPatients(1)}
+                  placeholder="Search by name, ID, or phone..."
+                  className="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 w-64"
+                  style={{ borderColor: '#E5E7EB' }}
                 />
+                <button
+                  onClick={() => fetchPatients(1)}
+                  disabled={loading}
+                  className="px-4 py-2 text-white rounded-lg text-sm hover:opacity-90 disabled:opacity-50 transition"
+                  style={{ backgroundColor: '#2e13d1' }}
+                >
+                  <Search className="h-4 w-4 inline mr-1" />
+                  {loading ? '...' : 'Search'}
+                </button>
               </div>
-              <button
-                onClick={searchPatients}
-                disabled={loading}
-                className="px-6 py-3 text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition"
-                style={{ backgroundColor: '#2e13d1' }}
-              >
-                {loading ? 'Searching...' : 'Search'}
-              </button>
             </div>
 
-            {/* Search Results */}
-            {patients.length > 0 && (
-              <div className="mt-4 space-y-2 max-h-96 overflow-y-auto">
-                {patients.map((patient) => (
-                  <div
-                    key={patient.id}
-                    onClick={() => handlePatientSelect(patient)}
-                    className="p-4 border rounded-lg cursor-pointer hover:shadow-md transition hover:border-blue-500"
-                    style={{ borderColor: '#E5E7EB' }}
+            {/* Patients Table */}
+            {patients.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider" style={{ color: '#6B7280' }}>Name</th>
+                      <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider" style={{ color: '#6B7280' }}>MRN</th>
+                      <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider" style={{ color: '#6B7280' }}>Gender</th>
+                      <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider" style={{ color: '#6B7280' }}>Age</th>
+                      <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider" style={{ color: '#6B7280' }}>Mobile</th>
+                      <th className="text-right px-6 py-3 font-semibold text-xs uppercase tracking-wider" style={{ color: '#6B7280' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y" style={{ borderColor: '#E5E7EB' }}>
+                    {patients.map((patient) => {
+                      const patientAge = patient?.dob ? calculateAge(patient.dob) : (patient?.age || 'N/A');
+                      return (
+                        <tr
+                          key={patient.id}
+                          onClick={() => handlePatientSelect(patient)}
+                          className="hover:bg-blue-50 cursor-pointer transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="h-8 w-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EEF2FF' }}>
+                                <User className="h-4 w-4" style={{ color: '#2e13d1' }} />
+                              </div>
+                              <span className="font-medium" style={{ color: '#0C0E0B' }}>{patient.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 font-mono text-xs" style={{ color: '#6B7280' }}>{patient.id}</td>
+                          <td className="px-6 py-4" style={{ color: '#0C0E0B' }}>{patient.gender || 'N/A'}</td>
+                          <td className="px-6 py-4" style={{ color: '#0C0E0B' }}>{patientAge}</td>
+                          <td className="px-6 py-4" style={{ color: '#0C0E0B' }}>{patient.mobile || patient.phone || 'N/A'}</td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handlePatientSelect(patient); }}
+                              className="px-3 py-1.5 text-white rounded-lg text-xs font-medium hover:opacity-90 transition"
+                              style={{ backgroundColor: '#2e13d1' }}
+                            >
+                              View History
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-12 text-center">
+                <User className="h-12 w-12 mx-auto mb-3" style={{ color: '#D1D5DB' }} />
+                <p className="text-lg font-medium" style={{ color: '#6B7280' }}>No patients found</p>
+                <p className="text-sm mt-1" style={{ color: '#9CA3AF' }}>Try adjusting your search or check back later.</p>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="px-6 py-4 border-t flex items-center justify-between" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
+                <p className="text-sm" style={{ color: '#6B7280' }}>
+                  Page {page} of {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => fetchPatients(page - 1)}
+                    disabled={page <= 1 || loading}
+                    className="px-3 py-1.5 border rounded text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ borderColor: '#E5E7EB', color: '#0C0E0B' }}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="h-10 w-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EEF2FF' }}>
-                          <User className="h-5 w-5" style={{ color: '#2e13d1' }} />
-                        </div>
-                        <div>
-                          <p className="font-semibold" style={{ color: '#0C0E0B' }}>{patient.name}</p>
-                          <p className="text-sm" style={{ color: '#6B7280' }}>{patient.id} • {patient.phone}</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-5 w-5" style={{ color: '#6B7280' }} />
-                    </div>
-                  </div>
-                ))}
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => fetchPatients(page + 1)}
+                    disabled={page >= totalPages || loading}
+                    className="px-3 py-1.5 border rounded text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ borderColor: '#E5E7EB', color: '#0C0E0B' }}
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
-      )}
-
-      {/* Patient Selected View */}
-      {selectedPatient && patientHistory && (
+      )}      {/* Patient Selected View */}
+      {selectedPatient && (patientSummary || patientHistory) && (
         <>
           {/* Header with Back Button */}
           <div className="border-b" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
@@ -1744,1040 +1886,807 @@ const ComprehensivePatientHistory = () => {
                 <div className="flex-1 grid grid-cols-6 gap-4">
                   <div>
                     <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Patient Name</p>
-                    <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>{patientHistory.patient.name}</p>
+                    <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>{(patientSummary?.patient || patientHistory?.patient)?.name}</p>
                   </div>
                   <div>
                     <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Age / Gender</p>
                     <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>
-                      {patientHistory.patient.age || 'N/A'} / {patientHistory.patient.gender || 'N/A'}
+                      {((patientSummary?.patient || patientHistory?.patient)?.age && (patientSummary?.patient || patientHistory?.patient)?.age !== 0 ? (patientSummary?.patient || patientHistory?.patient)?.age : ((patientSummary?.patient || patientHistory?.patient)?.dob ? calculateAge((patientSummary?.patient || patientHistory?.patient)?.dob) : 'N/A'))} / {(patientSummary?.patient || patientHistory?.patient)?.gender || 'N/A'}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Blood Type</p>
-                    <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>{patientHistory.patient.bloodType || 'N/A'}</p>
+                    <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>{(patientSummary?.patient || patientHistory?.patient)?.bloodType || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Mobile</p>
-                    <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>{patientHistory.patient.phone || 'N/A'}</p>
+                    <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>{(patientSummary?.patient || patientHistory?.patient)?.phone || (patientSummary?.patient || patientHistory?.patient)?.mobile || 'N/A'}</p>
                   </div>
-                  <div>
-                    <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Status</p>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedVisit?.status)}`}>
-                      {selectedVisit?.status?.replace(/_/g, ' ') || 'N/A'}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium" style={{ color: '#6B7280' }}>Card</p>
-                    <p className="text-sm font-semibold" style={{ color: '#0C0E0B' }}>
-                      {selectedVisit?.cardProduct?.name || 'N/A'}
-                    </p>
-                  </div>
+
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Visit Selector Tabs */}
+          {/* Visit Cards */}
           <div className="border-b" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
               <p className="text-xs font-medium mb-2" style={{ color: '#6B7280' }}>SELECT VISIT</p>
-              <div className="flex overflow-x-auto space-x-2 pb-2">
-                {patientHistory.visits?.map((visit) => (
-                  <button
-                    key={visit.id}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(patientSummary?.visits || patientHistory?.visits)?.map((visitItem) => (
+                  <div
+                    key={visitItem.id}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:shadow-md ${selectedHistoryVisitId === visitItem.id ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
                     onClick={() => {
-                      setSelectedVisitId(visit.id);
-                      // After selecting a visit, default to vitals tab
-                      setActiveTab('vitals');
-                    }}
-                    className={`px-4 py-2 rounded-lg border transition whitespace-nowrap text-sm font-medium ${selectedVisitId === visit.id
-                      ? 'text-white'
-                      : 'bg-white hover:border-gray-400'
-                      }`}
-                    style={{
-                      backgroundColor: selectedVisitId === visit.id ? '#2e13d1' : 'white',
-                      borderColor: selectedVisitId === visit.id ? '#2e13d1' : '#E5E7EB',
-                      color: selectedVisitId === visit.id ? 'white' : '#0C0E0B'
+                      setSelectedHistoryVisitId(visitItem.id);
+                      setSelectedVisitId(visitItem.id);
+                      setVisitDetailTab("summary");
                     }}
                   >
-                    <div>{visit.visitUid}</div>
-                    <div className={`text-xs ${selectedVisitId === visit.id ? 'text-white' : 'text-gray-500'}`}>
-                      {new Date(visit.date).toLocaleDateString()}
-                    </div>
-                    {visit.cardProduct && (
-                      <div className={`text-xs mt-0.5 ${selectedVisitId === visit.id ? 'text-indigo-200' : 'text-indigo-600'}`}>
-                        💳 {visit.cardProduct.name}
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <p className="font-bold text-lg" style={{ color: '#0C0E0B' }}>{visitItem.visitUid}</p>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${visitItem.status === 'COMPLETED' ? 'bg-green-100 text-green-700 border border-green-200' : visitItem.status === 'CANCELLED' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-yellow-100 text-yellow-700 border border-yellow-200'}`}>
+                            {visitItem.status?.replace(/_/g, ' ') || 'N/A'}
+                          </span>
+                        </div>
+                        <p className="text-sm flex items-center gap-1" style={{ color: '#6B7280' }}>
+                          <Calendar className="h-3 w-3" />
+                          {new Date(visitItem.date || visitItem.createdAt).toLocaleDateString()} • {new Date(visitItem.date || visitItem.createdAt).toLocaleTimeString()}
+                        </p>
+                        {visitItem.diagnosis && (
+                          <p className="text-sm mt-2 font-medium bg-blue-50 px-3 py-1 rounded-lg border border-blue-100" style={{ color: '#1E40AF' }}>
+                            📋 {visitItem.diagnosis}
+                          </p>
+                        )}
+                        {visitItem.createdBy && (
+                          <p className="text-xs mt-2" style={{ color: '#6B7280' }}>
+                            👨‍⚕️ Dr. {visitItem.createdBy.fullname}
+                          </p>
+                        )}
+                        {visitItem.cardProduct && (
+                          <p className="text-xs mt-1 font-medium text-indigo-600">
+                            💳 Card: {visitItem.cardProduct.name}
+                          </p>
+                        )}
                       </div>
-                    )}
-                  </button>
+                      <ChevronRight className={`h-5 w-5 transition-transform ${selectedHistoryVisitId === visitItem.id ? 'text-indigo-600 rotate-90' : 'text-gray-400'}`} />
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Tabs Navigation - SMART FLEX BLOCKS */}
-          {selectedVisit && (
-            <div className="border-b pb-4" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                  <div className="flex flex-wrap gap-2 flex-1">
-                    {tabs.map((tab) => {
-                      const Icon = tab.icon;
-                      const isActive = activeTab === tab.id;
 
-                      // Define distinct colors for each tab matching the consultation page where possible
-                      const tabColors = {
-                        'vitals': { bg: '#EFF6FF', activeBg: '#DBEAFE', text: '#1E40AF', border: '#3B82F6' },
-                        'diagnosisNotes': { bg: '#F3E8FF', activeBg: '#E9D5FF', text: '#6B21A8', border: '#A855F7' },
-                        'medications': { bg: '#FCE7F3', activeBg: '#FBCFE8', text: '#9F1239', border: '#EC4899' },
-                        'compoundPrescriptions': { bg: '#FFF7ED', activeBg: '#FFEDD5', text: '#9A3412', border: '#F97316' },
-                        'emergencyOrders': { bg: '#FEE2E2', activeBg: '#FECACA', text: '#991B1B', border: '#EF4444' },
-                        'labResults': { bg: '#E0F2FE', activeBg: '#BAE6FD', text: '#0C4A6E', border: '#0EA5E9' },
-                        'radiologyResults': { bg: '#FFF1F2', activeBg: '#FEE2E2', text: '#991B1B', border: '#EF4444' },
-                        'gallery': { bg: '#F0FDF4', activeBg: '#DCFCE7', text: '#166534', border: '#22C55E' },
-                        'attachedImages': { bg: '#E0E7FF', activeBg: '#C7D2FE', text: '#3730A3', border: '#6366F1' },
-                        'dentalChart': { bg: '#FEF3C7', activeBg: '#FDE68A', text: '#92400E', border: '#F59E0B' },
-                        'dentalServices': { bg: '#FEF3C7', activeBg: '#FDE68A', text: '#92400E', border: '#F59E0B' },
-                        'nurseServices': { bg: '#F0F9FF', activeBg: '#DBEAFE', text: '#1E3A8A', border: '#3B82F6' },
-                        'bills': { bg: '#F1F5F9', activeBg: '#E2E8F0', text: '#475569', border: '#94A3B8' },
-                        'registers': { bg: '#FFF1F2', activeBg: '#FFE4E6', text: '#9F1239', border: '#F43F5E' }
-                      };
-
-                      const colors = tabColors[tab.id] || { bg: '#F9FAFB', activeBg: '#F3F4F6', text: '#6B7280', border: '#9CA3AF' };
-
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => setActiveTab(tab.id)}
-                          className={`flex items-center justify-center gap-2 px-3 py-2 border-2 font-semibold text-[13px] transition-all rounded-lg shadow-sm ${isActive ? 'ring-2 ring-offset-1' : 'hover:scale-[1.02] hover:shadow-md active:scale-[0.98]'
-                            }`}
-                          style={{
-                            borderColor: isActive ? colors.border : 'transparent',
-                            backgroundColor: isActive ? colors.activeBg : colors.bg,
-                            color: isActive ? colors.text : colors.text,
-                            boxShadow: isActive ? `0 4px 10px -2px ${colors.border}40` : 'none',
-                            ringColor: isActive ? colors.border : 'transparent'
-                          }}
-                        >
-                          <Icon className="h-4 w-4 flex-shrink-0" />
-                          <span className="whitespace-nowrap">{tab.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="flex space-x-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-gray-100 w-full lg:w-auto justify-end">
-                    <button
-                      onClick={handlePrintVisit}
-                      className="flex items-center space-x-2 px-4 py-2 rounded-lg border transition text-sm font-medium hover:bg-gray-50"
-                      style={{ borderColor: '#E5E7EB', color: '#0C0E0B', backgroundColor: '#FFFFFF' }}
-                    >
-                      <Printer className="h-4 w-4" />
-                      <span>Print</span>
-                    </button>
-                    <button
-                      onClick={handleDownloadPDF}
-                      className="flex items-center space-x-2 px-4 py-2 rounded-lg transition text-sm font-medium text-white hover:opacity-90"
-                      style={{ backgroundColor: '#2e13d1' }}
-                    >
-                      <Download className="h-4 w-4" />
-                      <span>Download PDF</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Content Area */}
-          {selectedVisit && (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-
-              {/* Vitals & History Tab */}
-              {activeTab === 'vitals' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Vital Signs History</h3>
-                  {selectedVisit.vitals && selectedVisit.vitals.length > 0 ? (
-                    <div className="space-y-4">
-                      {selectedVisit.vitals.map((vital, index) => (
-                        <div key={vital.id} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                          <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-medium" style={{ color: '#0C0E0B' }}>Record #{index + 1}</h4>
-                            <span className="text-sm" style={{ color: '#6B7280' }}>{formatDate(vital.createdAt)}</span>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <p style={{ color: '#6B7280' }}>Heart Rate</p>
-                              <p className="font-semibold" style={{ color: '#0C0E0B' }}>{vital.heartRate} bpm</p>
-                            </div>
-                            <div>
-                              <p style={{ color: '#6B7280' }}>Temperature</p>
-                              <p className="font-semibold" style={{ color: '#0C0E0B' }}>{vital.temperature}°C</p>
-                            </div>
-                            <div>
-                              <p style={{ color: '#6B7280' }}>Blood Pressure</p>
-                              <p className="font-semibold" style={{ color: '#0C0E0B' }}>{vital.bloodPressure} mmHg</p>
-                            </div>
-                            <div>
-                              <p style={{ color: '#6B7280' }}>Oxygen Sat</p>
-                              <p className="font-semibold" style={{ color: '#0C0E0B' }}>{vital.oxygenSaturation}%</p>
-                            </div>
-                          </div>
-                          {vital.chiefComplaint && (
-                            <div className="mt-3 pt-3 border-t" style={{ borderColor: '#E5E7EB' }}>
-                              <p style={{ color: '#6B7280' }} className="text-sm">Chief Complaint:</p>
-                              <p className="text-sm" style={{ color: '#0C0E0B' }}>{vital.chiefComplaint}</p>
-                            </div>
-                          )}
-                          {vital.physicalExamination && (
-                            <div className="mt-2">
-                              <p style={{ color: '#6B7280' }} className="text-sm">Physical Examination:</p>
-                              <p className="text-sm" style={{ color: '#0C0E0B' }}>{vital.physicalExamination}</p>
-                            </div>
-                          )}
-                          {vital.notes && (
-                            <div className="mt-2">
-                              <p style={{ color: '#6B7280' }} className="text-sm">Notes:</p>
-                              <p className="text-sm" style={{ color: '#0C0E0B' }}>{vital.notes}</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p style={{ color: '#6B7280' }}>No vital signs recorded for this visit</p>
-                  )}
-                </div>
-              )}
-
-              {/* Attached Images Tab */}
-              {activeTab === 'attachedImages' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Attached Images</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {selectedVisit.attachedImages.map((image, index) => (
-                      <div key={image.id} className="relative group">
-                        <div className="w-full h-48 bg-gray-200 rounded-lg border-2 border-gray-200 overflow-hidden">
-                          <img
-                            src={getImageUrl(image.filePath)}
-                            alt={image.description || 'Medical image'}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        {image.description && (
-                          <p className="text-xs mt-2" style={{ color: '#6B7280' }}>{image.description}</p>
-                        )}
-                        <button
-                          className="mt-2 w-full px-3 py-2 text-sm rounded transition flex items-center justify-center space-x-2 text-white hover:opacity-90"
-                          style={{ backgroundColor: '#2e13d1' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const allImages = selectedVisit.attachedImages.map(img => ({
-                              filePath: getImageUrl(img.filePath),
-                              fileName: img.fileName,
-                              description: img.description
-                            }));
-                            openImageViewer(allImages, index);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span>View Image</span>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Before & After Gallery Tab */}
-              {activeTab === 'gallery' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Before & After Gallery</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {selectedVisit.galleryImages.map((image) => (
-                      <div key={image.id} className="relative group">
-                        <img
-                          src={getImageUrl(image.filePath)}
-                          alt={image.imageType}
-                          className="w-full h-48 object-cover rounded border cursor-pointer hover:opacity-80 transition"
-                          style={{ borderColor: '#E5E7EB' }}
-                          onClick={() => openImageViewer([image], 0)}
-                        />
-                        <div className={`absolute top-2 left-2 px-2 py-1 text-xs font-medium rounded shadow ${image.imageType === 'BEFORE' ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'
-                          }`}>
-                          {image.imageType}
-                        </div>
-                        <div className="mt-2">
-                          <p className="text-xs" style={{ color: '#6B7280' }}>{image.uploadedBy.fullname}</p>
-                          <p className="text-xs" style={{ color: '#9CA3AF' }}>{formatDate(image.createdAt)}</p>
-                          {image.description && (
-                            <p className="text-xs mt-1 line-clamp-2" style={{ color: '#6B7280' }}>{image.description}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Lab Results Tab */}
-              {activeTab === 'labResults' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold" style={{ color: '#0C0E0B' }}>Lab Results</h3>
-                    {((selectedVisit.labResults && selectedVisit.labResults.length > 0) || (selectedVisit.labOrders && selectedVisit.labOrders.length > 0) || (selectedVisit.labTestOrders && selectedVisit.labTestOrders.length > 0)) && (
+          {/* Sub-tab Navigation */}
+          {selectedVisit && (() => {
+            const sv = getSelectedVisit();
+            if (!sv) return null;
+            return (
+              <div className="border-b pb-4" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {[
+                      { id: 'summary', label: 'Summary' },
+                      { id: 'vitals', label: 'Vitals', count: sv.vitals?.length },
+                      { id: 'notes', label: 'Diagnosis Notes' },
+                      { id: 'labs', label: 'Lab Orders', count: (sv.labOrders?.length || 0) + (sv.labTestOrders?.length || 0) },
+                      { id: 'radiology', label: 'Radiology', count: (sv.radiologyOrders?.length || 0) + (sv.batchOrders?.filter(bo => bo.type === 'RADIOLOGY').reduce((a, b) => a + (b.services?.length || 0), 0) || 0) },
+                      { id: 'medications', label: 'Medications', count: sv.medicationOrders?.length },
+                      { id: 'compoundRx', label: 'Compound Rx', count: sv.compoundPrescriptions?.length },
+                      { id: 'procedures', label: 'Procedures', count: sv.procedures?.length },
+                      { id: 'images', label: 'Images', count: sv.files?.length || sv.attachedImages?.length },
+                      { id: 'other', label: 'Other Services' },
+                    ].map(tab => (
                       <button
-                        onClick={handlePrintLabResults}
-                        className="flex items-center space-x-2 px-4 py-2 rounded-lg transition text-sm font-medium text-white hover:opacity-90"
-                        style={{ backgroundColor: '#2e13d1' }}
+                        key={tab.id}
+                        onClick={() => setVisitDetailTab(tab.id)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${visitDetailTab === tab.id ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'}`}
                       >
-                        <Printer className="h-4 w-4" />
-                        <span>Print Lab Results</span>
+                        {tab.label}{tab.count !== undefined ? ` (${tab.count})` : ''}
                       </button>
-                    )}
+                    ))}
                   </div>
-                  <div className="space-y-4">
-                    {([...(selectedVisit.labResults || []), ...(selectedVisit.labOrders || []), ...(selectedVisit.labTestOrders || [])].filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i)).map((result, index) => {
-                      // Handle labResults, labOrders, and labTestOrders format
-                      const testType = result.testType || result.type || result.labTest || {};
-                      const testName = testType.name || result.serviceName || result.labTest?.name || 'Lab Test';
-                      const status = result.status || 'PENDING';
-                      return (
-                        <div key={result.id || index} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                          <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-medium text-lg" style={{ color: '#0C0E0B' }}>
-                              {testName}
-                            </h4>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(status)}`}>
-                              {status}
+
+                  {/* Tab Content */}
+                  <div className="bg-white border rounded-lg p-6">
+                    {/* Summary Tab */}
+                    {visitDetailTab === 'summary' && (
+                      <div className="space-y-6">
+                        {/* Header */}
+                        <div className="flex items-center gap-2 pb-3 border-b flex-wrap">
+                          <FileText className="h-5 w-5 text-indigo-600" />
+                          <h4 className="text-lg font-bold">Visit #{sv.visitUid}</h4>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${sv.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {sv.status?.replace(/_/g, ' ')}
+                          </span>
+                          {sv.cardProduct && (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                              💳 {sv.cardProduct.name}
                             </span>
+                          )}
+                          <span className="text-xs text-gray-500 ml-auto">
+                            {new Date(sv.date || sv.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="p-3 bg-green-50 rounded-lg">
+                            <p className="text-xs text-green-700">Diagnoses</p>
+                            <p className="text-2xl font-bold text-green-800">{sv.diagnoses?.length || 0}</p>
                           </div>
+                          <div className="p-3 bg-blue-50 rounded-lg">
+                            <p className="text-xs text-blue-700">Lab Orders</p>
+                            <p className="text-2xl font-bold text-blue-800">{(sv.labOrders?.length || 0) + (sv.labTestOrders?.length || 0) + (sv.batchOrders?.filter(bo => bo.type === 'LAB').reduce((a, b) => a + (b.services?.length || 0), 0) || 0)}</p>
+                          </div>
+                          <div className="p-3 bg-amber-50 rounded-lg">
+                            <p className="text-xs text-amber-700">Radiology</p>
+                            <p className="text-2xl font-bold text-amber-800">{(sv.radiologyOrders?.length || 0) + (sv.batchOrders?.filter(bo => bo.type === 'RADIOLOGY').reduce((a, b) => a + (b.services?.length || 0), 0) || 0)}</p>
+                          </div>
+                          <div className="p-3 bg-purple-50 rounded-lg">
+                            <p className="text-xs text-purple-700">Medications</p>
+                            <p className="text-2xl font-bold text-purple-800">{sv.medicationOrders?.length || 0}</p>
+                          </div>
+                        </div>
 
-                          {result.detailedResults && result.detailedResults.length > 0 ? (
-                            <div className="mt-3 overflow-x-auto">
-                              <table className="w-full text-sm border" style={{ borderColor: '#E5E7EB' }}>
-                                <thead style={{ backgroundColor: '#F3F4F6' }}>
-                                  <tr>
-                                    <th className="px-3 py-2 text-left border" style={{ color: '#6B7280', borderColor: '#E5E7EB' }}>Test Name</th>
-                                    <th className="px-3 py-2 text-left border" style={{ color: '#6B7280', borderColor: '#E5E7EB' }}>Result</th>
-                                    <th className="px-3 py-2 text-left border" style={{ color: '#6B7280', borderColor: '#E5E7EB' }}>Unit</th>
-                                    <th className="px-3 py-2 text-left border" style={{ color: '#6B7280', borderColor: '#E5E7EB' }}>Reference Range</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {result.detailedResults.map((test, idx) => (
-                                    <tr key={idx} style={{ borderColor: '#E5E7EB' }}>
-                                      <td className="px-3 py-2 border" style={{ color: '#0C0E0B', borderColor: '#E5E7EB' }}>
-                                        {test.testName || 'Details not given'}
-                                      </td>
-                                      <td className="px-3 py-2 font-semibold border" style={{ color: '#0C0E0B', borderColor: '#E5E7EB' }}>
-                                        {typeof test.result === 'object' ? JSON.stringify(test.result) : (test.result || 'Details not given')}
-                                      </td>
-                                      <td className="px-3 py-2 border" style={{ color: '#0C0E0B', borderColor: '#E5E7EB' }}>
-                                        {test.unit || '-'}
-                                      </td>
-                                      <td className="px-3 py-2 border" style={{ color: '#6B7280', borderColor: '#E5E7EB' }}>
-                                        {test.referenceRange || 'Details not given'}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          ) : result.resultText ? (
-                            <div className="mt-3 p-3 rounded" style={{ backgroundColor: '#FFF3CD', color: '#856404' }}>
-                              <p className="text-sm font-medium">Result Summary:</p>
-                              <p className="text-sm mt-1">{result.resultText}</p>
-                            </div>
-                          ) : (
-                            <div className="mt-3 p-3 rounded" style={{ backgroundColor: '#FFF3CD', color: '#856404' }}>
-                              <p className="text-sm italic">📋 Lab test was ordered but detailed results have not been entered yet.</p>
-                            </div>
-                          )}
-
-                          {result.additionalNotes && (
-                            <div className="mt-3 pt-3 border-t" style={{ borderColor: '#E5E7EB' }}>
-                              <p style={{ color: '#6B7280' }} className="text-sm font-semibold">Additional Notes:</p>
-                              <p className="text-sm mt-1" style={{ color: '#0C0E0B' }}>{result.additionalNotes}</p>
-                            </div>
-                          )}
-
-                          {(result.results && (result.results._images || (result.results[0] && result.results[0].results && result.results[0].results._images) || []) && (result.results._images || (result.results[0] && result.results[0].results && result.results[0].results._images) || []).length > 0) && (
-                            <div className="mt-3 pt-3 border-t" style={{ borderColor: '#E5E7EB' }}>
-                              <p style={{ color: '#6B7280' }} className="text-sm font-semibold">Attached Images:</p>
-                              <div className="grid grid-cols-3 gap-2 mt-2">
-                                {(result.results._images || (result.results[0] && result.results[0].results && result.results[0].results._images) || []).map((img, idx) => (
-                                  <div key={idx} className="relative">
-                                    <img src={img.url ? getImageUrl(img.url) : (img.data || img)} alt={"Lab result " + (idx + 1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.url ? getImageUrl(img.url) : (img.data || img), '_blank')} />
+                        {/* Diagnosis Notes Section */}
+                        {sv.diagnosisNotes && sv.diagnosisNotes.length > 0 && (
+                          <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                            <h5 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">📋 Diagnosis Notes</h5>
+                            <div className="space-y-2">
+                              {sv.diagnosisNotes.map((note, i) => (
+                                <div key={i} className="p-3 bg-white rounded-lg border border-blue-100">
+                                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.notes || note.content || note.text}</p>
+                                  <div className="flex gap-4 mt-2 text-xs text-blue-600">
+                                    <span>Dr. {note.doctor?.fullname || 'Unknown'}</span>
+                                    <span>{new Date(note.createdAt).toLocaleString()}</span>
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-
-                          <div className="mt-3 pt-3 border-t text-xs" style={{ borderColor: '#E5E7EB', color: '#6B7280' }}>
-                            <div className="flex justify-between">
-                              <span>Ordered: {result.createdAt ? new Date(result.createdAt).toLocaleString() : 'N/A'}</span>
-                              {result.verifiedBy && result.verifiedAt && (
-                                <span>Verified by: {result.verifiedBy} on {new Date(result.verifiedAt).toLocaleString()}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Radiology Results Tab */}
-              {activeTab === 'radiologyResults' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold" style={{ color: '#0C0E0B' }}>Radiology Results & Orders</h3>
-                    {((selectedVisit.radiologyResults && selectedVisit.radiologyResults.length > 0) || (selectedVisit.radiologyOrders && selectedVisit.radiologyOrders.length > 0)) && (
-                      <button
-                        onClick={handlePrintRadiologyResults}
-                        className="flex items-center space-x-2 px-4 py-2 rounded-lg transition text-sm font-medium text-white hover:opacity-90"
-                        style={{ backgroundColor: '#2e13d1' }}
-                      >
-                        <Printer className="h-4 w-4" />
-                        <span>Print Radiology Results</span>
-                      </button>
-                    )}
-                  </div>
-                  <div className="space-y-4">
-                    {([...(selectedVisit.radiologyResults || []), ...(selectedVisit.radiologyOrders || [])].filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i)).map((result, index) => {
-                      // Handle both radiologyResults and radiologyOrders format
-                      const testType = result.testType || result.type || {};
-                      const serviceName = result.serviceName || testType.name || 'Radiology Test';
-                      return (
-                        <div key={result.id || index} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                          <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-medium" style={{ color: '#0C0E0B' }}>{serviceName}</h4>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(result.status)}`}>
-                              {result.status}
-                            </span>
-                          </div>
-                          {result.findings && (
-                            <div className="mt-3">
-                              <p style={{ color: '#6B7280' }} className="text-sm">Findings:</p>
-                              <p className="text-base" style={{ color: '#0C0E0B' }}>{result.findings}</p>
-                            </div>
-                          )}
-                          {result.conclusion && (
-                            <div className="mt-3">
-                              <p style={{ color: '#6B7280' }} className="text-sm">Conclusion:</p>
-                              <p className="text-base" style={{ color: '#0C0E0B' }}>{result.conclusion}</p>
-                            </div>
-                          )}
-                          {result.impression && (
-                            <div className="mt-2">
-                              <p style={{ color: '#6B7280' }} className="text-sm">Impression:</p>
-                              <p className="text-base" style={{ color: '#0C0E0B' }}>{result.impression}</p>
-                            </div>
-                          )}
-                          {result.attachments && result.attachments.length > 0 && (
-                            <div className="mt-3 grid grid-cols-3 gap-2">
-                              {result.attachments.map((attachment, idx) => (
-                                <div key={idx}>
-                                  <img
-                                    src={getImageUrl(attachment.fileUrl)}
-                                    alt={`Radiology ${idx + 1}`}
-                                    className="w-full h-24 object-cover rounded border cursor-pointer hover:opacity-80"
-                                    style={{ borderColor: '#E5E7EB' }}
-                                    onClick={() => openImageViewer(result.attachments, idx)}
-                                  />
                                 </div>
                               ))}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Medications Tab */}
-              {activeTab === 'medications' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold" style={{ color: '#0C0E0B' }}>Medications</h3>
-                    {((selectedVisit.medications && selectedVisit.medications.length > 0) || (selectedVisit.medicationOrders && selectedVisit.medicationOrders.length > 0)) && (
-                      <button
-                        onClick={handlePrintMedications}
-                        className="flex items-center space-x-2 px-4 py-2 rounded-lg transition text-sm font-medium text-white hover:opacity-90"
-                        style={{ backgroundColor: '#2e13d1' }}
-                      >
-                        <Printer className="h-4 w-4" />
-                        <span>Print Prescription</span>
-                      </button>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    {([...(selectedVisit.medications || []), ...(selectedVisit.medicationOrders || [])].filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i)).map((med) => {
-                      // Handle both medicationOrders and medications format
-                      const medication = med.medication || med.medicationCatalog || {};
-                      const medName = medication.name || med.name || 'Unknown';
-                      return (
-                        <div key={med.id} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                          <div className="flex justify-between items-start mb-2">
-                            <h4 className="font-medium" style={{ color: '#0C0E0B' }}>{medName}</h4>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(med.status)}`}>
-                              {med.status}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div>
-                              <span style={{ color: '#6B7280' }}>Dosage:</span> <span style={{ color: '#0C0E0B' }}>{med.dosage || 'N/A'}</span>
-                            </div>
-                            <div>
-                              <span style={{ color: '#6B7280' }}>Frequency:</span> <span style={{ color: '#0C0E0B' }}>{med.frequency || 'N/A'}</span>
-                            </div>
-                            <div>
-                              <span style={{ color: '#6B7280' }}>Duration:</span> <span style={{ color: '#0C0E0B' }}>{med.duration || 'N/A'}</span>
-                            </div>
-                            <div>
-                              <span style={{ color: '#6B7280' }}>Quantity:</span> <span style={{ color: '#0C0E0B' }}>{med.quantity || 'N/A'}</span>
-                            </div>
-                          </div>
-                          {(med.instructionText || med.instructions) && (
-                            <div className="mt-2 pt-2 border-t" style={{ borderColor: '#E5E7EB' }}>
-                              <p style={{ color: '#6B7280' }} className="text-sm">Instructions:</p>
-                              <p className="text-sm" style={{ color: '#0C0E0B' }}>{med.instructionText || med.instructions}</p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Compound Prescriptions Tab */}
-              {activeTab === 'compoundPrescriptions' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold" style={{ color: '#0C0E0B' }}>Compound Prescriptions</h3>
-                    {selectedVisit.compoundPrescriptions?.length > 0 && (
-                      <div className="text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded-full font-medium">
-                        {selectedVisit.compoundPrescriptions.length} Records
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-4">
-                    {selectedVisit.compoundPrescriptions.map((cp, idx) => (
-                      <div key={idx} className="p-4 border border-amber-200 rounded-lg bg-amber-50 shadow-sm transition-all hover:shadow-md">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <p className="font-bold text-amber-900 text-lg">{cp.formulationType} - {cp.quantity}{cp.quantityUnit}</p>
-                            <span className="text-xs font-mono bg-white/50 px-2 py-0.5 rounded text-amber-800 border border-amber-200">{cp.referenceNumber || 'No Ref #'}</span>
-                          </div>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(cp.status || 'PRESCRIBED')}`}>
-                            {cp.status || 'PRESCRIBED'}
-                          </span>
-                        </div>
-                        <div className="text-sm text-amber-800 mb-2 p-3 bg-white/60 rounded-lg border border-amber-100">
-                          <span className="font-bold block mb-2 text-amber-900">Active Ingredients:</span>
-                          <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 list-disc list-inside">
-                            {cp.ingredients?.map((ing, i) => (
-                              <li key={i} className="text-amber-800 drop-shadow-sm">
-                                {ing.ingredientName} <span className="font-mono font-bold">{ing.strength}{ing.unit}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-amber-900 mt-3 pt-3 border-t border-amber-200">
-                          {cp.frequencyType && (
-                            <div className="flex items-center gap-2">
-                              <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
-                                <Clock className="h-3 w-3" />
-                              </div>
-                              <p><span className="font-bold">Sig:</span> {cp.frequencyType.replace(/_/g, ' ')}</p>
-                            </div>
-                          )}
-                          {cp.durationValue && (
-                            <div className="flex items-center gap-2">
-                              <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
-                                <Calendar className="h-3 w-3" />
-                              </div>
-                              <p><span className="font-bold">Duration:</span> {cp.durationValue} {cp.durationUnit?.toLowerCase()}</p>
-                            </div>
-                          )}
-                        </div>
-                        {(cp.prescriptionText || cp.rawText || cp.instructions) && (
-                          <div className="text-sm text-amber-700 italic mt-3 bg-white/40 p-3 rounded-lg border border-amber-100">
-                            <span className="font-bold not-italic text-amber-900 block mb-1">Pharmacist Instructions:</span>
-                            {cp.prescriptionText || cp.rawText || cp.instructions}
                           </div>
                         )}
-                        <div className="mt-3 pt-2 text-[10px] text-amber-600 flex justify-between">
-                          <span>Date: {cp.createdAt ? new Date(cp.createdAt).toLocaleString() : 'N/A'}</span>
-                          <span>Prescription Order</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
-              {/* Diagnosis Notes Tab */}
-              {activeTab === 'diagnosisNotes' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Diagnosis & Notes</h3>
-
-                  {/* Confirmed Diagnoses Section */}
-                  {selectedVisit.diagnoses && selectedVisit.diagnoses.length > 0 && (
-                    <div className="mb-6 p-4 border border-red-100 rounded-lg bg-red-50">
-                      <h4 className="text-sm font-bold text-red-800 uppercase mb-2 flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" /> Confirmed Diagnoses
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedVisit.diagnoses.map((d, i) => (
-                          <span key={i} className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium border border-red-200 shadow-sm">
-                            {d.disease?.name || d.diseaseId} {d.type ? `(${d.type})` : ''}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-4">
-                    {selectedVisit.diagnosisNotes.map((note) => (
-                      <div key={note.id} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                        <div className="flex justify-between items-start mb-4">
-                          <span className="text-sm" style={{ color: '#6B7280' }}>{formatDate(note.createdAt)}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium" style={{ color: '#2e13d1' }}>
-                              Dr. {note.doctor?.fullname || 'Unknown'}
-                            </span>
-                            {!editingNoteId ? (
-                              <button
-                                onClick={() => {
-                                  setEditingNoteId(note.id);
-                                  setEditingNoteData({
-                                    chiefComplaint: note.chiefComplaint || '',
-                                    historyOfPresentIllness: note.historyOfPresentIllness || '',
-                                    pastMedicalHistory: note.pastMedicalHistory || '',
-                                    allergicHistory: note.allergicHistory || '',
-                                    physicalExamination: note.physicalExamination || '',
-                                    investigationFindings: note.investigationFindings || '',
-                                    assessmentAndDiagnosis: note.assessmentAndDiagnosis || '',
-                                    treatmentPlan: note.treatmentPlan || '',
-                                    treatmentGiven: note.treatmentGiven || '',
-                                    medicationIssued: note.medicationIssued || '',
-                                    additional: note.additional || '',
-                                    prognosis: note.prognosis || ''
-                                  });
-                                }}
-                                className="ml-2 p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                title="Edit Note"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </button>
-                            ) : editingNoteId === note.id ? (
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      setIsSavingNote(true);
-                                      await api.put(`/doctors/visits/${selectedVisit.id}/diagnosis-notes/${note.id}`, { notes: editingNoteData });
-                                      toast.success('Notes updated successfully');
-                                      setEditingNoteId(null);
-                                      // Refresh the data
-                                      if (selectedPatient) {
-                                        const response = await api.get(`/doctors/patient-history/${selectedPatient.id}`);
-                                        setPatientHistory(response.data);
-                                      }
-                                    } catch (error) {
-                                      console.error('Error updating notes:', error);
-                                      toast.error('Failed to update notes');
-                                    } finally {
-                                      setIsSavingNote(false);
-                                    }
-                                  }}
-                                  disabled={isSavingNote}
-                                  className="p-1 text-green-600 hover:bg-green-50 rounded"
-                                  title="Save"
-                                >
-                                  <Check className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => setEditingNoteId(null)}
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                  title="Cancel"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          {renderNoteField('chiefComplaint', 'Chief Complaint', note)}
-                          {renderNoteField('historyOfPresentIllness', 'History of Present Illness', note)}
-                          {renderNoteField('pastMedicalHistory', 'Past Medical History', note)}
-                          {renderNoteField('allergicHistory', 'Allergic History', note)}
-                          {renderNoteField('physicalExamination', 'Physical Examination', note)}
-                          {renderNoteField('investigationFindings', 'Investigation Findings', note)}
-                          {renderNoteField('assessmentAndDiagnosis', 'Assessment & Diagnosis', note)}
-                          {renderNoteField('treatmentPlan', 'Treatment Plan', note)}
-                          {renderNoteField('treatmentGiven', 'Treatment Given', note)}
-                          {renderNoteField('medicationIssued', 'Medication Issued', note)}
-                          {renderNoteField('additional', 'Additional Notes', note)}
-                          {renderNoteField('prognosis', 'Prognosis', note)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Procedures Tab */}
-              {activeTab === 'procedures' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Procedures</h3>
-                  {selectedVisit.procedures && selectedVisit.procedures.length > 0 ? (
-                    <div className="space-y-4">
-                      {selectedVisit.procedures.map((proc, idx) => (
-                        <div key={idx} className="p-4 border rounded-lg bg-slate-50 border-slate-200">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-bold text-slate-900">{proc.name}</h4>
-                              <p className="text-xs text-slate-500 mt-0.5">ID: {proc.id}</p>
-                            </div>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(proc.status)}`}>
-                              {proc.status}
-                            </span>
-                          </div>
-                          <div className="mt-2 text-sm text-slate-600">
-                            Requested on: {new Date(proc.createdAt).toLocaleString()}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500">No procedures recorded for this visit.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Nurse Services Tab */}
-              {activeTab === 'nurseServices' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Nurse Services Performed</h3>
-                  {selectedVisit.nurseServices && selectedVisit.nurseServices.length > 0 ? (
-                    <div className="space-y-4">
-                      {selectedVisit.nurseServices.map((service) => (
-                        <div key={service.id} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <h4 className="font-medium" style={{ color: '#0C0E0B' }}>{service.serviceName}</h4>
-                              <p className="text-sm" style={{ color: '#6B7280' }}>{service.serviceCode}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-semibold" style={{ color: '#2e13d1' }}>{service.servicePrice?.toFixed(2) || '0.00'} ETB</p>
-                              {service.completedAt && (
-                                <p className="text-xs" style={{ color: '#6B7280' }}>{formatDate(service.completedAt)}</p>
-                              )}
-                            </div>
-                          </div>
-                          {service.serviceDescription && (
-                            <p className="text-sm mt-2" style={{ color: '#6B7280' }}>{service.serviceDescription}</p>
-                          )}
-                          {service.assignedNurse && (
-                            <p className="text-sm mt-2" style={{ color: '#6B7280' }}>
-                              <span className="font-medium">Performed by:</span> {service.assignedNurse}
-                            </p>
-                          )}
-                          {service.notes && (
-                            <div className="mt-2 pt-2 border-t" style={{ borderColor: '#E5E7EB' }}>
-                              <p style={{ color: '#6B7280' }} className="text-sm font-semibold">Notes:</p>
-                              <p className="text-sm" style={{ color: '#0C0E0B' }}>{service.notes}</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm" style={{ color: '#6B7280' }}>No nurse services performed in this visit.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Dental Services Tab */}
-              {activeTab === 'dentalServices' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Dental Services Performed</h3>
-                  {selectedVisit.dentalServices && selectedVisit.dentalServices.length > 0 ? (
-                    <div className="space-y-4">
-                      {selectedVisit.dentalServices.map((service) => (
-                        <div key={service.id} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <h4 className="font-medium" style={{ color: '#0C0E0B' }}>{service.serviceName}</h4>
-                              <p className="text-sm" style={{ color: '#6B7280' }}>{service.serviceCode}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-semibold" style={{ color: '#2e13d1' }}>{service.servicePrice?.toFixed(2) || '0.00'} ETB</p>
-                              {service.completedAt && (
-                                <p className="text-xs" style={{ color: '#6B7280' }}>{formatDate(service.completedAt)}</p>
-                              )}
-                            </div>
-                          </div>
-                          {service.serviceDescription && (
-                            <p className="text-sm mt-2" style={{ color: '#6B7280' }}>{service.serviceDescription}</p>
-                          )}
-                          {service.doctor && (
-                            <p className="text-sm mt-2" style={{ color: '#6B7280' }}>
-                              <span className="font-medium">Performed by:</span> Dr. {service.doctor}
-                            </p>
-                          )}
-                          {service.notes && (
-                            <div className="mt-2 pt-2 border-t" style={{ borderColor: '#E5E7EB' }}>
-                              <p style={{ color: '#6B7280' }} className="text-sm font-semibold">Notes:</p>
-                              <p className="text-sm" style={{ color: '#0C0E0B' }}>{service.notes}</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm" style={{ color: '#6B7280' }}>No dental services performed in this visit.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Dental Chart Tab */}
-              {activeTab === 'dentalChart' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Dental Chart</h3>
-                  <DentalChartDisplay
-                    patientId={patientHistory.patient.id}
-                    visitId={selectedVisit.id}
-                  />
-                </div>
-              )}
-
-              {/* Emergency Orders Tab */}
-              {activeTab === 'emergencyOrders' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Emergency Drug Orders</h3>
-                  {selectedVisit.emergencyOrders && selectedVisit.emergencyOrders.length > 0 ? (
-                    <div className="space-y-4">
-                      {selectedVisit.emergencyOrders.map((order) => {
-                        const cleanedName = formatMedicationName(order.serviceName, order.strength);
-                        const instructionLine = formatEmergencyInstruction(order);
-                        return (
-                          <div key={order.id} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <h4 className="font-medium" style={{ color: '#0C0E0B' }}>{cleanedName}</h4>
-                                <p className="text-sm" style={{ color: '#6B7280' }}>{order.serviceCode} {order.strength && `• ${order.strength}`}</p>
-                              </div>
-                              <div className="text-right">
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(order.status)}`}>
-                                  {order.status}
+                        {/* Confirmed Diagnoses */}
+                        {sv.patientDiagnoses && sv.patientDiagnoses.length > 0 && (
+                          <div className="p-4 bg-red-50 border border-red-100 rounded-lg">
+                            <h5 className="font-semibold text-red-900 mb-3 flex items-center gap-2">🦠 Confirmed Diagnoses</h5>
+                            <div className="flex flex-wrap gap-2">
+                              {sv.patientDiagnoses.map((diag, i) => (
+                                <span key={i} className="px-3 py-1.5 bg-white text-red-700 border border-red-200 rounded text-xs font-semibold">
+                                  {diag.disease?.name} ({diag.type})
                                 </span>
-                                <p className="font-semibold mt-1" style={{ color: '#2e13d1' }}>
-                                  ETB {(order.servicePrice * order.quantity).toFixed(2)}
-                                </p>
-                              </div>
+                              ))}
                             </div>
-                            <div className="text-sm p-2 bg-blue-50 border border-blue-100 rounded text-blue-800 font-medium flex items-center gap-2">
-                              <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase">SIG</span>
-                              {instructionLine.instruction}
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-sm mt-3">
-                              <div>
-                                <span style={{ color: '#6B7280' }}>Quantity:</span> <span style={{ color: '#0C0E0B' }}>{order.quantity}</span>
-                              </div>
-                              {order.doctor && (
-                                <div>
-                                  <span style={{ color: '#6B7280' }}>Ordered by:</span> <span style={{ color: '#0C0E0B' }}>Dr. {order.doctor}</span>
+                          </div>
+                        )}
+
+                        {/* Vitals Section */}
+                        {sv.vitals && sv.vitals.length > 0 && (
+                          <div className="p-4 bg-red-50 rounded-lg border border-red-100">
+                            <h5 className="font-semibold text-red-900 mb-3 flex items-center gap-2">❤️ Vital Signs</h5>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              {sv.vitals.map((vital, i) => (
+                                <div key={i} className="p-3 bg-white rounded-lg border border-red-100 text-sm">
+                                  <p className="text-xs text-red-500 mb-1">{new Date(vital.createdAt).toLocaleString()}</p>
+                                  <div className="grid grid-cols-2 gap-1 text-xs">
+                                    <span>BP: {vital.bloodPressure || 'N/A'}</span>
+                                    <span>HR: {vital.heartRate || 'N/A'}</span>
+                                    <span>Temp: {vital.temperature ? vital.temperature + '°C' : 'N/A'}</span>
+                                    <span>Weight: {vital.weight ? vital.weight + 'kg' : 'N/A'}</span>
+                                    {vital.oxygenSaturation && <span>O₂: {vital.oxygenSaturation}%</span>}
+                                  </div>
+                                  <p className="text-xs text-red-400 mt-2">Recorded by: {vital.recordedBy?.fullname || vital.recordedByRole || 'N/A'}</p>
                                 </div>
-                              )}
+                              ))}
                             </div>
-                            {(instructionLine.special || order.notes) && (
-                              <div className="mt-2 pt-2 border-t" style={{ borderColor: '#E5E7EB' }}>
-                                <p style={{ color: '#6B7280' }} className="text-xs font-semibold">Additional Notes:</p>
-                                <p className="text-sm italic" style={{ color: '#374151' }}>{instructionLine.special || order.notes}</p>
-                              </div>
-                            )}
-                            {order.completedAt && (
-                              <div className="mt-2 pt-2 border-t text-xs" style={{ borderColor: '#E5E7EB', color: '#6B7280' }}>
-                                Completed: {formatDate(order.completedAt)}
-                              </div>
-                            )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-sm" style={{ color: '#6B7280' }}>No emergency drug orders for this visit.</p>
-                  )}
-                </div>
-              )}
+                        )}
 
-              {/* Material Needs Tab */}
-              {activeTab === 'materialNeeds' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Material Needs Orders</h3>
-                  {selectedVisit.materialNeeds && selectedVisit.materialNeeds.length > 0 ? (
-                    <div className="space-y-4">
-                      {selectedVisit.materialNeeds.map((order) => (
-                        <div key={order.id} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <h4 className="font-medium" style={{ color: '#0C0E0B' }}>{order.serviceName}</h4>
-                              <p className="text-sm" style={{ color: '#6B7280' }}>{order.serviceCode}</p>
-                            </div>
-                            <div className="text-right">
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(order.status)}`}>
-                                {order.status}
-                              </span>
-                              <p className="font-semibold mt-1" style={{ color: '#2e13d1' }}>
-                                ETB {(order.servicePrice * order.quantity).toFixed(2)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm mt-2">
-                            <div>
-                              <span style={{ color: '#6B7280' }}>Quantity:</span> <span style={{ color: '#0C0E0B' }}>{order.quantity}</span>
-                            </div>
-                            {order.nurse && (
-                              <div>
-                                <span style={{ color: '#6B7280' }}>Ordered by:</span> <span style={{ color: '#0C0E0B' }}>{order.nurse}</span>
-                              </div>
-                            )}
-                          </div>
-                          {order.instructions && (
-                            <div className="mt-2 pt-2 border-t" style={{ borderColor: '#E5E7EB' }}>
-                              <p style={{ color: '#6B7280' }} className="text-sm font-semibold">Instructions:</p>
-                              <p className="text-sm" style={{ color: '#0C0E0B' }}>{order.instructions}</p>
-                            </div>
-                          )}
-                          {order.notes && (
-                            <div className="mt-2 pt-2 border-t" style={{ borderColor: '#E5E7EB' }}>
-                              <p style={{ color: '#6B7280' }} className="text-sm font-semibold">Notes:</p>
-                              <p className="text-sm" style={{ color: '#0C0E0B' }}>{order.notes}</p>
-                            </div>
-                          )}
-                          {order.completedAt && (
-                            <div className="mt-2 pt-2 border-t text-xs" style={{ borderColor: '#E5E7EB', color: '#6B7280' }}>
-                              Completed: {formatDate(order.completedAt)}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm" style={{ color: '#6B7280' }}>No material needs orders for this visit.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Bills & Payments Tab */}
-              {activeTab === 'registers' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Patient Registers</h3>
-                  {selectedVisit.abortionCareRecords?.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="font-medium text-orange-700 flex items-center gap-2 mb-3">
-                        <AlertTriangle className="h-4 w-4" /> Abortion Care Records
-                      </h4>
-                      <div className="space-y-2">
-                        {selectedVisit.abortionCareRecords.map((rec) => (
-                          <div key={rec.id} className="p-3 border border-orange-200 rounded-lg bg-orange-50">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                              <div><span className="text-gray-500">Care Type:</span> <span className="font-medium">{rec.careType === 'SAFE_ABORTION' ? 'Safe Abortion' : 'Post-Abortion Care'}</span></div>
-                              <div><span className="text-gray-500">Procedure:</span> <span className="font-medium">{rec.procedureType || '-'}</span></div>
-                              <div><span className="text-gray-500">Gest. Age:</span> <span className="font-medium">{rec.gestationalAgeWeeks ? `${rec.gestationalAgeWeeks} wks` : '-'}</span></div>
-                              <div><span className="text-gray-500">Outcome:</span> <span className="font-medium">{rec.death ? 'Death' : rec.complications ? 'Complications' : 'OK'}</span></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {selectedVisit.familyPlanningRecords?.length > 0 && (
-                    <div>
-                      <h4 className="font-medium text-pink-700 flex items-center gap-2 mb-3">
-                        <Heart className="h-4 w-4" /> Family Planning Records
-                      </h4>
-                      <div className="space-y-2">
-                        {selectedVisit.familyPlanningRecords.map((rec) => (
-                          <div key={rec.id} className="p-3 border border-pink-200 rounded-lg bg-pink-50">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                              <div><span className="text-gray-500">Acceptor:</span> <span className="font-medium">{rec.isNewAcceptor ? 'New' : rec.isRepeatAcceptor ? 'Repeat' : '-'}</span></div>
-                              <div><span className="text-gray-500">Contraceptive:</span> <span className="font-medium">{rec.contraceptiveProvided || '-'}</span></div>
-                              <div><span className="text-gray-500">HIV Test:</span> <span className="font-medium">{rec.hivTestPerformed ? (rec.hivTestResult === 'POSITIVE' ? 'Positive' : 'Negative') : 'Not done'}</span></div>
-                              <div><span className="text-gray-500">Target Pop.:</span> <span className="font-medium">{rec.targetPopulation || '-'}</span></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {(!selectedVisit.abortionCareRecords?.length && !selectedVisit.familyPlanningRecords?.length) && (
-                    <p style={{ color: '#6B7280' }}>No register records for this visit</p>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'bills' && (
-                <div className="bg-white rounded-lg border shadow-sm p-6" style={{ borderColor: '#E5E7EB' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Bills & Payments</h3>
-                  {selectedVisit.bills && selectedVisit.bills.length > 0 ? (
-                    <div className="space-y-3">
-                      {selectedVisit.bills.map((bill) => (
-                        <div key={bill.id} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <p className="text-sm" style={{ color: '#6B7280' }}>Bill ID: {bill.id.substring(0, 8)}...</p>
-                              <p className="text-lg font-semibold" style={{ color: '#0C0E0B' }}>
-                                ETB {bill.totalAmount?.toFixed(2) || '0.00'}
-                              </p>
-                            </div>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(bill.status)}`}>
-                              {bill.status}
-                            </span>
-                          </div>
-                          {bill.services && bill.services.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-sm mb-1" style={{ color: '#6B7280' }}>Services:</p>
-                              <ul className="text-sm space-y-1">
-                                {bill.services.map((service, idx) => {
-                                  const price = service.price || service.service?.price || 0;
+                        {/* Lab Results Section */}
+                        {(() => {
+                          if (!sv.labTestOrders || sv.labTestOrders.length === 0) return null;
+                          const completedOrders = sv.labTestOrders.filter(o => o.results && o.results.length > 0);
+                          if (completedOrders.length === 0) return null;
+                          const panelGroups = {};
+                          const standaloneOrders = [];
+                          completedOrders.forEach(order => {
+                            const g = order.labTest?.group;
+                            if (g && g.id) {
+                              if (!panelGroups[g.id]) panelGroups[g.id] = { group: g, orders: [], allResults: [], latestDate: null, additionalNotes: '' };
+                              panelGroups[g.id].orders.push(order);
+                              const r = order.results[0];
+                              if (r) {
+                                panelGroups[g.id].allResults.push({ order, result: r });
+                                const d = new Date(r.createdAt);
+                                if (!panelGroups[g.id].latestDate || d > panelGroups[g.id].latestDate) panelGroups[g.id].latestDate = d;
+                                if (r.additionalNotes) panelGroups[g.id].additionalNotes = r.additionalNotes;
+                              }
+                            } else {
+                              standaloneOrders.push(order);
+                            }
+                          });
+                          const panelEntries = Object.values(panelGroups);
+                          return (
+                            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                              <h5 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">🧪 Lab Results</h5>
+                              <div className="space-y-4">
+                                {panelEntries.map(pg => {
+                                  const seenFields = new Set();
+                                  const combinedFields = [];
+                                  const panelImages = [];
+                                  const seenUrls = new Set();
+                                  pg.allResults.forEach(({ order, result }) => {
+                                    const fields = order.labTest?.resultFields || [];
+                                    if (fields.length > 0) {
+                                      fields.forEach(field => {
+                                        const key = field.fieldName || field.id;
+                                        if (!seenFields.has(key)) {
+                                          seenFields.add(key);
+                                          const value = getResultValue(result.results, field);
+                                          combinedFields.push({ field, value, result });
+                                        }
+                                      });
+                                    } else if (result.results && typeof result.results === 'object' && !Array.isArray(result.results)) {
+                                      const testName = order.labTest?.name || 'Unknown';
+                                      if (!seenFields.has(testName)) {
+                                        seenFields.add(testName);
+                                        const entries = Object.entries(result.results).filter(([k]) => k !== '_images');
+                                        const displayVal = entries.length > 0 ? (typeof entries[0][1] === 'object' ? JSON.stringify(entries[0][1]) : String(entries[0][1])) : '';
+                                        if (displayVal) {
+                                          combinedFields.push({
+                                            field: { id: testName, label: testName, fieldName: testName, unit: '', referenceRange: '' },
+                                            value: displayVal,
+                                            result
+                                          });
+                                        }
+                                      }
+                                    }
+                                    if (result.results?._images) {
+                                      (Array.isArray(result.results._images) ? result.results._images : [result.results._images]).forEach(img => {
+                                        const u = img.data || img.url || img;
+                                        if (u && !seenUrls.has(String(u))) { seenUrls.add(String(u)); panelImages.push(img); }
+                                      });
+                                    }
+                                  });
                                   return (
-                                    <li key={idx} className="flex justify-between">
-                                      <span style={{ color: '#0C0E0B' }}>{service.service?.name || 'Unknown Service'}</span>
-                                      <span className="font-medium" style={{ color: '#0C0E0B' }}>
-                                        ETB {Number(price).toFixed(2)}
-                                      </span>
-                                    </li>
+                                    <div key={'pg-'+pg.group.id} className="border border-indigo-200 rounded-lg bg-indigo-50 overflow-hidden">
+                                      <div className="px-4 py-3 bg-indigo-100 border-b border-indigo-200">
+                                        <div className="flex items-center justify-between">
+                                          <div>
+                                            <p className="font-semibold text-indigo-800">{pg.group.name} Panel</p>
+                                            <p className="text-xs text-indigo-600">{pg.orders.length} tests{pg.latestDate ? ' • '+new Date(pg.latestDate).toLocaleDateString() : ''}</p>
+                                          </div>
+                                          <span className="px-2 py-1 text-xs font-semibold text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
+                                        </div>
+                                      </div>
+                                      {combinedFields.filter(f => f.value !== undefined).length > 0 && (
+                                        <div className="p-4">
+                                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            {combinedFields.map(({ field, value }) => {
+                                              if (value === undefined) return null;
+                                              const rc = field.normalRange ? checkValueInNormalRange(value, field.normalRange) : { inRange: true };
+                                              return (
+                                                <div key={field.id} className={'p-3 rounded-lg text-sm border ' + (!rc.inRange ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200')}>
+                                                  <div className="font-semibold text-gray-800 text-xs">{field.label}</div>
+                                                  <div className={'text-base font-bold mt-0.5 ' + (!rc.inRange ? 'text-red-600' : 'text-gray-900')}>
+                                                    {value} {field.unit || ''}
+                                                  </div>
+                                                  {!rc.inRange && rc.message && <div className="text-xs text-red-500 mt-0.5">{rc.message}</div>}
+                                                  {field.referenceRange && <div className="text-xs text-gray-400 mt-0.5">Ref: {field.referenceRange}</div>}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {pg.additionalNotes && (
+                                        <div className="px-4 pb-2">
+                                          <p className="text-xs font-medium text-gray-500">Note: {pg.additionalNotes}</p>
+                                        </div>
+                                      )}
+                                      {panelImages.length > 0 && (
+                                        <div className="px-4 pb-4">
+                                          <p className="text-xs font-medium text-indigo-700 mb-2">Attached Images ({panelImages.length})</p>
+                                          <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                                            {panelImages.map((img, idx) => {
+                                              const url = getImageUrl(img.url || img.data || img);
+                                              return (
+                                                <div key={idx} onClick={() => openImageViewer(panelImages.map(u => ({ fileUrl: u.url || u.fileUrl || u.filePath || (typeof u === 'string' ? u : ''), fileName: u.name || u.fileName || 'Lab Image' })), idx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-indigo-200 hover:border-indigo-400 transition-all">
+                                                  <img src={url} alt="Lab" className="w-full h-16 object-cover" />
+                                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                                                    <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 bg-black/50 px-2 py-1 rounded">View</span>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   );
                                 })}
-                              </ul>
+                                {standaloneOrders.map(order => {
+                                  const r = order.results?.[0];
+                                  if (!r) return null;
+                                  const orderImages = [];
+                                  if (r.results?._images) {
+                                    (Array.isArray(r.results._images) ? r.results._images : [r.results._images]).forEach(img => {
+                                      const u = img.data || img.url || img;
+                                      if (u && !orderImages.some(x => String(x.data || x.url || x) === String(u))) orderImages.push(img);
+                                    });
+                                  }
+                                  const fieldVals = (order.labTest?.resultFields || []).map(f => ({ field: f, value: getResultValue(r.results, f) })).filter(fv => fv.value !== undefined);
+                                  return (
+                                    <div key={order.id || standaloneOrders.indexOf(order)} className="p-3 bg-white rounded-lg border border-blue-100">
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          <p className="font-semibold text-blue-900 text-sm">{order.labTest?.name || 'Lab Test'}</p>
+                                          <p className="text-xs text-gray-500 mt-0.5">{new Date(order.createdAt || r.createdAt).toLocaleString()}</p>
+                                        </div>
+                                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">{order.status || 'COMPLETED'}</span>
+                                      </div>
+                                      {fieldVals.length > 0 && (
+                                        <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                          {fieldVals.map(({ field, value }) => {
+                                            const rc = field.normalRange ? checkValueInNormalRange(value, field.normalRange) : { inRange: true };
+                                            return (
+                                              <div key={field.id} className={'p-2 rounded text-xs border ' + (!rc.inRange ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200')}>
+                                                <span className="font-medium text-gray-700">{field.label}: </span>
+                                                <span className={'font-bold ' + (!rc.inRange ? 'text-red-600' : 'text-gray-900')}>{value} {field.unit || ''}</span>
+                                                {!rc.inRange && rc.message && <span className="text-red-500 ml-1">({rc.message})</span>}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                      {r.additionalNotes && <p className="text-xs text-gray-500 mt-1">Note: {r.additionalNotes}</p>}
+                                      {r.verifiedBy && <p className="text-xs text-blue-600 mt-1">Verified</p>}
+                                      {orderImages.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-gray-200">
+                                          <p className="text-xs font-medium text-gray-500 mb-1">Attached Images:</p>
+                                          <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                                            {orderImages.map((img, idx) => {
+                                              const url = getImageUrl(img.url || img.data || img);
+                                              return (
+                                                <div key={idx} onClick={() => openImageViewer(orderImages.map(u => ({ fileUrl: u.url || u.fileUrl || u.filePath || (typeof u === 'string' ? u : ''), fileName: u.name || u.fileName || 'Lab Image' })), idx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-blue-200 hover:border-blue-400 transition-all">
+                                                  <img src={url} alt="Lab" className="w-full h-12 object-cover" />
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          )}
-                          {bill.paidAt && (
-                            <div className="mt-2 pt-2 border-t text-sm" style={{ borderColor: '#E5E7EB', color: '#6B7280' }}>
-                              Paid on: {formatDate(bill.paidAt)}
+                          );
+                        })()}                        {/* Radiology Section */}
+                        {sv.batchOrders && sv.batchOrders.filter(bo => bo.type === 'RADIOLOGY').length > 0 && (
+                          <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
+                            <h5 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">🩻 Radiology Results</h5>
+                            <div className="space-y-3">
+                              {sv.batchOrders.filter(bo => bo.type === 'RADIOLOGY').map((bo, i) => (
+                                <div key={i}>
+                                  {bo.radiologyResults?.map((result, j) => (
+                                    <div key={j} className="p-3 bg-white rounded-lg border border-purple-100 mb-2">
+                                      <div className="flex justify-between items-start">
+                                        <p className="font-semibold text-purple-900 text-sm">{result.testType?.name || 'Radiology'}</p>
+                                        <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">COMPLETED</span>
+                                      </div>
+                                      {(result.clinicalIndication || result.technique || result.findings || result.conclusion) && (
+                                        <div className="mt-2 space-y-1.5 text-sm">
+                                          {result.clinicalIndication && <p><span className="font-medium text-purple-700">Indication:</span> {result.clinicalIndication}</p>}
+                                          {result.technique && <p><span className="font-medium text-purple-700">Technique:</span> {result.technique}</p>}
+                                          {(result.finding || result.resultText || result.findings) && <p className="whitespace-pre-wrap"><span className="font-medium text-purple-700">Findings:</span> {result.finding || result.resultText || result.findings}</p>}
+                                          {result.conclusion && <p className="whitespace-pre-wrap"><span className="font-medium text-purple-700">Conclusion:</span> {result.conclusion}</p>}
+                                        </div>
+                                      )}
+                                      {result.attachments?.length > 0 && (
+                                        <div className="mt-2 grid grid-cols-3 md:grid-cols-4 gap-2">
+                                          {result.attachments.map((att, aIdx) => (
+                                            <div key={aIdx} onClick={() => openImageViewer(result.attachments, aIdx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-purple-200 hover:border-blue-400 transition-all">
+                                              <img src={getImageUrl(att.fileUrl)} alt={att.fileName || 'Scan'} className="w-full h-20 object-cover" />
+                                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                                                <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 bg-black/50 px-2 py-1 rounded">Click to view</span>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {result.radiologistUser && <p className="text-xs text-purple-600 mt-1">Reported by: Dr. {result.radiologistUser.fullname}</p>}
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
                             </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p style={{ color: '#6B7280' }}>No billing records for this visit</p>
-                  )}
+                          </div>
+                        )}
+
+                        {/* Medications Section */}
+                        {sv.medicationOrders && sv.medicationOrders.length > 0 && (
+                          <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                            <h5 className="font-semibold text-indigo-900 mb-3 flex items-center gap-2">💊 Medications</h5>
+                            <div className="space-y-2">
+                              {sv.medicationOrders.map((med, i) => (
+                                <div key={i} className="p-3 bg-white rounded-lg border border-indigo-100 text-sm">
+                                  <p className="font-semibold text-gray-900">{med.medicationCatalog?.name || med.name}</p>
+                                  <p className="text-xs text-indigo-600">Prescribed by: Dr. {med.doctor?.fullname || 'Unknown'}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Emergency / Material Orders */}
+                        {sv.emergencyDrugOrders && sv.emergencyDrugOrders.length > 0 && (
+                          <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                            <h5 className="font-semibold text-orange-900 mb-3 flex items-center gap-2">🚑 Emergency Orders</h5>
+                            <div className="space-y-2">
+                              {sv.emergencyDrugOrders.map((drug, i) => (
+                                <div key={i} className="p-3 bg-white rounded-lg border border-orange-100 text-sm">
+                                  <p className="font-semibold text-orange-900">{drug.service?.name || 'Item'}</p>
+                                  <p className="text-xs text-orange-600">Ordered by: Dr. {drug.doctor?.fullname || drug.doctor || 'Unknown'}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Nurse Services */}
+                        {sv.nurseServiceAssignments && sv.nurseServiceAssignments.length > 0 && (
+                          <div className="p-4 bg-pink-50 rounded-lg border border-pink-100">
+                            <h5 className="font-semibold text-pink-900 mb-3 flex items-center gap-2">👩‍⚕️ Nurse Services</h5>
+                            <div className="space-y-2">
+                              {sv.nurseServiceAssignments.map((svc, i) => (
+                                <div key={i} className="p-3 bg-white rounded-lg border border-pink-100 text-sm">
+                                  <p className="font-semibold text-pink-900">{svc.service?.name || 'Service'}</p>
+                                  <p className="text-xs text-pink-600">Handled by: {svc.assignedNurse?.fullname || 'Unknown'}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Empty state for summary */}
+                        {(!sv.diagnosisNotes || sv.diagnosisNotes.length === 0) &&
+                          (!sv.vitals || sv.vitals.length === 0) &&
+                          (!sv.labTestOrders || sv.labTestOrders.length === 0) &&
+                          (!sv.medicationOrders || sv.medicationOrders.length === 0) &&
+                          (!sv.emergencyDrugOrders || sv.emergencyDrugOrders.length === 0) &&
+                          (!sv.nurseServiceAssignments || sv.nurseServiceAssignments.length === 0) && (
+                          <div className="text-center py-8 bg-gray-50 rounded-lg">
+                            <p className="text-sm text-gray-500">No data recorded for this visit.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Vitals Tab */}
+                    {visitDetailTab === 'vitals' && (
+                      <div className="bg-white p-6">
+                        <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Vital Signs History</h3>
+                        {sv.vitals && sv.vitals.length > 0 ? (
+                          <div className="space-y-4">
+                            {sv.vitals.map((vital, index) => (
+                              <div key={vital.id} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
+                                <div className="flex justify-between items-start mb-3">
+                                  <h4 className="font-medium" style={{ color: '#0C0E0B' }}>Record #{index + 1}</h4>
+                                  <span className="text-sm" style={{ color: '#6B7280' }}>{new Date(vital.createdAt).toLocaleString()}</span>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div><p style={{ color: '#6B7280' }}>Heart Rate</p><p className="font-semibold" style={{ color: '#0C0E0B' }}>{vital.heartRate} bpm</p></div>
+                                  <div><p style={{ color: '#6B7280' }}>Temperature</p><p className="font-semibold" style={{ color: '#0C0E0B' }}>{vital.temperature}°C</p></div>
+                                  <div><p style={{ color: '#6B7280' }}>Blood Pressure</p><p className="font-semibold" style={{ color: '#0C0E0B' }}>{vital.bloodPressure} mmHg</p></div>
+                                  <div><p style={{ color: '#6B7280' }}>Oxygen Sat</p><p className="font-semibold" style={{ color: '#0C0E0B' }}>{vital.oxygenSaturation}%</p></div>
+                                </div>
+                                {vital.chiefComplaint && (<div className="mt-3 pt-3 border-t" style={{ borderColor: '#E5E7EB' }}><p style={{ color: '#6B7280' }} className="text-sm">Chief Complaint:</p><p className="text-sm" style={{ color: '#0C0E0B' }}>{vital.chiefComplaint}</p></div>)}
+                                {vital.physicalExamination && (<div className="mt-2"><p style={{ color: '#6B7280' }} className="text-sm">Physical Examination:</p><p className="text-sm" style={{ color: '#0C0E0B' }}>{vital.physicalExamination}</p></div>)}
+                                {vital.notes && (<div className="mt-2"><p style={{ color: '#6B7280' }} className="text-sm">Notes:</p><p className="text-sm" style={{ color: '#0C0E0B' }}>{vital.notes}</p></div>)}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (<p style={{ color: '#6B7280' }}>No vital signs recorded for this visit</p>)}
+                      </div>
+                    )}
+
+                    {visitDetailTab === 'labs' && (
+                      <div className="bg-white p-6">
+                        <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Lab Results & Orders</h3>
+                        {(() => {
+                          if (!sv.labTestOrders || sv.labTestOrders.length === 0) {
+                            return <div className="text-center py-12 bg-gray-50 rounded-lg"><p className="text-sm text-gray-500">No lab results or orders for this visit.</p></div>;
+                          }
+                          const completedOrders = sv.labTestOrders.filter(o => o.results && o.results.length > 0);
+                          const panelGroups = {};
+                          const standaloneOrders = [];
+                          completedOrders.forEach(order => {
+                            const g = order.labTest?.group;
+                            if (g && g.id) {
+                              if (!panelGroups[g.id]) panelGroups[g.id] = { group: g, orders: [], allResults: [], latestDate: null, additionalNotes: '' };
+                              panelGroups[g.id].orders.push(order);
+                              const r = order.results[0];
+                              if (r) {
+                                panelGroups[g.id].allResults.push({ order, result: r });
+                                const d = new Date(r.createdAt);
+                                if (!panelGroups[g.id].latestDate || d > panelGroups[g.id].latestDate) panelGroups[g.id].latestDate = d;
+                                if (r.additionalNotes) panelGroups[g.id].additionalNotes = r.additionalNotes;
+                              }
+                            } else {
+                              standaloneOrders.push(order);
+                            }
+                          });
+                          const panelEntries = Object.values(panelGroups);
+                          const pendingOrders = sv.labTestOrders.filter(o => !o.results || o.results.length === 0);
+                          return (<div className="space-y-6">
+                            {panelEntries.map(pg => {
+                              const seenFields = new Set();
+                              const combinedFields = [];
+                              const panelImages = [];
+                              const seenUrls = new Set();
+                              pg.allResults.forEach(({ order, result }) => {
+                                const fields = order.labTest?.resultFields || [];
+                                if (fields.length > 0) {
+                                  fields.forEach(field => {
+                                    const key = field.fieldName || field.id;
+                                    if (!seenFields.has(key)) {
+                                      seenFields.add(key);
+                                      const value = getResultValue(result.results, field);
+                                      combinedFields.push({ field, value, result });
+                                    }
+                                  });
+                                } else if (result.results && typeof result.results === 'object' && !Array.isArray(result.results)) {
+                                  const testName = order.labTest?.name || 'Unknown';
+                                  if (!seenFields.has(testName)) {
+                                    seenFields.add(testName);
+                                    const entries = Object.entries(result.results).filter(([k]) => k !== '_images');
+                                    const displayVal = entries.length > 0 ? (typeof entries[0][1] === 'object' ? JSON.stringify(entries[0][1]) : String(entries[0][1])) : '';
+                                    if (displayVal) {
+                                      combinedFields.push({
+                                        field: { id: testName, label: testName, fieldName: testName, unit: '', referenceRange: '' },
+                                        value: displayVal,
+                                        result
+                                      });
+                                    }
+                                  }
+                                }
+                                if (result.results?._images) {
+                                  (Array.isArray(result.results._images) ? result.results._images : [result.results._images]).forEach(img => {
+                                    const u = img.data || img.url || img;
+                                    if (u && !seenUrls.has(String(u))) { seenUrls.add(String(u)); panelImages.push(img); }
+                                  });
+                                }
+                              });
+                              return (
+                                <div key={'pg-'+pg.group.id} className="border border-indigo-200 rounded-lg bg-indigo-50 overflow-hidden">
+                                  <div className="px-4 py-3 bg-indigo-100 border-b border-indigo-200">
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <p className="font-semibold text-indigo-800">{pg.group.name} Panel</p>
+                                        <p className="text-xs text-indigo-600">{pg.orders.length} tests{pg.latestDate ? ' • '+new Date(pg.latestDate).toLocaleDateString() : ''}</p>
+                                      </div>
+                                      <span className="px-2 py-1 text-xs font-semibold text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
+                                    </div>
+                                  </div>
+                                  {combinedFields.filter(f => f.value !== undefined).length > 0 && (
+                                    <div className="p-4">
+                                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        {combinedFields.map(({ field, value }) => {
+                                          if (value === undefined) return null;
+                                          const rc = field.normalRange ? checkValueInNormalRange(value, field.normalRange) : { inRange: true };
+                                          return (
+                                            <div key={field.id} className={'p-3 rounded-lg text-sm border ' + (!rc.inRange ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200')}>
+                                              <div className="font-semibold text-gray-800 text-xs">{field.label}</div>
+                                              <div className={'text-base font-bold mt-0.5 ' + (!rc.inRange ? 'text-red-600' : 'text-gray-900')}>
+                                                {value} {field.unit || ''}
+                                              </div>
+                                              {!rc.inRange && rc.message && <div className="text-xs text-red-500 mt-0.5">{rc.message}</div>}
+                                              {field.referenceRange && <div className="text-xs text-gray-400 mt-0.5">Ref: {field.referenceRange}</div>}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {pg.additionalNotes && (
+                                    <div className="px-4 pb-2">
+                                      <p className="text-xs font-medium text-gray-500">Note: {pg.additionalNotes}</p>
+                                    </div>
+                                  )}
+                                  {panelImages.length > 0 && (
+                                    <div className="px-4 pb-4">
+                                      <p className="text-xs font-medium text-indigo-700 mb-2">Attached Images ({panelImages.length})</p>
+                                      <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                                        {panelImages.map((img, idx) => {
+                                          const url = getImageUrl(img.url || img.data || img);
+                                          return (
+                                            <div key={idx} onClick={() => openImageViewer(panelImages.map(u => ({ fileUrl: u.url || u.fileUrl || u.filePath || (typeof u === 'string' ? u : ''), fileName: u.name || u.fileName || 'Lab Image' })), idx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-indigo-200 hover:border-indigo-400 transition-all">
+                                              <img src={url} alt="Lab" className="w-full h-20 object-cover" />
+                                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                                                <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 bg-black/50 px-2 py-1 rounded">View</span>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {standaloneOrders.length > 0 && (
+                              <div className="space-y-4">
+                                {standaloneOrders.map(order => {
+                                  const r = order.results?.[0];
+                                  if (!r) return null;
+                                  const orderImages = [];
+                                  if (r.results?._images) {
+                                    (Array.isArray(r.results._images) ? r.results._images : [r.results._images]).forEach(img => {
+                                      const u = img.data || img.url || img;
+                                      if (u && !orderImages.some(x => String(x.data || x.url || x) === String(u))) orderImages.push(img);
+                                    });
+                                  }
+                                  const fieldVals = (order.labTest?.resultFields || []).map(f => ({ field: f, value: getResultValue(r.results, f) })).filter(fv => fv.value !== undefined);
+                                  return (
+                                    <div key={order.id || standaloneOrders.indexOf(order)} className="p-4 border border-blue-100 rounded-lg bg-blue-50">
+                                      <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                          <p className="font-semibold text-blue-900">{order.labTest?.name || 'Lab Test'}</p>
+                                          <p className="text-xs text-blue-600">{new Date(order.createdAt || r.createdAt).toLocaleString()}</p>
+                                        </div>
+                                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">{order.status || 'COMPLETED'}</span>
+                                      </div>
+                                      {fieldVals.length > 0 && (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                          {fieldVals.map(({ field, value }) => {
+                                            const rc = field.normalRange ? checkValueInNormalRange(value, field.normalRange) : { inRange: true };
+                                            return (
+                                              <div key={field.id} className={'p-2 rounded text-xs border ' + (!rc.inRange ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200')}>
+                                                <span className="font-medium text-gray-700">{field.label}: </span>
+                                                <span className={'font-bold ' + (!rc.inRange ? 'text-red-600' : 'text-gray-900')}>{value} {field.unit || ''}</span>
+                                                {!rc.inRange && rc.message && <span className="text-red-500 ml-1">({rc.message})</span>}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                      {r.additionalNotes && <p className="text-xs text-gray-500 mt-2">Note: {r.additionalNotes}</p>}
+                                      {r.verifiedBy && <p className="text-xs text-blue-600 mt-1">Verified</p>}
+                                      {orderImages.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-gray-200">
+                                          <p className="text-xs font-medium text-gray-500 mb-1">Attached Images:</p>
+                                          <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                                            {orderImages.map((img, idx) => {
+                                              const url = getImageUrl(img.url || img.data || img);
+                                              return (
+                                                <div key={idx} onClick={() => openImageViewer(orderImages.map(u => ({ fileUrl: u.url || u.fileUrl || u.filePath || (typeof u === 'string' ? u : ''), fileName: u.name || u.fileName || 'Lab Image' })), idx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-blue-200 hover:border-blue-400 transition-all">
+                                                  <img src={url} alt="Lab" className="w-full h-16 object-cover" />
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {pendingOrders.length > 0 && (
+                              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-sm font-medium text-yellow-800">Pending Orders ({pendingOrders.length})</p>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {pendingOrders.map((o, i) => (
+                                    <span key={i} className="px-2 py-1 text-xs bg-white border border-yellow-200 rounded text-yellow-700">{o.labTest?.name || 'Test'}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>);
+                        })()}
+                      </div>
+                    )}                    {/* Other tabs use getSelectedVisit() which returns visitDetails */}
+
+                    {/* Sub-tab: Diagnosis Notes */}
+                    {visitDetailTab === 'notes' && (
+                      <div className="bg-white p-6">
+                        <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Diagnosis Notes</h3>
+                        {sv.diagnosisNotes && sv.diagnosisNotes.length > 0 ? (
+                          <div className="space-y-4">
+                            {sv.diagnosisNotes.map((note, i) => (
+                              <div key={i} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
+                                <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.notes || note.content || note.text}</p>
+                                <div className="flex gap-4 mt-2 text-xs text-blue-600">
+                                  <span>Dr. {note.doctor?.fullname || 'Unknown'}</span>
+                                  <span>{new Date(note.createdAt).toLocaleString()}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ color: '#6B7280' }}>No diagnosis notes for this visit.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Sub-tab: Medications */}
+                    {visitDetailTab === 'medications' && (
+                      <div className="bg-white p-6">
+                        <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Medications</h3>
+                        {sv.medicationOrders && sv.medicationOrders.length > 0 ? (
+                          <div className="space-y-3">
+                            {sv.medicationOrders.map((med, i) => (
+                              <div key={i} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
+                                <p className="font-semibold text-gray-900">{med.medicationCatalog?.name || med.name}</p>
+                                <p className="text-xs text-indigo-600">Prescribed by: Dr. {med.doctor?.fullname || 'Unknown'}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ color: '#6B7280' }}>No medications prescribed for this visit.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Sub-tab: Radiology */}
+                    {visitDetailTab === 'radiology' && (
+                      <div className="bg-white p-6">
+                        <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Radiology Results</h3>
+                        {sv.batchOrders?.filter(bo => bo.type === 'RADIOLOGY').length > 0 || sv.radiologyOrders?.length > 0 ? (
+                          <div className="space-y-4">
+                            {[...(sv.batchOrders?.filter(bo => bo.type === 'RADIOLOGY') || []), ...(sv.radiologyOrders || [])].map((order, i) => (
+                              <div key={i} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
+                                <p className="font-semibold text-purple-900">{order.service?.name || order.type?.name || 'Radiology'}</p>
+                                {order.radiologyResults?.map((rr, j) => (
+                                  <div key={j} className="mt-2 p-3 bg-white rounded border border-purple-100">
+                                    {rr.findings && <p className="text-sm"><span className="font-medium">Findings:</span> {rr.findings}</p>}
+                                    {rr.conclusion && <p className="text-sm mt-1"><span className="font-medium">Conclusion:</span> {rr.conclusion}</p>}
+                                    {rr.finding && <p className="text-sm"><span className="font-medium">Result:</span> {rr.finding}</p>}
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ color: '#6B7280' }}>No radiology results for this visit.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Sub-tab: Images */}
+                    {visitDetailTab === 'images' && (
+                      <div className="bg-white p-6">
+                        <h3 className="text-lg font-semibold mb-4" style={{ color: '#0C0E0B' }}>Visit Images</h3>
+                        {sv.files?.length > 0 || sv.attachedImages?.length > 0 ? (
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {(sv.files || sv.attachedImages || []).map((file, i) => (
+                              <div key={i} onClick={() => openImageViewer(sv.files || sv.attachedImages, i)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 transition-all">
+                                <img src={getImageUrl(file.fileUrl || file.url)} alt="Visit" className="w-full h-32 object-cover" />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ color: '#6B7280' }}>No images for this visit.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            );
+          })()}
+        <ImageViewer
+          isOpen={imageViewerState.isOpen}
+          onClose={closeImageViewer}
+          images={imageViewerState.images}
+          currentIndex={imageViewerState.currentIndex}
+        />
         </>
       )}
     </div>
