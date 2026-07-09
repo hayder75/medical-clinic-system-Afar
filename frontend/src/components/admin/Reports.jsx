@@ -1642,35 +1642,37 @@ const Reports = ({ revenueTypeOverride }) => {
 
           {revenueType === 'billing' && selectedBillingDay && (
             <div className="card mt-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-gray-100">
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900">
+                  <h4 className="text-lg font-bold text-gray-900">
                     {selectedBillingUser?.userName || 'Billing User'} - {new Date((selectedBillingDayDetails?.summary?.date || selectedBillingDayDetails?.date || selectedBillingDay.date) + 'T00:00:00').toLocaleDateString()}
                   </h4>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Transactions: {selectedBillingDayDetails?.summary?.transactions ?? selectedBillingDay.transactions ?? 0}
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Transactions: <span className="font-semibold text-gray-700">{selectedBillingDayDetails?.summary?.transactions ?? selectedBillingDay.transactions ?? 0}</span>
                   </p>
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="flex flex-wrap items-center gap-3">
                   {selectedBillingDayDetails?.summary?.sameDayRevenue > 0 && (
-                    <div className="text-right bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200">
-                      <p className="text-[10px] font-semibold text-blue-800">☀️ Same-Day Shift Cash</p>
-                      <p className="text-sm font-bold text-blue-700">
+                    <div className="bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 text-left sm:text-right">
+                      <p className="text-[10px] font-semibold text-blue-800 flex items-center gap-1">☀️ Same-Day Shift</p>
+                      <p className="text-sm font-bold text-blue-700 mt-0.5">
                         {formatCurrency(selectedBillingDayDetails.summary.sameDayRevenue)}
                       </p>
                     </div>
                   )}
                   {selectedBillingDayDetails?.summary?.carryOverRevenue > 0 && (
-                    <div className="text-right bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
-                      <p className="text-[10px] font-semibold text-amber-800">🌙 Prev Shift Carry-Over</p>
-                      <p className="text-sm font-bold text-amber-700">
+                    <div className="bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 text-left sm:text-right">
+                      <p className="text-[10px] font-semibold text-amber-800 flex items-center gap-1">🌙 Prev Shift Carry</p>
+                      <p className="text-sm font-bold text-amber-700 mt-0.5">
                         {formatCurrency(selectedBillingDayDetails.summary.carryOverRevenue)}
                       </p>
                     </div>
                   )}
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">Total Register Cash</p>
-                    <p className="text-xl font-bold text-amber-700">{formatCurrency(selectedBillingDayDetails?.summary?.processedAmount ?? selectedBillingDayDetails?.summary?.totalRevenue ?? selectedBillingDay.revenue ?? 0)}</p>
+                  <div className="bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-left sm:text-right">
+                    <p className="text-[10px] font-semibold text-gray-600">Total Register Cash</p>
+                    <p className="text-lg font-bold text-amber-800 mt-0.5">
+                      {formatCurrency(selectedBillingDayDetails?.summary?.processedAmount ?? selectedBillingDayDetails?.summary?.totalRevenue ?? selectedBillingDay.revenue ?? 0)}
+                    </p>
                   </div>
                 </div>
               </div>
