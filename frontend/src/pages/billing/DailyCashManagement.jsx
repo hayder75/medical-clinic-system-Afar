@@ -58,7 +58,14 @@ const EXPENSE_CATEGORIES = [
 ];
 
 const formatCurrency = (amount) => `ETB ${Number(amount || 0).toLocaleString()}`;
-const getLocalDateInputValue = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+const getEATDateString = (dateInput = new Date()) => {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(dateInput));
+  } catch (e) {
+    return new Date(new Date(dateInput).getTime() + (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
+  }
+};
+const getLocalDateInputValue = () => getEATDateString();
 
 const DailyCashManagement = () => {
   const [session, setSession] = useState(null);
@@ -276,7 +283,7 @@ const DailyCashManagement = () => {
                   <input type="date" value={selectedDate || getLocalDateInputValue()} onChange={(e) => setSelectedDate(e.target.value)}
                     className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 hover:bg-white transition-colors" />
                 </div>
-                <span className="text-sm text-gray-500">{selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : new Date(session.sessionDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                <span className="text-sm text-gray-500">{selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : new Date(session.sessionDate).toLocaleDateString('en-US', { timeZone: 'Africa/Addis_Ababa', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                 <span className="text-gray-300">|</span>
                 <User className="h-3.5 w-3.5 text-gray-400" />
                 <span className="text-sm text-gray-500">{session.createdBy?.fullname || 'Cashier'}</span>
@@ -300,9 +307,8 @@ const DailyCashManagement = () => {
       </div>
 
       {/* ───── HERO METRICS ───── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: 'Starting Cash', value: formatCurrency(session.startingCash), gradient: 'from-blue-500 to-blue-600', icon: Banknote },
           { label: 'Total Received', value: formatCurrency(calculatedTotals.totalReceived), gradient: 'from-emerald-500 to-emerald-600', icon: TrendingUp },
           { label: 'Total Expenses', value: formatCurrency(calculatedTotals.totalExpenses), gradient: 'from-rose-500 to-rose-600', icon: MinusCircle },
           { label: 'Current Cash', value: formatCurrency(calculatedTotals.currentCash), gradient: 'from-violet-500 to-violet-600', icon: PiggyBank },
@@ -333,7 +339,7 @@ const DailyCashManagement = () => {
                 Accepted / Processed Services
               </h2>
               <p className="text-sm text-gray-500">
-                {acceptedSummary.date ? new Date(acceptedSummary.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Today'}
+                {acceptedSummary.date ? new Date(acceptedSummary.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Today'}
               </p>
             </div>
             <div className="flex items-center gap-3">
