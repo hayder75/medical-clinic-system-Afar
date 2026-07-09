@@ -33,6 +33,7 @@ const Reports = ({ revenueTypeOverride }) => {
   const [popupDayData, setPopupDayData] = useState(null);
   const [cardProducts, setCardProducts] = useState([]);
   const [showCommissionModal, setShowCommissionModal] = useState(false);
+  const [showCarryOverModal, setShowCarryOverModal] = useState(false);
 
   useEffect(() => {
     api.get('/admin/card-products')
@@ -942,6 +943,58 @@ const Reports = ({ revenueTypeOverride }) => {
     total: 0
   };
 
+  const getGroupedCarryOver = (details) => {
+    if (!details) return [];
+    
+    const carryOverRows = details.filter(r => r.isCarryOver);
+    const groups = {};
+    
+    carryOverRows.forEach(row => {
+      const pName = row.patientName || 'Unknown Patient';
+      if (!groups[pName]) {
+        groups[pName] = {
+          patientName: pName,
+          doctors: new Set(),
+          services: new Set(),
+          visitCreatedAt: row.visitCreatedAt,
+          createdAt: row.createdAt,
+          amount: 0
+        };
+      }
+      
+      const g = groups[pName];
+      g.amount += row.amount || 0;
+      if (row.doctorName) g.doctors.add(row.doctorName);
+      
+      if (row.serviceNames && row.serviceNames.length > 0) {
+        row.serviceNames.forEach(sName => {
+          const lower = sName.toLowerCase();
+          if (lower.includes('card') || lower.includes('registration')) g.services.add('Card Registration');
+          else if (lower.includes('lab') || lower.includes('widal') || lower.includes('weil') || lower.includes('cbc') || lower.includes('urine') || lower.includes('stool')) g.services.add('Lab');
+          else if (lower.includes('radiology') || lower.includes('x-ray') || lower.includes('ultrasound') || lower.includes('usg') || lower.includes('xray')) g.services.add('Radiology');
+          else if (lower.includes('consultation')) g.services.add('Consultation');
+          else if (lower.includes('emergency') || lower.includes('medication') || lower.includes('injection') || lower.includes('drug')) g.services.add('Pharmacy/Emergency');
+          else g.services.add('Service');
+        });
+      } else if (row.categoryBreakdown) {
+        Object.keys(row.categoryBreakdown).forEach(cat => {
+          if (cat.includes('CARD') || cat.includes('REGISTRATION')) g.services.add('Card Registration');
+          else if (cat.includes('LAB')) g.services.add('Lab');
+          else if (cat.includes('RADIOLOGY')) g.services.add('Radiology');
+          else if (cat.includes('CONSULTATION')) g.services.add('Consultation');
+          else if (cat.includes('EMERGENCY')) g.services.add('Pharmacy/Emergency');
+          else g.services.add('Service');
+        });
+      }
+    });
+    
+    return Object.values(groups).map(g => ({
+      ...g,
+      doctors: Array.from(g.doctors).join(', ') || 'N/A',
+      services: Array.from(g.services).join(', ') || 'Service'
+    }));
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1596,6 +1649,119 @@ const Reports = ({ revenueTypeOverride }) => {
             </div>
           )}
 
+          {/* 🌙 CARRY-OVER DETAILS MODAL */}
+          {showCarryOverModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowCarryOverModal(false)}>
+              <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                {/* Modal Header */}
+                <div className="p-6 bg-gradient-to-r from-amber-500 to-amber-600 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-white/20">
+                      <span className="text-xl">🌙</span>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold">Prev Shift Carry-Over Details</h3>
+                      <p className="text-xs text-amber-100 mt-0.5">
+                        Visits created during previous night shift but paid today
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowCarryOverModal(false)}
+                    className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="p-6 overflow-y-auto space-y-4 flex-1 bg-gray-50">
+                  {getGroupedCarryOver(selectedBillingDayDetails?.details).length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <p className="text-base font-semibold">No carry-over details found</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Desktop Table View (hidden on small screens) */}
+                      <div className="hidden md:block overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase border-b border-gray-100">
+                            <tr>
+                              <th className="px-5 py-4">Patient</th>
+                              <th className="px-5 py-4">Doctor</th>
+                              <th className="px-5 py-4">Services</th>
+                              <th className="px-5 py-4">Created (Visit)</th>
+                              <th className="px-5 py-4">Paid (Processed)</th>
+                              <th className="px-5 py-4 text-right">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {getGroupedCarryOver(selectedBillingDayDetails.details).map((row, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="px-5 py-4 font-bold text-gray-800">{row.patientName}</td>
+                                <td className="px-5 py-4 text-gray-600 font-medium">{row.doctors}</td>
+                                <td className="px-5 py-4">
+                                  <span className="inline-flex items-center px-2 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-lg">
+                                    {row.services}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-4 text-xs text-gray-500">{format12HourEAT(row.visitCreatedAt)}</td>
+                                <td className="px-5 py-4 text-xs text-gray-500">{format12HourEAT(row.createdAt)}</td>
+                                <td className="px-5 py-4 text-right font-bold text-amber-700">{formatCurrency(row.amount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile Card View (hidden on desktop) */}
+                      <div className="md:hidden space-y-3">
+                        {getGroupedCarryOver(selectedBillingDayDetails.details).map((row, idx) => (
+                          <div key={idx} className="p-4 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-bold text-gray-800 text-base">{row.patientName}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Doctor: <span className="font-semibold text-gray-700">{row.doctors}</span></p>
+                              </div>
+                              <span className="text-base font-bold text-amber-700">{formatCurrency(row.amount)}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-lg">
+                                {row.services}
+                              </span>
+                            </div>
+                            <div className="pt-2 border-t border-gray-100 flex flex-col gap-1 text-[11px] text-gray-500">
+                              <div className="flex justify-between">
+                                <span>Visit Created:</span>
+                                <span className="font-medium text-gray-700">{format12HourEAT(row.visitCreatedAt)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Paid Processed:</span>
+                                <span className="font-medium text-gray-700">{format12HourEAT(row.createdAt)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-5 bg-white border-t border-gray-100 flex justify-end">
+                  <button
+                    onClick={() => setShowCarryOverModal(false)}
+                    className="px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm font-semibold text-gray-600 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {showCommissionModal && (
             <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={() => setShowCommissionModal(false)}>
               <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
@@ -1661,7 +1827,11 @@ const Reports = ({ revenueTypeOverride }) => {
                     </div>
                   )}
                   {selectedBillingDayDetails?.summary?.carryOverRevenue > 0 && (
-                    <div className="bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 text-left sm:text-right">
+                    <div 
+                      onClick={() => setShowCarryOverModal(true)}
+                      className="bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 text-left sm:text-right cursor-pointer hover:bg-amber-100/70 hover:shadow-sm active:scale-95 transition-all"
+                      title="Click to view details"
+                    >
                       <p className="text-[10px] font-semibold text-amber-800 flex items-center gap-1">🌙 Prev Shift Carry</p>
                       <p className="text-sm font-bold text-amber-700 mt-0.5">
                         {formatCurrency(selectedBillingDayDetails.summary.carryOverRevenue)}
