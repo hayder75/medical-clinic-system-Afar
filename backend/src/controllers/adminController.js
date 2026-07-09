@@ -4168,7 +4168,9 @@ exports.getBillingUserDayDetails = async (req, res) => {
             },
             visit: {
               select: {
-                createdAt: true
+                createdAt: true,
+                suggestedDoctorId: true,
+                suggestedDoctor: { select: { fullname: true } }
               }
             }
           }
@@ -4196,6 +4198,9 @@ exports.getBillingUserDayDetails = async (req, res) => {
         sameDayRevenue += tx.amount || 0;
       }
 
+      const isCarryOver = !!(vDate && new Date(vDate) < dayStart);
+      const doctorName = tx.billing?.visit?.suggestedDoctor?.fullname || null;
+
       return {
         transactionId: tx.id,
         billingId: tx.billingId,
@@ -4204,6 +4209,10 @@ exports.getBillingUserDayDetails = async (req, res) => {
         paymentMethod: tx.paymentMethod,
         amount: tx.amount || 0,
         createdAt: tx.createdAt,
+        isCarryOver,
+        visitCreatedAt: tx.billing?.visit?.createdAt || null,
+        doctorName,
+        serviceNames: (tx.billing?.services || []).map(s => s.service?.name).filter(Boolean),
         walkInFlags: walkInFlags || { labWalkIn: false, radiologyWalkIn: false, nurseWalkIn: false },
         categoryBreakdown: allocation
       };

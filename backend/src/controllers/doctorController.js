@@ -4779,10 +4779,16 @@ exports.createDoctorServiceOrder = async (req, res) => {
         ? `${billing.notes}; Doctor ordered: ${serviceNames.join(', ')}`
         : `Doctor ordered: ${serviceNames.join(', ')}`;
 
+      const allServices = await tx.billingService.findMany({
+        where: { billingId: billing.id },
+        select: { totalPrice: true }
+      });
+      const totalFromServices = allServices.reduce((s, bs) => s + bs.totalPrice, 0);
+
       const finalBilling = await tx.billing.update({
         where: { id: billing.id },
         data: {
-          totalAmount: { increment: totalIncrease },
+          totalAmount: totalFromServices,
           notes: updatedNotes.substring(0, 500)
         }
       });
@@ -8144,7 +8150,7 @@ exports.getVisitDetails = async (req, res) => {
         },
         labTestOrders: {
           include: {
-            labTest: true,
+            labTest: { include: { group: true, resultFields: true } },
             results: {
               include: { test: true, attachments: { select: { id: true, fileUrl: true, fileName: true } } },
               orderBy: { createdAt: 'desc' },
@@ -8178,27 +8184,12 @@ exports.getVisitDetails = async (req, res) => {
 
     if (!visit) return res.status(404).json({ error: 'Visit not found' });
 
-    // Strip _images from lab JSON results to keep payload small
-    const cleanResults = (results) => {
-      if (!results) return results;
-      if (Array.isArray(results)) return results.map(r => cleanResults(r));
-      if (typeof results === 'object') {
-        const { _images, ...rest } = results;
-        const cleaned = {};
-        for (const [k, v] of Object.entries(rest)) {
-          cleaned[k] = cleanResults(v);
-        }
-        return cleaned;
-      }
-      return results;
-    };
-
-    // Strip images from labTestOrder results
+    // Pass through labTestOrders with _images intact for frontend display
     const labTestOrders = (visit.labTestOrders || []).map(o => ({
       ...o,
       results: (o.results || []).map(r => ({
         ...r,
-        results: cleanResults(r.results),
+        results: r.results || {},
       })),
     }));
 

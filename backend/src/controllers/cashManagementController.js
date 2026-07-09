@@ -2,6 +2,7 @@ const prisma = require('../config/database');
 const z = require('zod');
 const { getDefaultClinicName } = require('../utils/pdfGenerator');
 const { buildCardBucketEntries, extractSlugFromServiceCode } = require('../utils/cardBucketHelper');
+const { getEthiopianDateRange } = require('../utils/dateUtils');
 
 // Validation schemas
 const createSessionSchema = z.object({
@@ -153,12 +154,14 @@ const getAcceptedServiceKey = (service, walkInFlags = null) => {
 exports.getCurrentSession = async (req, res) => {
   try {
     const userId = req.user.id;
+    const { date } = req.query;
     
-    // Check if there's an active session for today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const { startOfDayUTC, endOfDayUTC, dateStr } = getEthiopianDateRange(date || new Date());
+    const today = startOfDayUTC;
+    const tomorrow = endOfDayUTC;
+    
+    const todayEAT = getEthiopianDateRange(new Date()).dateStr;
+    const isPastDate = !!(date && date < todayEAT);
     
     let session = await prisma.dailyCashSession.findFirst({
       where: {
@@ -167,7 +170,7 @@ exports.getCurrentSession = async (req, res) => {
           gte: today,
           lt: tomorrow
         },
-        status: 'ACTIVE'
+        ...(isPastDate ? {} : { status: 'ACTIVE' })
       },
       include: {
         transactions: {
@@ -196,6 +199,9 @@ exports.getCurrentSession = async (req, res) => {
     
     // If no active session exists, create one
     if (!session) {
+      if (isPastDate) {
+        return res.json({ session: null });
+      }
       session = await prisma.dailyCashSession.create({
         data: {
           createdById: userId,
@@ -252,17 +258,14 @@ exports.getCurrentSession = async (req, res) => {
     // Get total from today's Account Deposits (advance payments only)
     // Note: INSURANCE and CHARITY payments are NOT counted - they have their own tracking pages
     // Note: CREDIT deposits are NOT counted - they're debt clearance, not new money received
-    const todayForAccounts = new Date();
-    todayForAccounts.setHours(0, 0, 0, 0);
-    const tomorrowForAccounts = new Date(todayForAccounts);
-    tomorrowForAccounts.setDate(tomorrowForAccounts.getDate() + 1);
+    const { startOfDayUTC: acctStart, endOfDayUTC: acctEnd } = getEthiopianDateRange(date || new Date());
     
     const todayAccountDeposits = await prisma.accountDeposit.findMany({
       where: {
         depositedById: userId,
         createdAt: {
-          gte: todayForAccounts,
-          lt: tomorrowForAccounts
+          gte: acctStart,
+          lt: acctEnd
         }
       },
       include: {
@@ -328,18 +331,15 @@ exports.addTransaction = async (req, res) => {
     const validatedData = addTransactionSchema.parse(req.body);
     const userId = req.user.id;
     
-    // Get current session
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Get current session (EAT timezone)
+    const { startOfDayUTC: sessStart, endOfDayUTC: sessEnd } = getEthiopianDateRange(new Date());
     
     let session = await prisma.dailyCashSession.findFirst({
       where: {
         createdById: userId,
         sessionDate: {
-          gte: today,
-          lt: tomorrow
+          gte: sessStart,
+          lt: sessEnd
         },
         status: 'ACTIVE'
       }
@@ -387,18 +387,15 @@ exports.addBankDeposit = async (req, res) => {
     const validatedData = addBankDepositSchema.parse(req.body);
     const userId = req.user.id;
     
-    // Get current session
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Get current session (EAT timezone)
+    const { startOfDayUTC: sessStart, endOfDayUTC: sessEnd } = getEthiopianDateRange(new Date());
     
     let session = await prisma.dailyCashSession.findFirst({
       where: {
         createdById: userId,
         sessionDate: {
-          gte: today,
-          lt: tomorrow
+          gte: sessStart,
+          lt: sessEnd
         },
         status: 'ACTIVE'
       }
@@ -444,18 +441,15 @@ exports.addExpense = async (req, res) => {
     const validatedData = addExpenseSchema.parse(req.body);
     const userId = req.user.id;
     
-    // Get current session
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Get current session (EAT timezone)
+    const { startOfDayUTC: sessStart, endOfDayUTC: sessEnd } = getEthiopianDateRange(new Date());
     
     let session = await prisma.dailyCashSession.findFirst({
       where: {
         createdById: userId,
         sessionDate: {
-          gte: today,
-          lt: tomorrow
+          gte: sessStart,
+          lt: sessEnd
         },
         status: 'ACTIVE'
       }
@@ -956,10 +950,7 @@ exports.getPatientReceipts = async (req, res) => {
     const { date, search, searchType } = req.query;
     
     // Get date range for filtering
-    const targetDate = date ? new Date(date) : new Date();
-    targetDate.setHours(0, 0, 0, 0);
-    const nextDay = new Date(targetDate);
-    nextDay.setDate(nextDay.getDate() + 1);
+    const { startOfDayUTC: targetDate, endOfDayUTC: nextDay } = getEthiopianDateRange(date || new Date());
     
     // Build where clause for patient search
     let patientWhere = {};
