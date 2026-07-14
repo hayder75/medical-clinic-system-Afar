@@ -102,7 +102,12 @@ const DailyCashManagement = () => {
   }, [searchQuery, searchType]);
 
   const fetchCurrentSession = async () => {
-    try { setLoading(true); const r = await api.get('/cash-management/current-session'); setSession(r.data.session); }
+    try {
+      setLoading(true);
+      const date = selectedDate || '';
+      const r = await api.get(`/cash-management/current-session${date ? `?date=${date}` : ''}`);
+      setSession(r.data.session);
+    }
     catch (e) { console.error(e); toast.error('Failed to fetch session'); }
     finally { setLoading(false); }
   };

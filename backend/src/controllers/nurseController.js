@@ -477,53 +477,42 @@ exports.assignDoctor = async (req, res) => {
       return res.status(404).json({ error: 'Consultation service not found. Please add consultation service to the catalog.' });
     }
 
-    // Only create billing if doctor's consultation is NOT waived
+    // Active Card Visit: Always create a 0 ETB billing consultation record to route through billing queue
     let billing = null;
-    if (!doctor.waiveConsultationFee) {
-      const consultationPrice = doctor.consultationFee || consultationService.price;
-      const emergencyVisit = await prisma.visit.findUnique({ where: { id: visitId } });
+    const emergencyVisit = await prisma.visit.findUnique({ where: { id: visitId } });
 
-      if (emergencyVisit.isEmergency) {
-        const { getOrCreateEmergencyBilling } = require('./emergencyController');
-        const emergencyBilling = await getOrCreateEmergencyBilling(visitId);
-        await prisma.billingService.create({
-          data: { billingId: emergencyBilling.id, serviceId: consultationService.id, quantity: 1, unitPrice: consultationPrice, totalPrice: consultationPrice }
-        });
-        await prisma.billing.update({ where: { id: emergencyBilling.id }, data: { totalAmount: { increment: consultationPrice } } });
-        billing = emergencyBilling;
-      } else {
-        billing = await prisma.billing.create({
-          data: { patientId, visitId, totalAmount: consultationPrice, status: 'PENDING', notes: 'Doctor consultation fee' }
-        });
-        await prisma.billingService.create({
-          data: { billingId: billing.id, serviceId: consultationService.id, quantity: 1, unitPrice: consultationPrice, totalPrice: consultationPrice }
-        });
-      }
+    if (emergencyVisit.isEmergency) {
+      const { getOrCreateEmergencyBilling } = require('./emergencyController');
+      const emergencyBilling = await getOrCreateEmergencyBilling(visitId);
+      await prisma.billingService.create({
+        data: { billingId: emergencyBilling.id, serviceId: consultationService.id, quantity: 1, unitPrice: 0, totalPrice: 0 }
+      });
+      // Increment emergency billing total by 0
+      await prisma.billing.update({ where: { id: emergencyBilling.id }, data: { totalAmount: { increment: 0 } } });
+      billing = emergencyBilling;
     } else {
-      console.log('🔍 assignDoctor: Doctor has waived consultation fee - skipping billing');
+      billing = await prisma.billing.create({
+        data: { 
+          patientId, 
+          visitId, 
+          totalAmount: 0, 
+          status: 'PENDING', 
+          notes: `Doctor consultation fee (Active Card — ${visit.patient?.cardType || 'GENERAL'})` 
+        }
+      });
+      await prisma.billingService.create({
+        data: { billingId: billing.id, serviceId: consultationService.id, quantity: 1, unitPrice: 0, totalPrice: 0 }
+      });
     }
 
-    // Update visit status based on waived consultation
+    // Active Card Visit: Patient must go to billing first to process 0 ETB bill
     let finalStatus = visit.status;
-    if (doctor.waiveConsultationFee) {
-      // Doctor waived consultation → send directly to doctor queue
-      // If patient was in WAITING_FOR_NURSE_SERVICE, they can still go to doctor
-      finalStatus = 'WAITING_FOR_DOCTOR';
-      console.log('🔍 assignDoctor: Doctor waived consultation → WAITING_FOR_DOCTOR (from status:', visit.status, ')');
-      console.log('🔍 assignDoctor: Patient will appear in doctor queue immediately');
+    if (visit.status === 'WAITING_FOR_NURSE_SERVICE') {
+      finalStatus = 'WAITING_FOR_NURSE_SERVICE';
     } else {
-      // Doctor NOT waived → need billing
-      // If patient was in WAITING_FOR_NURSE_SERVICE, keep them there until billing is done
-      if (visit.status === 'WAITING_FOR_NURSE_SERVICE') {
-        finalStatus = 'WAITING_FOR_NURSE_SERVICE'; // Keep in nurse service until billing
-        console.log('🔍 assignDoctor: Doctor NOT waived, patient in WAITING_FOR_NURSE_SERVICE → keeping status');
-        console.log('🔍 assignDoctor: Patient needs to pay consultation fee before appearing in doctor queue');
-      } else {
-        finalStatus = 'TRIAGED'; // For billing
-        console.log('🔍 assignDoctor: Doctor NOT waived → TRIAGED (for billing)');
-        console.log('🔍 assignDoctor: Patient needs to pay consultation fee before appearing in doctor queue');
-      }
+      finalStatus = 'TRIAGED';
     }
+    console.log('🔍 assignDoctor: Active Card 0 ETB billing created → status:', finalStatus);
 
     await prisma.visit.update({
       where: { id: visitId },
@@ -2146,32 +2135,25 @@ exports.assignCombined = async (req, res) => {
         });
         assignments.push(doctorAssignment);
 
-        // Only add consultation fee if doctor's consultation is NOT waived
-        if (!doctor.waiveConsultationFee) {
-          // Find consultation service
-          const consultationService = await tx.service.findFirst({
-            where: {
-              category: 'CONSULTATION',
-              name: { contains: 'Consultation', mode: 'insensitive' }
-            }
-          });
-
-          if (!consultationService) {
-            throw new Error('Consultation service not found. Please add consultation service to the catalog.');
+        // Find consultation service
+        const consultationService = await tx.service.findFirst({
+          where: {
+            category: 'CONSULTATION',
+            name: { contains: 'Consultation', mode: 'insensitive' }
           }
+        });
 
-          // Add consultation to billing services
-          const consultationPrice = doctor.consultationFee || consultationService.price;
-          billingServices.push({
-            serviceId: consultationService.id,
-            quantity: 1,
-            unitPrice: consultationPrice,
-            totalPrice: consultationPrice
-          });
-          totalAmount += consultationPrice;
-        } else {
-          // Doctor has waived consultation fee - skipping billing
+        if (!consultationService) {
+          throw new Error('Consultation service not found. Please add consultation service to the catalog.');
         }
+
+        // Active Card Visit: Always add consultation to billing services at 0 price
+        billingServices.push({
+          serviceId: consultationService.id,
+          quantity: 1,
+          unitPrice: 0,
+          totalPrice: 0
+        });
       }
 
       // Check if this is an emergency visit
@@ -2181,8 +2163,8 @@ exports.assignCombined = async (req, res) => {
 
       let billing = null;
 
-      // Create billing only if there's an amount to bill
-      if (totalAmount > 0) {
+      // Create billing if there's an amount to bill or if we have 0-price consultation services
+      if (totalAmount > 0 || billingServices.length > 0) {
 
         // Create billing for non-waived services
         if (visit.isEmergency) {
@@ -2311,35 +2293,19 @@ exports.assignCombined = async (req, res) => {
         }
       }
 
-      // Determine final visit status based on waived services and doctor waiver
+      // Determine final visit status based on whether we created a billing
       let finalStatus = visit.status; // Default: keep current status
 
-      // Check if all services are waived
-      const allServicesWaived = totalAmount === 0;
-
-      // Get doctor info if assigned
-      const doctorAssignment = assignments.find(a => a.doctor);
-      const doctorHasWaiver = doctorAssignment?.doctor?.waiveConsultationFee || false;
-
-      console.log('🔍 assignCombined: Determining final status - totalAmount:', totalAmount, 'allServicesWaived:', allServicesWaived, 'doctorId:', doctorId, 'doctorHasWaiver:', doctorHasWaiver);
-
-      if (allServicesWaived && !doctorId) {
-        // All services waived + no doctor → send to nurse daily tasks
-        finalStatus = 'WAITING_FOR_NURSE_SERVICE';
-        console.log('🔍 assignCombined: Scenario 1 - All services waived, no doctor → WAITING_FOR_NURSE_SERVICE');
-      } else if (allServicesWaived && doctorId && doctorHasWaiver) {
-        // All services waived + doctor assigned + doctor waived → send to doctor queue AND nurse daily tasks
-        finalStatus = 'WAITING_FOR_DOCTOR';
-        console.log('🔍 assignCombined: Scenario 2A - All services waived + doctor waived → WAITING_FOR_DOCTOR');
-        console.log('🔍 assignCombined: Patient will appear in doctor queue AND nurse daily tasks');
-      } else if (allServicesWaived && doctorId && !doctorHasWaiver) {
-        // All services waived + doctor assigned + doctor NOT waived → need billing for consultation
-        finalStatus = 'TRIAGED';
-        console.log('🔍 assignCombined: Scenario 2B - All services waived + doctor NOT waived → TRIAGED (for billing)');
+      if (billingServices.length > 0) {
+        if (visit.status === 'WAITING_FOR_NURSE_SERVICE') {
+          finalStatus = 'WAITING_FOR_NURSE_SERVICE'; // Keep in nurse service until billing is done
+        } else {
+          finalStatus = 'TRIAGED'; // Route to billing queue
+        }
+        console.log('🔍 assignCombined: Billing services exist → routing to billing desk first, status:', finalStatus);
       } else {
-        // Some services NOT waived → need billing
-        finalStatus = 'TRIAGED';
-        console.log('🔍 assignCombined: Scenario 3 - Some services NOT waived → TRIAGED (for billing)');
+        // No services at all, keep current status
+        console.log('🔍 assignCombined: No billing services → keeping status:', finalStatus);
       }
 
       // Update visit status and link doctor assignment

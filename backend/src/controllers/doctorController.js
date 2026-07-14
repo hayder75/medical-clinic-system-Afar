@@ -530,11 +530,18 @@ exports.getQueue = async (req, res) => {
         bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
       );
 
+      // Check if there is a pending consultation bill (needs processing)
+      const hasPendingConsultation = visit.bills && visit.bills.some(bill =>
+        bill.status === 'PENDING' &&
+        bill.services &&
+        bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
+      );
+
       // Check if doctor has waived consultation fee
       const doctorHasWaiver = visit.assignment?.doctor?.waiveConsultationFee || false;
 
-      // Include if: paid consultation OR in doctor queue OR doctor has waiver
-      const shouldInclude = hasPaidConsultation || isInDoctorQueue || doctorHasWaiver;
+      // Include if: paid consultation OR in doctor queue OR (doctor has waiver AND no pending consultation bill)
+      const shouldInclude = hasPaidConsultation || isInDoctorQueue || (doctorHasWaiver && !hasPendingConsultation);
 
       if (!shouldInclude) {
         console.log(`🔍 Visit ${visit.id} (status: ${visit.status}, assignmentId: ${visit.assignmentId}) EXCLUDED - no paid consultation (${hasPaidConsultation}), not IN_DOCTOR_QUEUE (${isInDoctorQueue}), and no waiver (${doctorHasWaiver})`);
@@ -1740,6 +1747,13 @@ exports.getUnifiedQueue = async (req, res) => {
           bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
         );
 
+        // Check if there is a pending consultation bill (needs processing)
+        const hasPendingConsultation = visit.bills && visit.bills.some(bill =>
+          bill.status === 'PENDING' &&
+          bill.services &&
+          bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
+        );
+
         // Check if doctor has waived consultation
         // Handle case where assignment might be null
         let doctorHasWaiver = false;
@@ -1749,7 +1763,7 @@ exports.getUnifiedQueue = async (req, res) => {
 
         // If patient has WAITING_FOR_NURSE_SERVICE status and doctor has waiver, include them
         // This handles the case where services were assigned first, then doctor was assigned
-        if (visit.status === 'WAITING_FOR_NURSE_SERVICE' && doctorHasWaiver) {
+        if (visit.status === 'WAITING_FOR_NURSE_SERVICE' && doctorHasWaiver && !hasPendingConsultation) {
           console.log(`🔍 Including visit ${visit.id} with WAITING_FOR_NURSE_SERVICE status - doctor has waiver`);
           return true;
         }
@@ -1761,9 +1775,9 @@ exports.getUnifiedQueue = async (req, res) => {
           return true;
         }
 
-        const included = hasPaidConsultation || doctorHasWaiver;
+        const included = hasPaidConsultation || (doctorHasWaiver && !hasPendingConsultation);
         if (!included) {
-          console.log(`🔍 Visit ${visit.id} (status: ${visit.status}) EXCLUDED - no paid consultation (${hasPaidConsultation}) and no waiver (${doctorHasWaiver})`);
+          console.log(`🔍 Visit ${visit.id} (status: ${visit.status}) EXCLUDED - no paid consultation (${hasPaidConsultation}) and no waiver (${doctorHasWaiver}) or pending bill exists`);
         } else {
           console.log(`🔍 Visit ${visit.id} (status: ${visit.status}) INCLUDED - hasPaidConsultation: ${hasPaidConsultation}, doctorHasWaiver: ${doctorHasWaiver}`);
         }
@@ -2487,8 +2501,13 @@ exports.getUnifiedQueue = async (req, res) => {
         bill.services &&
         bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
       );
+      const hasPendingConsultation = visit.bills && visit.bills.some(bill =>
+        bill.status === 'PENDING' &&
+        bill.services &&
+        bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
+      );
       const doctorHasWaiver = visit.assignment?.doctor?.waiveConsultationFee || false;
-      return hasPaidConsultation || doctorHasWaiver;
+      return hasPaidConsultation || (doctorHasWaiver && !hasPendingConsultation);
     });
 
     // Main queue: qualifying visits NOT in sent or returned statuses
@@ -2776,10 +2795,10 @@ exports.getVisitDetails = async (req, res) => {
             include: {
               resultFields: {
                 orderBy: { displayOrder: 'asc' }
-                },
-                group: true
-              }
-            },
+              },
+              group: true
+            }
+          },
           results: {
             include: {
               attachments: true
@@ -4779,16 +4798,10 @@ exports.createDoctorServiceOrder = async (req, res) => {
         ? `${billing.notes}; Doctor ordered: ${serviceNames.join(', ')}`
         : `Doctor ordered: ${serviceNames.join(', ')}`;
 
-      const allServices = await tx.billingService.findMany({
-        where: { billingId: billing.id },
-        select: { totalPrice: true }
-      });
-      const totalFromServices = allServices.reduce((s, bs) => s + bs.totalPrice, 0);
-
       const finalBilling = await tx.billing.update({
         where: { id: billing.id },
         data: {
-          totalAmount: totalFromServices,
+          totalAmount: { increment: totalIncrease },
           notes: updatedNotes.substring(0, 500)
         }
       });
@@ -4977,8 +4990,7 @@ exports.getPatientHistory = async (req, res) => {
               include: {
                 resultFields: {
                   orderBy: { displayOrder: 'asc' }
-                },
-                group: true
+                }
               }
             },
             results: {
@@ -8072,7 +8084,6 @@ exports.getExternalPrescriptions = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch external prescriptions' });
   }
 };
-
 // ── All Patients Page: lightweight summary (patient + visit list, no heavy includes) ──
 exports.getPatientHistorySummary = async (req, res) => {
   try {

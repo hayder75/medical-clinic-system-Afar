@@ -3045,71 +3045,144 @@ const PatientConsultationPage = () => {
                                   <h4 className="font-bold text-lg flex items-center gap-2 text-blue-800">
                                     🧪 Lab Results & Orders
                                   </h4>
-                                  {selectedVisit.labResults && selectedVisit.labResults.length > 0 ? (
-                                    <div className="space-y-4">
-                                      {selectedVisit.labResults.map((result, idx) => (
-                                        <div key={idx} className="p-4 border border-blue-100 rounded-lg shadow-sm bg-blue-50">
-                                          <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                              <p className="font-semibold text-blue-900">{result.testType?.name || 'Lab Test'}</p>
-                                              <p className="text-xs text-blue-600">{new Date(result.createdAt).toLocaleString()}</p>
-                                            </div>
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${result.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                              {result.status}
-                                            </span>
-                                          </div>
+                                  {(() => {
+                                    const allLabResults = [
+                                      ...(selectedVisit.labResults || []),
+                                      ...(selectedVisit.labOrders || []),
+                                      ...(selectedVisit.labTestOrders || [])
+                                    ].filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
 
-                                          {result.resultText && (
-                                            <div className="mt-2 text-sm bg-white p-2 rounded border border-blue-50 text-gray-700">
-                                              <span className="font-medium">Note/Result:</span> {result.resultText}
-                                            </div>
-                                          )}
+                                    if (allLabResults.length === 0) {
+                                      return <p className="text-gray-500">No lab results available for this visit</p>;
+                                    }
 
-                                          {result.detailedResults && result.detailedResults.length > 0 && (
-                                            <div className="mt-3 bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                                                <thead className="bg-gray-50">
-                                                  <tr>
-                                                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Test</th>
-                                                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Result</th>
-                                                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Unit</th>
-                                                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Ref Range</th>
-                                                  </tr>
-                                                </thead>
-                                                <tbody className="bg-white divide-y divide-gray-200">
-                                                  {result.detailedResults.map((dr, di) => (
-                                                    <tr key={di}>
-                                                      <td className="px-3 py-2 text-gray-900 font-medium">{dr.testName}</td>
-                                                      <td className="px-3 py-2 text-gray-700 font-bold">{dr.result}</td>
-                                                      <td className="px-3 py-2 text-gray-500">{dr.unit}</td>
-                                                      <td className="px-3 py-2 text-gray-500">{dr.referenceRange}</td>
-                                                    </tr>
-                                                  ))}
-                                                </tbody>
-                                              </table>
+                                    const getStatusColor = (status) => {
+                                      switch (status) {
+                                        case 'COMPLETED':
+                                        case 'DISPENSED':
+                                        case 'PAID':
+                                          return 'bg-green-100 text-green-800';
+                                        case 'PENDING':
+                                        case 'QUEUED':
+                                          return 'bg-yellow-100 text-yellow-800';
+                                        case 'CANCELLED':
+                                          return 'bg-red-100 text-red-800';
+                                        default:
+                                          return 'bg-gray-100 text-gray-800';
+                                      }
+                                    };
+
+                                    return (
+                                      <div className="space-y-4">
+                                        {allLabResults.map((result, idx) => {
+                                          const testType = result.testType || result.type || result.labTest || {};
+                                          const testName = testType.name || result.serviceName || result.labTest?.name || 'Lab Test';
+                                          const status = result.status || 'PENDING';
+
+                                          // Extract lab images
+                                          const labImages = [
+                                            ...(result.attachments || []),
+                                            ...(result.results?._images || result.results?.[0]?.results?._images || []).map(img => ({
+                                              fileUrl: img.url || img.data || img,
+                                              fileName: img.name || 'Lab Image'
+                                            }))
+                                          ];
+
+                                          return (
+                                            <div key={result.id || idx} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
+                                              <div className="flex justify-between items-start mb-3">
+                                                <h4 className="font-semibold text-blue-900 text-base">
+                                                  {testName}
+                                                </h4>
+                                                <span className={`px-2.5 py-0.5 rounded text-xs font-semibold ${getStatusColor(status)}`}>
+                                                  {status}
+                                                </span>
+                                              </div>
+
+                                              {result.detailedResults && result.detailedResults.length > 0 ? (
+                                                <div className="mt-3 overflow-x-auto bg-white rounded-lg border border-gray-200">
+                                                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                                    <thead className="bg-gray-50">
+                                                      <tr>
+                                                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase">Test</th>
+                                                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase">Result</th>
+                                                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase">Unit</th>
+                                                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase">Ref Range</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white divide-y divide-gray-200">
+                                                      {result.detailedResults.map((dr, di) => (
+                                                        <tr key={di}>
+                                                          <td className="px-3 py-2 text-gray-900 font-medium">{dr.testName}</td>
+                                                          <td className="px-3 py-2 text-gray-700 font-bold">{dr.result}</td>
+                                                          <td className="px-3 py-2 text-gray-500">{dr.unit || '-'}</td>
+                                                          <td className="px-3 py-2 text-gray-500">{dr.referenceRange || 'N/A'}</td>
+                                                        </tr>
+                                                      ))}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              ) : result.resultText ? (
+                                                <div className="mt-3 p-3 rounded text-sm" style={{ backgroundColor: '#FFF3CD', color: '#856404' }}>
+                                                  <p className="font-semibold">Result Summary:</p>
+                                                  <p className="mt-1">{result.resultText}</p>
+                                                </div>
+                                              ) : (
+                                                <div className="mt-3 p-3 rounded text-sm bg-gray-50 text-gray-500 border border-dashed border-gray-200">
+                                                  <p className="italic">📋 Lab test was ordered but detailed results have not been entered yet.</p>
+                                                </div>
+                                              )}
+
+                                              {result.additionalNotes && (
+                                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                                  <p style={{ color: '#6B7280' }} className="text-xs font-semibold uppercase">Additional Notes:</p>
+                                                  <p className="text-sm mt-1" style={{ color: '#0C0E0B' }}>{result.additionalNotes}</p>
+                                                </div>
+                                              )}
+
+                                              {/* Lab Attachments / Images */}
+                                              {labImages.length > 0 && (
+                                                <div className="mt-4 pt-3 border-t border-gray-200">
+                                                  <p style={{ color: '#6B7280' }} className="text-xs font-semibold uppercase mb-2">Attached Images ({labImages.length}):</p>
+                                                  <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                                                    {labImages.map((img, idx) => (
+                                                      <div
+                                                        key={idx}
+                                                        onClick={() => openImageViewer(labImages, idx)}
+                                                        className="relative group cursor-pointer rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 transition-all bg-white"
+                                                      >
+                                                        <img
+                                                          src={getImageUrl(img.fileUrl || img.filePath || img.path)}
+                                                          alt={img.fileName || `Lab File ${idx + 1}`}
+                                                          className="w-full h-24 object-cover"
+                                                          onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                          }}
+                                                        />
+                                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                                                          <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 bg-black/50 px-2 py-1 rounded">Click to view</span>
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              <div className="mt-3 pt-3 border-t border-gray-200 text-xs flex justify-between text-gray-500">
+                                                <span>Ordered: {result.createdAt ? new Date(result.createdAt).toLocaleString() : 'N/A'}</span>
+                                                {result.verifiedByUser && (
+                                                  <span>Verified by: {result.verifiedByUser.fullname} on {new Date(result.verifiedAt).toLocaleString()}</span>
+                                                )}
+                                                {!result.verifiedByUser && result.verifiedBy && (
+                                                  <span>Verified by: {result.verifiedBy}</span>
+                                                )}
+                                              </div>
                                             </div>
-                                          )}
-                                          {result.processedByUser && (
-                                            <div className="mt-2 text-xs text-blue-700">
-                                              Processed by: {result.processedByUser.fullname} ({result.processedByUser.role})
-                                            </div>
-                                          )}
-                                          {result.verifiedByUser && (
-                                            <div className="mt-1 text-xs text-blue-600">
-                                              Verified by: {result.verifiedByUser.fullname} | {new Date(result.verifiedAt).toLocaleString()}
-                                            </div>
-                                          )}
-                                          {!result.verifiedByUser && result.verifiedBy && (
-                                            <div className="mt-1 text-xs text-gray-500">
-                                              Verified by: {result.verifiedBy}
-                                            </div>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="text-gray-500">No lab results available for this visit</p>
-                                  )}
+                                          );
+                                        })}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               )}
 
