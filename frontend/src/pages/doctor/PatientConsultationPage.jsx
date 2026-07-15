@@ -2770,28 +2770,90 @@ const PatientConsultationPage = () => {
                                       <h5 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
                                         🧪 Lab Results
                                       </h5>
-                                      <div className="space-y-2">
-                                        {selectedVisit.labResults.map((result, i) => (
-                                          <div key={i} className="p-3 bg-white rounded-lg border border-blue-100">
-                                            <div className="flex justify-between items-start">
-                                              <p className="font-semibold text-blue-900 text-sm">{result.testType?.name}</p>
-                                              <span className={`px-2 py-0.5 rounded-full text-xs ${result.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                {result.status}
-                                              </span>
-                                            </div>
-                                            <p className="text-xs text-gray-500 mt-1">{new Date(result.createdAt).toLocaleString()}</p>
-                                            {result.processedByUser && (
-                                              <p className="text-xs text-blue-700 mt-1">Processed by: {result.processedByUser.fullname} ({result.processedByUser.role})</p>
-                                            )}
-                                            {result.verifiedByUser && (
-                                              <p className="text-xs text-blue-600">Verified by: {result.verifiedByUser.fullname} | {new Date(result.verifiedAt).toLocaleString()}</p>
-                                            )}
-                                            {!result.verifiedByUser && result.verifiedBy && (
-                                              <p className="text-xs text-gray-500">Verified by: {result.verifiedBy}</p>
-                                            )}
+                                      {(() => {
+                                        const panelGroups = {};
+                                        const standaloneItems = [];
+                                        selectedVisit.labResults.forEach(result => {
+                                          const g = result.testType?.group;
+                                          if (g && g.id) {
+                                            if (!panelGroups[g.id]) panelGroups[g.id] = { group: g, results: [], fields: [], images: [], seenUrls: new Set() };
+                                            panelGroups[g.id].results.push(result);
+                                            (result.detailedResults || []).forEach(f => {
+                                              if (f.result !== null && !panelGroups[g.id].fields.some(x => x.testName === f.testName)) {
+                                                panelGroups[g.id].fields.push(f);
+                                              }
+                                            });
+                                            (result.attachments || []).forEach(a => {
+                                              const u = a.fileUrl || a.url;
+                                              if (u && !panelGroups[g.id].seenUrls.has(String(u))) {
+                                                panelGroups[g.id].seenUrls.add(String(u));
+                                                panelGroups[g.id].images.push(a);
+                                              }
+                                            });
+                                          } else {
+                                            standaloneItems.push(result);
+                                          }
+                                        });
+                                        const panelEntries = Object.values(panelGroups);
+                                        return (
+                                          <div className="space-y-3">
+                                            {panelEntries.map(pg => (
+                                              <div key={pg.group.id} className="border border-indigo-200 rounded-lg bg-indigo-50 overflow-hidden">
+                                                <div className="px-3 py-2 bg-indigo-100 border-b border-indigo-200">
+                                                  <p className="font-semibold text-indigo-800 text-sm">{pg.group.name} Panel</p>
+                                                  <p className="text-xs text-indigo-600">{pg.results.length} tests</p>
+                                                </div>
+                                                {pg.fields.length > 0 && (
+                                                  <div className="p-3 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                    {pg.fields.map((f, i) => (
+                                                      <div key={i} className="p-2 rounded-lg text-xs bg-white border border-gray-200">
+                                                        <div className="font-semibold text-gray-800">{f.testName}</div>
+                                                        <div className="text-sm font-bold text-gray-900">{f.result} {f.unit || ''}</div>
+                                                        {f.referenceRange && <div className="text-xs text-gray-400">Ref: {f.referenceRange}</div>}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                                {pg.images.length > 0 && (
+                                                  <div className="px-3 pb-3">
+                                                    <p className="text-xs font-medium text-indigo-700 mb-1">Images ({pg.images.length})</p>
+                                                    <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                                                      {pg.images.map((img, idx) => {
+                                                        const url = getImageUrl(img.fileUrl || img.url || img.data || img);
+                                                        return (
+                                                          <div key={idx} className="relative group cursor-pointer rounded-lg overflow-hidden border border-indigo-200">
+                                                            <img src={url} alt="Lab" className="w-full h-16 object-cover" />
+                                                          </div>
+                                                        );
+                                                      })}
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ))}
+                                            {standaloneItems.map((result, i) => (
+                                              <div key={i} className="p-3 bg-white rounded-lg border border-blue-100">
+                                                <div className="flex justify-between items-start">
+                                                  <p className="font-semibold text-blue-900 text-sm">{result.testType?.name}</p>
+                                                  <span className={`px-2 py-0.5 rounded-full text-xs ${result.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                    {result.status}
+                                                  </span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">{new Date(result.createdAt).toLocaleString()}</p>
+                                                {result.processedByUser && (
+                                                  <p className="text-xs text-blue-700 mt-1">Processed by: {result.processedByUser.fullname} ({result.processedByUser.role})</p>
+                                                )}
+                                                {result.verifiedByUser && (
+                                                  <p className="text-xs text-blue-600">Verified by: {result.verifiedByUser.fullname} | {new Date(result.verifiedAt).toLocaleString()}</p>
+                                                )}
+                                                {!result.verifiedByUser && result.verifiedBy && (
+                                                  <p className="text-xs text-gray-500">Verified by: {result.verifiedBy}</p>
+                                                )}
+                                              </div>
+                                            ))}
                                           </div>
-                                        ))}
-                                      </div>
+                                        );
+                                      })()}
                                     </div>
                                   )}
 

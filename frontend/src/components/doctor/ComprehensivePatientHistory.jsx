@@ -1940,9 +1940,9 @@ const ComprehensivePatientHistory = () => {
                             📋 {visitItem.diagnosis}
                           </p>
                         )}
-                        {visitItem.createdBy && (
+                        {(visitItem.doctor || visitItem.suggestedDoctor || visitItem.createdBy) && (
                           <p className="text-xs mt-2" style={{ color: '#6B7280' }}>
-                            👨‍⚕️ Dr. {visitItem.createdBy.fullname}
+                            👨‍⚕️ Dr. {(visitItem.doctor?.fullname || visitItem.suggestedDoctor?.fullname || visitItem.createdBy?.fullname)?.replace(/^(Dr\.\s*)/i, '')}
                           </p>
                         )}
                         {visitItem.cardProduct && (
