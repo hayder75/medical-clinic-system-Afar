@@ -59,6 +59,13 @@ import {
 
 const getConsultationCacheKey = (doctorScope, visitId) => `doctor-consultation-cache:${doctorScope || 'unknown'}:${visitId || 'unknown'}`;
 
+const stripHtml = (html) => {
+  if (!html) return '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+};
+
 const NOTE_FIELDS = [
   { key: 'chiefComplaint', label: 'Chief Complaint' },
   { key: 'historyOfPresentIllness', label: 'History of Present Illness' },
@@ -2713,11 +2720,20 @@ const PatientConsultationPage = () => {
                                       <div className="space-y-2">
                                         {selectedVisit.diagnosisNotes.map((note, i) => (
                                           <div key={i} className="p-3 bg-white rounded-lg border border-blue-100">
-                                            <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.notes || note.content || note.text}</p>
-                                            <div className="flex gap-4 mt-2 text-xs text-blue-600">
-                                              <span>Dr. {note.doctor?.fullname || 'Unknown'}</span>
-                                              <span>{new Date(note.createdAt).toLocaleString()}</span>
-                                            </div>
+                                            <p className="text-xs text-gray-500 font-medium mb-2">
+                                              Recorded by {note.doctor?.fullname || 'Unknown'} - {new Date(note.createdAt).toLocaleString()}
+                                              {note.updatedAt && ` (Updated: ${new Date(note.updatedAt).toLocaleString()})`}
+                                            </p>
+                                            {NOTE_FIELDS.map(field => {
+                                              const val = stripHtml(note[field.key]);
+                                              if (!val) return null;
+                                              return (
+                                                <div key={field.key} className="mb-1.5 text-sm">
+                                                  <span className="font-medium text-gray-700">{field.label}: </span>
+                                                  <span className="text-gray-600">{val}</span>
+                                                </div>
+                                              );
+                                            })}
                                           </div>
                                         ))}
                                       </div>
