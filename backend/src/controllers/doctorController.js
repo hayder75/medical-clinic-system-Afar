@@ -4988,6 +4988,7 @@ exports.getPatientHistory = async (req, res) => {
           include: {
             labTest: {
               include: {
+                group: true,
                 resultFields: {
                   orderBy: { displayOrder: 'asc' }
                 }

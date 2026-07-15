@@ -2145,38 +2145,36 @@ const ComprehensivePatientHistory = () => {
                                         }
                                       }
                                     }
-                                    if (result.results?._images) {
-                                      (Array.isArray(result.results._images) ? result.results._images : [result.results._images]).forEach(img => {
-                                        const u = img.data || img.url || img;
-                                        if (u && !seenUrls.has(String(u))) { seenUrls.add(String(u)); panelImages.push(img); }
-                                      });
-                                    }
+                                  extractLabImages(result).forEach(img => {
+                                    const u = img.fileUrl || img.url || img.data || img;
+                                    if (u && !seenUrls.has(String(u))) { seenUrls.add(String(u)); panelImages.push(img); }
                                   });
-                                  return (
-                                    <div key={'pg-'+pg.group.id} className="border border-indigo-200 rounded-lg bg-indigo-50 overflow-hidden">
-                                      <div className="px-4 py-3 bg-indigo-100 border-b border-indigo-200">
-                                        <div className="flex items-center justify-between">
-                                          <div>
-                                            <p className="font-semibold text-indigo-800">{pg.group.name} Panel</p>
-                                            <p className="text-xs text-indigo-600">{pg.orders.length} tests{pg.latestDate ? ' • '+new Date(pg.latestDate).toLocaleDateString() : ''}</p>
-                                          </div>
-                                          <span className="px-2 py-1 text-xs font-semibold text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
+                                });
+                                return (
+                                  <div key={'pg-'+pg.group.id} className="border border-indigo-200 rounded-lg bg-indigo-50 overflow-hidden">
+                                    <div className="px-4 py-3 bg-indigo-100 border-b border-indigo-200">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="font-semibold text-indigo-800">{pg.group.name} Panel</p>
+                                          <p className="text-xs text-indigo-600">{pg.orders.length} tests{pg.latestDate ? ' • '+new Date(pg.latestDate).toLocaleDateString() : ''}</p>
                                         </div>
+                                        <span className="px-2 py-1 text-xs font-semibold text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
                                       </div>
-                                      {combinedFields.filter(f => f.value !== undefined).length > 0 && (
-                                        <div className="p-4">
-                                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                            {combinedFields.map(({ field, value }) => {
-                                              if (value === undefined) return null;
-                                              const rc = field.normalRange ? checkValueInNormalRange(value, field.normalRange) : { inRange: true };
-                                              return (
-                                                <div key={field.id} className={'p-3 rounded-lg text-sm border ' + (!rc.inRange ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200')}>
-                                                  <div className="font-semibold text-gray-800 text-xs">{field.label}</div>
-                                                  <div className={'text-base font-bold mt-0.5 ' + (!rc.inRange ? 'text-red-600' : 'text-gray-900')}>
-                                                    {value} {field.unit || ''}
-                                                  </div>
-                                                  {!rc.inRange && rc.message && <div className="text-xs text-red-500 mt-0.5">{rc.message}</div>}
-                                                  {field.referenceRange && <div className="text-xs text-gray-400 mt-0.5">Ref: {field.referenceRange}</div>}
+                                    </div>
+                                    {combinedFields.filter(f => f.value !== undefined).length > 0 && (
+                                      <div className="p-4">
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                          {combinedFields.map(({ field, value }) => {
+                                            if (value === undefined) return null;
+                                            const rc = field.normalRange ? checkValueInNormalRange(value, field.normalRange) : { inRange: true };
+                                            return (
+                                              <div key={field.id} className={'p-3 rounded-lg text-sm border ' + (!rc.inRange ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200')}>
+                                                <div className="font-semibold text-gray-800 text-xs">{field.label}</div>
+                                                <div className={'text-base font-bold mt-0.5 ' + (!rc.inRange ? 'text-red-600' : 'text-gray-900')}>
+                                                  {value} {field.unit || ''}
+                                                </div>
+                                                {!rc.inRange && rc.message && <div className="text-xs text-red-500 mt-0.5">{rc.message}</div>}
+                                                {field.referenceRange && <div className="text-xs text-gray-400 mt-0.5">Ref: {field.referenceRange}</div>}
                                                 </div>
                                               );
                                             })}
@@ -2193,7 +2191,7 @@ const ComprehensivePatientHistory = () => {
                                           <p className="text-xs font-medium text-indigo-700 mb-2">Attached Images ({panelImages.length})</p>
                                           <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                                             {panelImages.map((img, idx) => {
-                                              const url = getImageUrl(img.url || img.data || img);
+                                              const url = getImageUrl(img.fileUrl || img.url || img.data || img);
                                               return (
                                                 <div key={idx} onClick={() => openImageViewer(panelImages.map(u => ({ fileUrl: u.url || u.fileUrl || u.filePath || (typeof u === 'string' ? u : ''), fileName: u.name || u.fileName || 'Lab Image' })), idx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-indigo-200 hover:border-indigo-400 transition-all">
                                                   <img src={url} alt="Lab" className="w-full h-16 object-cover" />
@@ -2213,12 +2211,10 @@ const ComprehensivePatientHistory = () => {
                                   const r = order.results?.[0];
                                   if (!r) return null;
                                   const orderImages = [];
-                                  if (r.results?._images) {
-                                    (Array.isArray(r.results._images) ? r.results._images : [r.results._images]).forEach(img => {
-                                      const u = img.data || img.url || img;
-                                      if (u && !orderImages.some(x => String(x.data || x.url || x) === String(u))) orderImages.push(img);
-                                    });
-                                  }
+                                  extractLabImages(r).forEach(img => {
+                                    const u = img.fileUrl || img.url || img.data || img;
+                                    if (u && !orderImages.some(x => String(x.fileUrl || x.url || x.data || x) === String(u))) orderImages.push(img);
+                                  });
                                   const fieldVals = (order.labTest?.resultFields || []).map(f => ({ field: f, value: getResultValue(r.results, f) })).filter(fv => fv.value !== undefined);
                                   return (
                                     <div key={order.id || standaloneOrders.indexOf(order)} className="p-3 bg-white rounded-lg border border-blue-100">
@@ -2250,7 +2246,7 @@ const ComprehensivePatientHistory = () => {
                                           <p className="text-xs font-medium text-gray-500 mb-1">Attached Images:</p>
                                           <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                                             {orderImages.map((img, idx) => {
-                                              const url = getImageUrl(img.url || img.data || img);
+                                              const url = getImageUrl(img.fileUrl || img.url || img.data || img);
                                               return (
                                                 <div key={idx} onClick={() => openImageViewer(orderImages.map(u => ({ fileUrl: u.url || u.fileUrl || u.filePath || (typeof u === 'string' ? u : ''), fileName: u.name || u.fileName || 'Lab Image' })), idx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-blue-200 hover:border-blue-400 transition-all">
                                                   <img src={url} alt="Lab" className="w-full h-12 object-cover" />
@@ -2455,12 +2451,10 @@ const ComprehensivePatientHistory = () => {
                                     }
                                   }
                                 }
-                                if (result.results?._images) {
-                                  (Array.isArray(result.results._images) ? result.results._images : [result.results._images]).forEach(img => {
-                                    const u = img.data || img.url || img;
-                                    if (u && !seenUrls.has(String(u))) { seenUrls.add(String(u)); panelImages.push(img); }
-                                  });
-                                }
+                                extractLabImages(result).forEach(img => {
+                                  const u = img.fileUrl || img.url || img.data || img;
+                                  if (u && !seenUrls.has(String(u))) { seenUrls.add(String(u)); panelImages.push(img); }
+                                });
                               });
                               return (
                                 <div key={'pg-'+pg.group.id} className="border border-indigo-200 rounded-lg bg-indigo-50 overflow-hidden">
@@ -2503,7 +2497,7 @@ const ComprehensivePatientHistory = () => {
                                       <p className="text-xs font-medium text-indigo-700 mb-2">Attached Images ({panelImages.length})</p>
                                       <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                                         {panelImages.map((img, idx) => {
-                                          const url = getImageUrl(img.url || img.data || img);
+                                          const url = getImageUrl(img.fileUrl || img.url || img.data || img);
                                           return (
                                             <div key={idx} onClick={() => openImageViewer(panelImages.map(u => ({ fileUrl: u.url || u.fileUrl || u.filePath || (typeof u === 'string' ? u : ''), fileName: u.name || u.fileName || 'Lab Image' })), idx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-indigo-200 hover:border-indigo-400 transition-all">
                                               <img src={url} alt="Lab" className="w-full h-20 object-cover" />
@@ -2525,12 +2519,10 @@ const ComprehensivePatientHistory = () => {
                                   const r = order.results?.[0];
                                   if (!r) return null;
                                   const orderImages = [];
-                                  if (r.results?._images) {
-                                    (Array.isArray(r.results._images) ? r.results._images : [r.results._images]).forEach(img => {
-                                      const u = img.data || img.url || img;
-                                      if (u && !orderImages.some(x => String(x.data || x.url || x) === String(u))) orderImages.push(img);
-                                    });
-                                  }
+                                  extractLabImages(r).forEach(img => {
+                                    const u = img.fileUrl || img.url || img.data || img;
+                                    if (u && !orderImages.some(x => String(x.fileUrl || x.url || x.data || x) === String(u))) orderImages.push(img);
+                                  });
                                   const fieldVals = (order.labTest?.resultFields || []).map(f => ({ field: f, value: getResultValue(r.results, f) })).filter(fv => fv.value !== undefined);
                                   return (
                                     <div key={order.id || standaloneOrders.indexOf(order)} className="p-4 border border-blue-100 rounded-lg bg-blue-50">
@@ -2562,7 +2554,7 @@ const ComprehensivePatientHistory = () => {
                                           <p className="text-xs font-medium text-gray-500 mb-1">Attached Images:</p>
                                           <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                                             {orderImages.map((img, idx) => {
-                                              const url = getImageUrl(img.url || img.data || img);
+                                              const url = getImageUrl(img.fileUrl || img.url || img.data || img);
                                               return (
                                                 <div key={idx} onClick={() => openImageViewer(orderImages.map(u => ({ fileUrl: u.url || u.fileUrl || u.filePath || (typeof u === 'string' ? u : ''), fileName: u.name || u.fileName || 'Lab Image' })), idx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-blue-200 hover:border-blue-400 transition-all">
                                                   <img src={url} alt="Lab" className="w-full h-16 object-cover" />
