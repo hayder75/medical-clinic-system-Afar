@@ -5445,6 +5445,15 @@ exports.getPatientHistory = async (req, res) => {
             }
           }
 
+          const rawImages = (() => {
+            try {
+              const r = orderResult?.results;
+              if (r && typeof r === 'object' && !Array.isArray(r) && r._images) {
+                return Array.isArray(r._images) ? r._images : [r._images];
+              }
+            } catch (e) {}
+            return [];
+          })();
           labResults.push({
             id: `labtestorder-${labTestOrder.id}`,
             testType: labTestOrder.labTest || { name: 'Lab Test', category: 'GENERAL' },
@@ -5453,6 +5462,7 @@ exports.getPatientHistory = async (req, res) => {
             additionalNotes: labTestOrder.instructions || orderResult?.additionalNotes || '',
             status: labTestOrder.status || 'PENDING',
             attachments: orderResult?.attachments || [],
+            _images: rawImages,
             createdAt: labTestOrder.createdAt,
             verifiedBy: orderResult?.verifiedBy || null,
             verifiedByUser: verifiedByUser,

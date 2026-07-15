@@ -2790,6 +2790,13 @@ const PatientConsultationPage = () => {
                                                 panelGroups[g.id].images.push(a);
                                               }
                                             });
+                                            (result._images || []).forEach(img => {
+                                              const u = img.fileUrl || img.url || img.data || img;
+                                              if (u && !panelGroups[g.id].seenUrls.has(String(u))) {
+                                                panelGroups[g.id].seenUrls.add(String(u));
+                                                panelGroups[g.id].images.push(img);
+                                              }
+                                            });
                                           } else {
                                             standaloneItems.push(result);
                                           }
