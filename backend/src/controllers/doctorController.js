@@ -5252,6 +5252,15 @@ exports.getPatientHistory = async (req, res) => {
             }
           }
 
+          const rawDetailImages = (() => {
+            try {
+              const r = result?.results;
+              if (r && typeof r === 'object' && !Array.isArray(r) && r._images) {
+                return Array.isArray(r._images) ? r._images : [r._images];
+              }
+            } catch (e) {}
+            return [];
+          })();
           return {
             id: result.id,
             testType: {
@@ -5263,6 +5272,7 @@ exports.getPatientHistory = async (req, res) => {
             additionalNotes: result.additionalNotes || '',
             status: result.status,
             attachments: [], // Detailed lab results don't have separate attachments
+            _images: rawDetailImages,
             createdAt: result.createdAt,
             verifiedBy: result.verifiedBy,
             verifiedByUser: verifiedByUser,
@@ -5314,6 +5324,7 @@ exports.getPatientHistory = async (req, res) => {
             additionalNotes: labOrder.notes || labOrder.additionalNotes || '',
             status: labOrder.status,
             attachments: labOrder.attachments || [],
+            _images: [],
             createdAt: labOrder.createdAt
           });
         }
@@ -5368,6 +5379,15 @@ exports.getPatientHistory = async (req, res) => {
                 }
               }
 
+              const rawBatchImages = (() => {
+                try {
+                  const r = detailedResult?.results;
+                  if (r && typeof r === 'object' && !Array.isArray(r) && r._images) {
+                    return Array.isArray(r._images) ? r._images : [r._images];
+                  }
+                } catch (e) {}
+                return [];
+              })();
               labResults.push({
                 id: `batch-${batchOrder.id}-${service.id}`,
                 testType: service.investigationType || service.service || { name: service.service?.name || 'Lab Test', category: 'GENERAL' },
@@ -5376,6 +5396,7 @@ exports.getPatientHistory = async (req, res) => {
                 additionalNotes: service.additionalNotes || batchOrder.additionalNotes || '',
                 status: service.status || batchOrder.status || 'PENDING',
                 attachments: [],
+                _images: rawBatchImages,
                 createdAt: batchOrder.createdAt || service.createdAt,
                 verifiedBy: detailedResult?.verifiedBy,
                 verifiedByUser: verifiedByUser,

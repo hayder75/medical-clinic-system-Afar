@@ -40,9 +40,18 @@ const LabOrdering = ({ visitId, patientId, patient, visit, onOrdersPlaced, exist
     }
   };
 
+  const getOrderCount = (testId) => {
+    let count = 0;
+    existingOrders.forEach(order => {
+      if (order.labTest && order.labTest.id === testId) count++;
+      else if (order.orders) count += order.orders.filter(o => o.labTest?.id === testId).length;
+      else if (order.services) count += order.services.filter(s => s.service?.id === testId).length;
+    });
+    return count;
+  };
+
   const handlePanelSelect = (panel) => {
-    const ids = panel.tests.map(t => t.id).filter(id => !isTestOrdered(id));
-    if (ids.length === 0) return;
+    const ids = panel.tests.map(t => t.id);
     const allSelected = ids.every(id => selectedTestIds.has(id));
     setSelectedTestIds(prev => {
       const next = new Set(prev);
@@ -52,20 +61,10 @@ const LabOrdering = ({ visitId, patientId, patient, visit, onOrdersPlaced, exist
   };
 
   const handleTestSelect = (testId) => {
-    if (isTestOrdered(testId)) return;
     setSelectedTestIds(prev => {
       const next = new Set(prev);
       next.has(testId) ? next.delete(testId) : next.add(testId);
       return next;
-    });
-  };
-
-  const isTestOrdered = (testId) => {
-    return existingOrders.some(order => {
-      if (order.labTest) return order.labTest.id === testId;
-      if (order.orders) return order.orders.some(o => o.labTest?.id === testId);
-      if (order.services) return order.services.some(s => s.service?.id === testId);
-      return false;
     });
   };
 
@@ -164,18 +163,22 @@ const LabOrdering = ({ visitId, patientId, patient, visit, onOrdersPlaced, exist
 
   const renderTestRow = (test) => {
     const sel = selectedTestIds.has(test.id);
-    const ord = isTestOrdered(test.id);
+    const orderCount = getOrderCount(test.id);
     return (
-      <label key={test.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors bg-white ${ord ? 'opacity-30 cursor-not-allowed' : sel ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}>
+      <label key={test.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors bg-white ${sel ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}>
         <input
           type="checkbox"
           checked={sel}
-          disabled={ord}
           onChange={() => handleTestSelect(test.id)}
           className="w-4 h-4 text-indigo-600 rounded border-gray-300"
         />
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex items-center gap-2">
           <span className={`text-sm ${sel ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>{test.name}</span>
+          {orderCount > 0 && (
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 flex-shrink-0">
+              ×{orderCount}
+            </span>
+          )}
         </div>
         <span className="text-xs text-gray-500 flex-shrink-0">{test.price != null ? `${Number(test.price).toLocaleString()} ETB` : '-'}</span>
       </label>
@@ -185,14 +188,11 @@ const LabOrdering = ({ visitId, patientId, patient, visit, onOrdersPlaced, exist
   const renderPanelButton = (panel) => {
     const fullySel = isPanelFullySelected(panel);
     const partialSel = isPanelPartiallySelected(panel);
-    const allOrdered = panel.tests?.every(t => isTestOrdered(t.id)) || false;
     return (
       <div key={panel.id} className="flex items-center gap-2">
         <button
           onClick={() => handlePanelSelect(panel)}
-          disabled={allOrdered}
           className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${
-            allOrdered ? 'bg-gray-100 text-gray-400 border-2 border-gray-200 cursor-not-allowed' :
             fullySel ? 'bg-indigo-700 text-white' : partialSel ? 'bg-indigo-500 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
           }`}
         >
@@ -200,17 +200,16 @@ const LabOrdering = ({ visitId, patientId, patient, visit, onOrdersPlaced, exist
             <input
               type="checkbox"
               checked={fullySel}
-              disabled={allOrdered}
               ref={el => { if (el) el.indeterminate = partialSel && !fullySel; }}
               onChange={() => handlePanelSelect(panel)}
               className="w-4 h-4 rounded border-gray-300"
               onClick={e => e.stopPropagation()}
             />
             <span>{panel.name}</span>
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${allOrdered ? 'bg-gray-200 text-gray-500' : fullySel ? 'bg-white/20' : partialSel ? 'bg-white/20' : 'bg-indigo-200 text-indigo-800'}`}>{panel.tests?.length || 0}</span>
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${fullySel ? 'bg-white/20' : partialSel ? 'bg-white/20' : 'bg-indigo-200 text-indigo-800'}`}>{panel.tests?.length || 0}</span>
           </div>
         </button>
-        {!allOrdered && partialSel && !fullySel && (
+        {partialSel && !fullySel && (
           <button
             onClick={() => handlePanelSelect(panel)}
             className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"

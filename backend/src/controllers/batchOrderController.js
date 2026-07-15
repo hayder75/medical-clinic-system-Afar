@@ -1223,70 +1223,9 @@ exports.createLabTestOrders = async (req, res) => {
       return res.status(404).json({ error: 'One or more lab tests not found or inactive' });
     }
 
-    // Check for existing orders to avoid duplicates
-    // Only block if there are unpaid or active orders (not completed ones - allow re-ordering)
-    // Orders without billingId are orphaned from a failed prior attempt and should be retryable
-    const existingOrders = await prisma.labTestOrder.findMany({
-      where: {
-        visitId: visitId,
-        labTestId: { in: labTestIds },
-        status: { in: ['UNPAID', 'PAID', 'QUEUED', 'IN_PROGRESS'] },
-        billingId: { not: null }
-      },
-      select: { labTestId: true, status: true }
-    });
-
-    const existingTestIds = new Set(existingOrders.map(o => o.labTestId));
-
-    // Clean up orphaned orders (UNPAID, no billingId) from a failed prior attempt
-    const orphanedOrders = await prisma.labTestOrder.findMany({
-      where: {
-        visitId: visitId,
-        labTestId: { in: labTestIds },
-        status: 'UNPAID',
-        billingId: null
-      },
-      select: { id: true, batchOrderId: true }
-    });
-    if (orphanedOrders.length > 0) {
-      console.log(`🧹 [createLabTestOrders] Cleaning up ${orphanedOrders.length} orphaned orders from failed prior attempt`);
-      const orphanedBatchIds = [...new Set(orphanedOrders.map(o => o.batchOrderId).filter(Boolean))];
-      await prisma.labTestOrder.deleteMany({
-        where: { id: { in: orphanedOrders.map(o => o.id) } }
-      });
-      if (orphanedBatchIds.length > 0) {
-        await prisma.batchOrder.deleteMany({
-          where: { id: { in: orphanedBatchIds } }
-        });
-      }
-    }
-
-    const newTestIds = labTestIds.filter(id => !existingTestIds.has(id));
-
-    if (newTestIds.length === 0) {
-      const completedTestIds = await prisma.labTestOrder.findMany({
-        where: {
-          visitId: visitId,
-          labTestId: { in: labTestIds },
-          status: 'COMPLETED'
-        },
-        select: { labTestId: true }
-      });
-
-      if (completedTestIds.length > 0 && completedTestIds.length === labTestIds.length) {
-        return res.status(400).json({
-          error: 'All selected lab tests have active orders. Completed tests can be re-ordered, but you have active (unpaid/queued) orders for all selected tests.',
-          message: 'You have active orders for all selected tests. Please wait for them to be completed or pay for existing orders first.'
-        });
-      }
-
-      return res.status(400).json({
-        error: 'All selected lab tests have already been ordered for this visit',
-        message: 'You have active orders for all selected tests. You can re-order completed tests, but please wait for active orders to be processed first.'
-      });
-    }
-
-    console.log(`✅ [createLabTestOrders] Creating ${newTestIds.length} new orders (${labTestIds.length - newTestIds.length} already exist)`);
+    // No duplicate check — allow re-ordering. Each request creates new LabTestOrder records.
+    const newTestIds = [...labTestIds];
+    console.log(`✅ [createLabTestOrders] Creating ${newTestIds.length} lab test order(s)`);
 
     const result = await prisma.$transaction(async (tx) => {
       // Create a batch order for grouping (optional, for compatibility)

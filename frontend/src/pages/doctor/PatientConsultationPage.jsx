@@ -2867,6 +2867,21 @@ const PatientConsultationPage = () => {
                                                     ))}
                                                   </div>
                                                 )}
+                                                {(result._images && result._images.length > 0) && (
+                                                  <div className="mt-2 pt-2 border-t border-gray-200">
+                                                    <p className="text-xs font-medium text-gray-500 mb-1">Attached Images:</p>
+                                                    <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                                                      {result._images.map((img, idx) => {
+                                                        const url = getImageUrl(img.fileUrl || img.url || img.data || img);
+                                                        return (
+                                                          <div key={idx} className="relative group cursor-pointer rounded-lg overflow-hidden border border-blue-200 hover:border-blue-400 transition-all">
+                                                            <img src={url} alt="Lab" className="w-full h-12 object-cover" />
+                                                          </div>
+                                                        );
+                                                      })}
+                                                    </div>
+                                                  </div>
+                                                )}
                                               </div>
                                             ))}
                                           </div>
@@ -3126,137 +3141,122 @@ const PatientConsultationPage = () => {
                                     🧪 Lab Results & Orders
                                   </h4>
                                   {(() => {
-                                    const allLabResults = [
-                                      ...(selectedVisit.labResults || []),
-                                      ...(selectedVisit.labOrders || []),
-                                      ...(selectedVisit.labTestOrders || [])
-                                    ].filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
-
-                                    if (allLabResults.length === 0) {
+                                    const allResults = selectedVisit.labResults || [];
+                                    if (allResults.length === 0) {
                                       return <p className="text-gray-500">No lab results available for this visit</p>;
                                     }
-
-                                    const getStatusColor = (status) => {
-                                      switch (status) {
-                                        case 'COMPLETED':
-                                        case 'DISPENSED':
-                                        case 'PAID':
-                                          return 'bg-green-100 text-green-800';
-                                        case 'PENDING':
-                                        case 'QUEUED':
-                                          return 'bg-yellow-100 text-yellow-800';
-                                        case 'CANCELLED':
-                                          return 'bg-red-100 text-red-800';
-                                        default:
-                                          return 'bg-gray-100 text-gray-800';
+                                    const panelGroups = {};
+                                    const standaloneItems = [];
+                                    allResults.forEach(result => {
+                                      const g = result.testType?.group;
+                                      if (g && g.id) {
+                                        if (!panelGroups[g.id]) panelGroups[g.id] = { group: g, results: [], fields: [], images: [], seenUrls: new Set() };
+                                        panelGroups[g.id].results.push(result);
+                                        (result.detailedResults || []).forEach(f => {
+                                          if (f.result !== null && !panelGroups[g.id].fields.some(x => x.testName === f.testName)) {
+                                            panelGroups[g.id].fields.push(f);
+                                          }
+                                        });
+                                        (result.attachments || []).forEach(a => {
+                                          const u = a.fileUrl || a.url;
+                                          if (u && !panelGroups[g.id].seenUrls.has(String(u))) {
+                                            panelGroups[g.id].seenUrls.add(String(u));
+                                            panelGroups[g.id].images.push(a);
+                                          }
+                                        });
+                                        (result._images || []).forEach(img => {
+                                          const u = img.fileUrl || img.url || img.data || img;
+                                          if (u && !panelGroups[g.id].seenUrls.has(String(u))) {
+                                            panelGroups[g.id].seenUrls.add(String(u));
+                                            panelGroups[g.id].images.push(img);
+                                          }
+                                        });
+                                      } else {
+                                        standaloneItems.push(result);
                                       }
-                                    };
-
+                                    });
+                                    const panelEntries = Object.values(panelGroups);
                                     return (
-                                      <div className="space-y-4">
-                                        {allLabResults.map((result, idx) => {
-                                          const testType = result.testType || result.type || result.labTest || {};
-                                          const testName = testType.name || result.serviceName || result.labTest?.name || 'Lab Test';
-                                          const status = result.status || 'PENDING';
-
-                                          // Extract lab images
-                                          const labImages = [
+                                      <div className="space-y-3">
+                                        {panelEntries.map(pg => (
+                                          <div key={pg.group.id} className="border border-indigo-200 rounded-lg bg-indigo-50 overflow-hidden">
+                                            <div className="px-3 py-2 bg-indigo-100 border-b border-indigo-200">
+                                              <p className="font-semibold text-indigo-800 text-sm">{pg.group.name} Panel</p>
+                                              <p className="text-xs text-indigo-600">{pg.results.length} test(s)</p>
+                                            </div>
+                                            {pg.fields.length > 0 && (
+                                              <div className="p-3 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                {pg.fields.map((f, i) => {
+                                                  const rc = f.normalRange ? checkValueInNormalRange(f.result, f.normalRange) : { inRange: true };
+                                                  return (
+                                                    <div key={i} className={'p-2 rounded-lg text-xs border ' + (!rc.inRange ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200')}>
+                                                      <div className="font-semibold text-gray-800">{f.testName}</div>
+                                                      <div className={'text-sm font-bold ' + (!rc.inRange ? 'text-red-600' : 'text-gray-900')}>{f.result} {f.unit || ''}</div>
+                                                      {f.referenceRange && <div className="text-xs text-gray-400">Ref: {f.referenceRange}</div>}
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            )}
+                                            {pg.images.length > 0 && (
+                                              <div className="px-3 pb-3">
+                                                <p className="text-xs font-medium text-indigo-700 mb-1">Images ({pg.images.length})</p>
+                                                <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                                                  {pg.images.map((img, idx) => {
+                                                    const url = getImageUrl(img.fileUrl || img.url || img.data || img);
+                                                    return (
+                                                      <div key={idx} onClick={() => openImageViewer(pg.images.map(u => ({ fileUrl: u.url || u.fileUrl || u.filePath || (typeof u === 'string' ? u : ''), fileName: u.name || u.fileName || 'Lab Image' })), idx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-indigo-200 hover:border-indigo-400 transition-all">
+                                                        <img src={url} alt="Lab" className="w-full h-16 object-cover" />
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                        {standaloneItems.map((result, i) => {
+                                          const standaloneImages = [
                                             ...(result.attachments || []),
-                                            ...(result.results?._images || result.results?.[0]?.results?._images || []).map(img => ({
-                                              fileUrl: img.url || img.data || img,
-                                              fileName: img.name || 'Lab Image'
-                                            }))
+                                            ...(result._images || [])
                                           ];
-
                                           return (
-                                            <div key={result.id || idx} className="p-4 border rounded-lg" style={{ borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                                              <div className="flex justify-between items-start mb-3">
-                                                <h4 className="font-semibold text-blue-900 text-base">
-                                                  {testName}
-                                                </h4>
-                                                <span className={`px-2.5 py-0.5 rounded text-xs font-semibold ${getStatusColor(status)}`}>
-                                                  {status}
+                                            <div key={i} className="p-3 bg-white rounded-lg border border-blue-100">
+                                              <div className="flex justify-between items-start">
+                                                <p className="font-semibold text-blue-900 text-sm">{result.testType?.name || result.serviceName || 'Lab Test'}</p>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${result.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                  {result.status || 'PENDING'}
                                                 </span>
                                               </div>
-
-                                              {result.detailedResults && result.detailedResults.length > 0 ? (
-                                                <div className="mt-3 overflow-x-auto bg-white rounded-lg border border-gray-200">
-                                                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                                                    <thead className="bg-gray-50">
-                                                      <tr>
-                                                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase">Test</th>
-                                                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase">Result</th>
-                                                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase">Unit</th>
-                                                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase">Ref Range</th>
-                                                      </tr>
-                                                    </thead>
-                                                    <tbody className="bg-white divide-y divide-gray-200">
-                                                      {result.detailedResults.map((dr, di) => (
-                                                        <tr key={di}>
-                                                          <td className="px-3 py-2 text-gray-900 font-medium">{dr.testName}</td>
-                                                          <td className="px-3 py-2 text-gray-700 font-bold">{dr.result}</td>
-                                                          <td className="px-3 py-2 text-gray-500">{dr.unit || '-'}</td>
-                                                          <td className="px-3 py-2 text-gray-500">{dr.referenceRange || 'N/A'}</td>
-                                                        </tr>
-                                                      ))}
-                                                    </tbody>
-                                                  </table>
-                                                </div>
-                                              ) : result.resultText ? (
-                                                <div className="mt-3 p-3 rounded text-sm" style={{ backgroundColor: '#FFF3CD', color: '#856404' }}>
-                                                  <p className="font-semibold">Result Summary:</p>
-                                                  <p className="mt-1">{result.resultText}</p>
-                                                </div>
-                                              ) : (
-                                                <div className="mt-3 p-3 rounded text-sm bg-gray-50 text-gray-500 border border-dashed border-gray-200">
-                                                  <p className="italic">📋 Lab test was ordered but detailed results have not been entered yet.</p>
+                                              <p className="text-xs text-gray-500 mt-1">{new Date(result.createdAt).toLocaleString()}</p>
+                                              {result.detailedResults && result.detailedResults.length > 0 && (
+                                                <div className="mt-2 pt-2 border-t border-gray-200 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                  {result.detailedResults.map((dr, di) => (
+                                                    <div key={di} className="text-xs">
+                                                      <span className="font-medium text-gray-700">{dr.testName}: </span>
+                                                      <span className="font-bold text-gray-900">{dr.result} {dr.unit || ''}</span>
+                                                      {dr.referenceRange && <span className="text-gray-400 ml-1">(Ref: {dr.referenceRange})</span>}
+                                                    </div>
+                                                  ))}
                                                 </div>
                                               )}
-
-                                              {result.additionalNotes && (
-                                                <div className="mt-3 pt-3 border-t border-gray-200">
-                                                  <p style={{ color: '#6B7280' }} className="text-xs font-semibold uppercase">Additional Notes:</p>
-                                                  <p className="text-sm mt-1" style={{ color: '#0C0E0B' }}>{result.additionalNotes}</p>
-                                                </div>
-                                              )}
-
-                                              {/* Lab Attachments / Images */}
-                                              {labImages.length > 0 && (
-                                                <div className="mt-4 pt-3 border-t border-gray-200">
-                                                  <p style={{ color: '#6B7280' }} className="text-xs font-semibold uppercase mb-2">Attached Images ({labImages.length}):</p>
-                                                  <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
-                                                    {labImages.map((img, idx) => (
-                                                      <div
-                                                        key={idx}
-                                                        onClick={() => openImageViewer(labImages, idx)}
-                                                        className="relative group cursor-pointer rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 transition-all bg-white"
-                                                      >
-                                                        <img
-                                                          src={getImageUrl(img.fileUrl || img.filePath || img.path)}
-                                                          alt={img.fileName || `Lab File ${idx + 1}`}
-                                                          className="w-full h-24 object-cover"
-                                                          onError={(e) => {
-                                                            e.target.style.display = 'none';
-                                                          }}
-                                                        />
-                                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
-                                                          <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 bg-black/50 px-2 py-1 rounded">Click to view</span>
+                                              {result.additionalNotes && <p className="text-xs text-gray-500 mt-1">Note: {result.additionalNotes}</p>}
+                                              {standaloneImages.length > 0 && (
+                                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                                  <p className="text-xs font-medium text-gray-500 mb-1">Attached Images:</p>
+                                                  <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                                                    {standaloneImages.map((img, idx) => {
+                                                      const url = getImageUrl(img.fileUrl || img.url || img.data || img);
+                                                      return (
+                                                        <div key={idx} onClick={() => openImageViewer(standaloneImages.map(u => ({ fileUrl: u.url || u.fileUrl || u.filePath || (typeof u === 'string' ? u : ''), fileName: u.name || u.fileName || 'Lab Image' })), idx)} className="relative group cursor-pointer rounded-lg overflow-hidden border border-blue-200 hover:border-blue-400 transition-all">
+                                                          <img src={url} alt="Lab" className="w-full h-12 object-cover" />
                                                         </div>
-                                                      </div>
-                                                    ))}
+                                                      );
+                                                    })}
                                                   </div>
                                                 </div>
                                               )}
-
-                                              <div className="mt-3 pt-3 border-t border-gray-200 text-xs flex justify-between text-gray-500">
-                                                <span>Ordered: {result.createdAt ? new Date(result.createdAt).toLocaleString() : 'N/A'}</span>
-                                                {result.verifiedByUser && (
-                                                  <span>Verified by: {result.verifiedByUser.fullname} on {new Date(result.verifiedAt).toLocaleString()}</span>
-                                                )}
-                                                {!result.verifiedByUser && result.verifiedBy && (
-                                                  <span>Verified by: {result.verifiedBy}</span>
-                                                )}
-                                              </div>
+                                              {result.verifiedByUser && <p className="text-xs text-blue-600 mt-1">Verified by: {result.verifiedByUser.fullname}</p>}
                                             </div>
                                           );
                                         })}
@@ -4525,7 +4525,7 @@ const PatientConsultationPage = () => {
                             );})}
                         </div>
 
-                        {/* New Lab Test Orders (New System) */}
+                        {/* New Lab Test Orders (New System) — per-order-instance */}
                         {hasNewLabResults && (
                           <div className="mt-6 space-y-4">
                             {(() => {
@@ -4535,96 +4535,109 @@ const PatientConsultationPage = () => {
                               completedOrders.forEach(order => {
                                 const g = order.labTest?.group;
                                 if (g && g.id) {
-                                  if (!panelGroups[g.id]) panelGroups[g.id] = { group: g, orders: [], allResults: [], latestDate: null, additionalNotes: '' };
+                                  if (!panelGroups[g.id]) panelGroups[g.id] = { group: g, orders: [] };
                                   panelGroups[g.id].orders.push(order);
-                                  const r = order.results[0];
-                                  if (r) {
-                                    panelGroups[g.id].allResults.push({ order, result: r });
-                                    const d = new Date(r.createdAt);
-                                    if (!panelGroups[g.id].latestDate || d > panelGroups[g.id].latestDate) panelGroups[g.id].latestDate = d;
-                                    if (r.additionalNotes) panelGroups[g.id].additionalNotes = r.additionalNotes;
-                                  }
                                 } else {
                                   standaloneOrders.push(order);
                                 }
                               });
-                              const panelEntries = Object.values(panelGroups);
+                              // Within each panel group, batch orders by batchOrderId
+                              // (tests ordered together in one session share a batchOrderId)
+                              const panelEntries = Object.values(panelGroups).map(pg => {
+                                const batches = {};
+                                pg.orders.forEach(order => {
+                                  const batchKey = order.batchOrderId || order.id;
+                                  if (!batches[batchKey]) batches[batchKey] = { batchOrderId: batchKey, orders: [], allResults: [], latestDate: null, additionalNotes: '' };
+                                  batches[batchKey].orders.push(order);
+                                  const r = order.results?.[0];
+                                  if (r) {
+                                    batches[batchKey].allResults.push({ order, result: r });
+                                    const d = new Date(r.createdAt);
+                                    if (!batches[batchKey].latestDate || d > batches[batchKey].latestDate) batches[batchKey].latestDate = d;
+                                    if (r.additionalNotes) batches[batchKey].additionalNotes = r.additionalNotes;
+                                  }
+                                });
+                                return { ...pg, batches: Object.values(batches) };
+                              });
                               return (<>
-                                {panelEntries.map(pg => {
-                                  const seenFields = new Set();
-                                  const combinedFields = [];
-                                  const panelImages = [];
-                                  const seenUrls = new Set();
-                                  pg.allResults.forEach(({ order, result }) => {
-                                    (order.labTest?.resultFields || []).forEach(field => {
-                                      const key = field.fieldName || field.id;
-                                      if (!seenFields.has(key)) {
-                                        seenFields.add(key);
-                                        const fv = getStructuredFieldValue(result.results, field);
-                                        combinedFields.push({ field, value: fv, result });
-                                      }
-                                    });
-                                    if (result.results?._images) {
-                                      result.results._images.forEach(img => {
-                                        const u = img.data || img.url || img;
-                                        if (!seenUrls.has(u)) { seenUrls.add(u); panelImages.push(img); }
-                                      });
-                                    }
-                                  });
-                                  return (
-                                    <div key={'panel-'+pg.group.id} className="p-4 border rounded-lg border-indigo-200 bg-indigo-50">
-                                      <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                          <p className="font-medium text-indigo-800">{pg.group.name} Panel</p>
-                                          <p className="text-sm text-indigo-600">{pg.orders.length} tests{pg.latestDate ? ' • '+new Date(pg.latestDate).toLocaleDateString() : ''}</p>
-                                        </div>
-                                        <span className="px-2 py-1 text-xs font-medium text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
+                                {panelEntries.map(pg => (
+                                  <div key={'panel-'+pg.group.id} className="p-4 border rounded-lg border-indigo-200 bg-indigo-50">
+                                    <div className="flex justify-between items-start mb-3">
+                                      <div>
+                                        <p className="font-medium text-indigo-800">{pg.group.name} Panel</p>
+                                        <p className="text-sm text-indigo-600">{pg.batches.length} order(s){pg.batches.some(b => b.latestDate) ? ' • '+new Date(Math.max(...pg.batches.filter(b => b.latestDate).map(b => b.latestDate))).toLocaleDateString() : ''}</p>
                                       </div>
-                                      {combinedFields.length > 0 && (
-                                        <div className="mb-3">
-                                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                            {combinedFields.map(({ field, value }) => {
-                                              if (value === undefined) return null;
-                                              const rc = checkValueInNormalRange(value, field.normalRange);
-                                              return (
-                                                <div key={field.id} className={'p-2 rounded text-sm ' + (!rc.inRange ? 'bg-red-50 border border-red-200' : 'bg-white')}>
-                                                  <div className="font-medium text-gray-800">{field.label}</div>
-                                                  <div className={!rc.inRange ? 'text-red-600 font-semibold' : 'text-gray-600'}>{value} {field.unit || ''}</div>
-                                                  {!rc.inRange && rc.message && <div className="text-xs text-red-500 mt-1">{rc.message}</div>}
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                      )}
-                                      {pg.additionalNotes && (
-                                        <div className="mt-3">
-                                          <p className="text-sm font-medium text-gray-700 mb-1">Additional Notes:</p>
-                                          <p className="text-sm text-gray-600 bg-white p-2 rounded">{pg.additionalNotes}</p>
-                                        </div>
-                                      )}
-                                      {panelImages.length > 0 && (
-                                        <div className="mt-3 pt-3 border-t border-indigo-200">
-                                          <p className="text-sm font-medium text-gray-700 mb-2">Attached Images:</p>
-                                          <div className="grid grid-cols-3 gap-2">
-                                            {panelImages.map((img, idx) => {
-                                              const u = img.url ? getImageUrl(img.url) : (img.data || img);
-                                              return (<div key={idx} className="relative"><img src={u} alt={"Lab "+(idx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(u,"_blank")} /></div>);
-                                            })}
-                                          </div>
-                                        </div>
-                                      )}
+                                      <span className="px-2 py-1 text-xs font-medium text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
                                     </div>
-                                  );
-                                })}
-                                {standaloneOrders.map(order => {
+                                    <div className="space-y-3">
+                                      {pg.batches.map((batch, batchIdx) => {
+                                        // Combine fields across all tests in this batch (dedup by fieldName)
+                                        const seenFields = new Set();
+                                        const combinedFields = [];
+                                        const allImages = [];
+                                        const seenUrls = new Set();
+                                        batch.allResults.forEach(({ order, result }) => {
+                                          (order.labTest?.resultFields || []).forEach(field => {
+                                            const key = field.fieldName || field.id;
+                                            if (!seenFields.has(key)) {
+                                              seenFields.add(key);
+                                              const fv = getStructuredFieldValue(result.results, field);
+                                              combinedFields.push({ field, value: fv });
+                                            }
+                                          });
+                                          if (result.results?._images) {
+                                            result.results._images.forEach(img => {
+                                              const u = img.url || img.data || img;
+                                              if (!seenUrls.has(String(u))) { seenUrls.add(String(u)); allImages.push(img); }
+                                            });
+                                          }
+                                        });
+                                        const dispFields = combinedFields.filter(f => f.value !== undefined);
+                                        return (
+                                          <div key={batch.batchOrderId} className="bg-white rounded-lg border border-indigo-100 overflow-hidden">
+                                            {pg.batches.length > 1 && (
+                                              <div className="px-3 py-1.5 bg-indigo-50 border-b border-indigo-100">
+                                                <p className="text-xs font-semibold text-indigo-600">Order #{batchIdx + 1} — {batch.latestDate ? new Date(batch.latestDate).toLocaleString() : ''}</p>
+                                              </div>
+                                            )}
+                                            <div className="p-3">
+                                              {dispFields.length > 0 && (
+                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                                  {dispFields.map(({ field, value }) => (
+                                                    <div key={field.id} className={'p-2 rounded text-sm ' + (!checkValueInNormalRange(value, field.normalRange).inRange ? 'bg-red-50 border border-red-200' : 'bg-white')}>
+                                                      <div className="font-medium text-gray-800">{field.label}</div>
+                                                      <div className={!checkValueInNormalRange(value, field.normalRange).inRange ? 'text-red-600 font-semibold' : 'text-gray-600'}>{value} {field.unit || ''}</div>
+                                                      {!checkValueInNormalRange(value, field.normalRange).inRange && checkValueInNormalRange(value, field.normalRange).message && <div className="text-xs text-red-500 mt-1">{checkValueInNormalRange(value, field.normalRange).message}</div>}
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+                                              {batch.additionalNotes && <p className="text-xs text-gray-500 mt-2">Note: {batch.additionalNotes}</p>}
+                                              {allImages.length > 0 && (
+                                                <div className="mt-2 pt-2 border-t border-indigo-100">
+                                                  <div className="grid grid-cols-3 gap-2">
+                                                    {allImages.map((img, imgIdx) => {
+                                                      const u = img.url ? getImageUrl(img.url) : (img.data || img);
+                                                      return (<div key={imgIdx} className="relative"><img src={u} alt={"Lab "+(imgIdx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(u,"_blank")} /></div>);
+                                                    })}
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                ))}
+                                {standaloneOrders.map((order, idx) => {
                                   const latestResult = order.results[0];
                                   return (
                                     <div key={order.id} className="p-4 border rounded-lg border-indigo-200 bg-indigo-50">
                                       <div className="flex justify-between items-start mb-3">
                                         <div>
-                                          <p className="font-medium text-indigo-800">{order.labTest.name}</p>
-                                          <p className="text-sm text-indigo-600">Completed: {new Date(latestResult.createdAt).toLocaleDateString()}</p>
+                                          <p className="font-medium text-indigo-800">{order.labTest.name} <span className="text-sm text-indigo-600">#{idx + 1}</span></p>
+                                          <p className="text-sm text-indigo-600">Completed: {new Date(latestResult.createdAt).toLocaleString()}</p>
                                         </div>
                                         <span className="px-2 py-1 text-xs font-medium text-indigo-800 bg-indigo-200 rounded-full">COMPLETED</span>
                                       </div>
@@ -4656,8 +4669,8 @@ const PatientConsultationPage = () => {
                                         <div className="mt-3 pt-3 border-t border-indigo-200">
                                           <p className="text-sm font-medium text-gray-700 mb-2">Attached Images:</p>
                                           <div className="grid grid-cols-3 gap-2">
-                                            {latestResult.results._images.map((img, idx) => (
-                                              <div key={idx} className="relative"><img src={img.url ? getImageUrl(img.url) : (img.data || img)} alt={"Lab "+(idx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.url ? getImageUrl(img.url) : (img.data || img),"_blank")} /></div>
+                                            {latestResult.results._images.map((img, imgIdx) => (
+                                              <div key={imgIdx} className="relative"><img src={img.url ? getImageUrl(img.url) : (img.data || img)} alt={"Lab "+(imgIdx+1)} className="w-full h-20 object-cover rounded border cursor-pointer" onClick={() => window.open(img.url ? getImageUrl(img.url) : (img.data || img),"_blank")} /></div>
                                             ))}
                                           </div>
                                         </div>

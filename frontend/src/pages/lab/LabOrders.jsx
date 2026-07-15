@@ -258,6 +258,7 @@ const LabOrders = () => {
     });
 
     setSelectedOrder(order);
+    setLabImages({}); // Clear cached images for a clean slate when opening a new order
     setShowTemplateForm(true);
 
     // Check if this is a grouped lab test order (labtest_group) 
@@ -662,23 +663,29 @@ const LabOrders = () => {
     if (isPanel) {
       setSelectedService('panel_' + serviceId);
       const group = panelGroupData[serviceId];
-      if (group && !labImages['panel_' + serviceId]) {
-        const storedImages = [];
-        group.entries.forEach(oid => {
-          const r = testResults[oid];
-          if (r?.results?._images?.length) {
-            r.results._images.forEach(img => {
-              const key = img.data || img.url || img;
-              if (key && !storedImages.some(x => (x.data || x.url || x) === key)) {
-                storedImages.push(img);
-              }
-            });
-          }
-        });
-        if (storedImages.length > 0) {
-          setLabImages(prev => ({ ...prev, ['panel_' + serviceId]: storedImages }));
+      // Always recompute from non-completed orders for a clean slate
+      const storedImages = [];
+      group?.entries.forEach(oid => {
+        const r = testResults[oid];
+        if (r?.completed) return; // Skip completed orders — clean slate for new orders
+        if (r?.results?._images?.length) {
+          r.results._images.forEach(img => {
+            const key = img.data || img.url || img;
+            if (key && !storedImages.some(x => (x.data || x.url || x) === key)) {
+              storedImages.push(img);
+            }
+          });
         }
-      }
+      });
+      setLabImages(prev => {
+        const next = { ...prev };
+        if (storedImages.length > 0) {
+          next['panel_' + serviceId] = storedImages;
+        } else {
+          delete next['panel_' + serviceId];
+        }
+        return next;
+      });
     } else {
       setSelectedService(serviceId);
     }
@@ -2078,7 +2085,7 @@ const LabOrders = () => {
                 </div>
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <h4 className="font-medium text-gray-900 mb-3">Attach Lab Images (for all tests in this panel)</h4>
-                  <ImageUpload onImagesChange={(imgs) => setLabImages(prev => ({ ...prev, ['panel_' + panelId]: imgs }))} existingImages={labImages['panel_' + panelId] || []} />
+                  <ImageUpload key={'panel_' + panelId} onImagesChange={(imgs) => setLabImages(prev => ({ ...prev, ['panel_' + panelId]: imgs }))} existingImages={labImages['panel_' + panelId] || []} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {allFields.map(f => {
@@ -2158,6 +2165,7 @@ const LabOrders = () => {
                   <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                     <h4 className="font-medium text-gray-900 mb-3">Attach Lab Images</h4>
                     <ImageUpload
+                      key={selectedService}
                       onImagesChange={(images) => {
                         setLabImages(prev => ({ ...prev, [selectedService]: images }));
                       }}
