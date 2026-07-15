@@ -2856,6 +2856,17 @@ const PatientConsultationPage = () => {
                                                 {!result.verifiedByUser && result.verifiedBy && (
                                                   <p className="text-xs text-gray-500">Verified by: {result.verifiedBy}</p>
                                                 )}
+                                                {result.detailedResults && result.detailedResults.length > 0 && (
+                                                  <div className="mt-2 pt-2 border-t border-gray-200 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                    {result.detailedResults.map((dr, di) => (
+                                                      <div key={di} className="text-xs">
+                                                        <span className="font-medium text-gray-700">{dr.testName}: </span>
+                                                        <span className="font-bold text-gray-900">{dr.result} {dr.unit || ''}</span>
+                                                        {dr.referenceRange && <span className="text-gray-400 ml-1">(Ref: {dr.referenceRange})</span>}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
                                               </div>
                                             ))}
                                           </div>
