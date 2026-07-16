@@ -193,13 +193,30 @@ exports.getPatientHistory = async (req, res) => {
       }
     });
 
+    // Get transfer records for showing receiving doctor on transferred visits
+    let transfers = [];
+    try {
+      transfers = await prisma.patientTransfer.findMany({
+        where: { patientId },
+        select: {
+          id: true, fromDoctorId: true, toDoctorId: true, visitId: true, subVisitId: true,
+          status: true, reason: true, createdAt: true,
+          fromDoctor: { select: { id: true, fullname: true } },
+          toDoctor: { select: { id: true, fullname: true, username: true, qualifications: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    } catch (err) {
+      console.warn('Could not fetch transfers for patient history:', err.message);
+    }
+
     // Get assigned doctors for each visit through Assignment table
     // Visit has assignmentId field that links to Assignment
     const visitsWithDoctors = await Promise.all(
       visits.map(async (visit) => {
         let assignedDoctor = null;
 
-        // If visit has assignmentId, fetch the assignment
+        // 1. If visit has assignmentId, fetch the assignment (most reliable)
         if (visit.assignmentId) {
           const assignment = await prisma.assignment.findUnique({
             where: { id: visit.assignmentId },
@@ -213,9 +230,35 @@ exports.getPatientHistory = async (req, res) => {
           if (assignment) {
             assignedDoctor = assignment.doctor;
           }
-        } else {
-          // Fallback: try to find assignment by patientId (for older visits without assignmentId)
-          // This is less accurate but better than nothing
+        }
+
+        // 2. If this is a sub-visit (transferred), find the receiving doctor from transfer record
+        if (!assignedDoctor && visit.parentVisitId) {
+          const transfer = transfers.find(t => t.subVisitId === visit.id);
+          if (transfer && transfer.toDoctor) {
+            assignedDoctor = {
+              id: transfer.toDoctor.id,
+              fullname: transfer.toDoctor.fullname,
+              username: transfer.toDoctor.username,
+              qualifications: transfer.toDoctor.qualifications
+            };
+          }
+        }
+
+        // 3. If still no doctor and suggestedDoctorId is set, fetch that doctor directly
+        if (!assignedDoctor && visit.suggestedDoctorId) {
+          const suggestedDoctor = await prisma.user.findUnique({
+            where: { id: visit.suggestedDoctorId },
+            select: { id: true, fullname: true, username: true, qualifications: true }
+          });
+          if (suggestedDoctor) {
+            assignedDoctor = suggestedDoctor;
+          }
+        }
+
+        // 4. Fallback: try to find assignment by patientId (for older visits without assignmentId)
+        // This is less accurate but better than nothing
+        if (!assignedDoctor) {
           const assignment = await prisma.assignment.findFirst({
             where: {
               patientId: visit.patientId,
@@ -240,23 +283,6 @@ exports.getPatientHistory = async (req, res) => {
         };
       })
     );
-
-    // Get transfer records for showing receiving doctor on transferred visits
-    let transfers = [];
-    try {
-      transfers = await prisma.patientTransfer.findMany({
-        where: { patientId },
-        select: {
-          id: true, fromDoctorId: true, toDoctorId: true, visitId: true, subVisitId: true,
-          status: true, reason: true, createdAt: true,
-          fromDoctor: { select: { id: true, fullname: true } },
-          toDoctor: { select: { id: true, fullname: true } }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
-    } catch (err) {
-      console.warn('Could not fetch transfers for patient history:', err.message);
-    }
 
     res.json({
       patient,
