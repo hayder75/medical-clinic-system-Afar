@@ -6,8 +6,6 @@ exports.requestLoan = async (req, res) => {
     const { amount, reason, settlementMethod } = req.body;
     const staffId = req.user.id;
 
-    console.log('Loan request received:', { amount, reason, settlementMethod, staffId });
-
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Valid amount is required' });
     }
@@ -18,8 +16,6 @@ exports.requestLoan = async (req, res) => {
       ? settlementMethod.toUpperCase()
       : 'INSTANT_PAID';
     
-    console.log('Using settlement method:', method);
-
     const loan = await prisma.loan.create({
       data: {
         staffId,

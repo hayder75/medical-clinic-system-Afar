@@ -1101,8 +1101,6 @@ exports.getPatientReceipts = async (req, res) => {
       visitCount: patientData.visitIds.size
     }));
     
-    console.log(`[getPatientReceipts] Found ${bills.length} bills, grouped into ${patients.length} patients for date ${targetDate.toISOString().split('T')[0]}`);
-    
     res.json({
       success: true,
       patients,

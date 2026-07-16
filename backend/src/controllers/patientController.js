@@ -71,14 +71,11 @@ exports.getPatient = async (req, res) => {
 exports.searchPatients = async (req, res) => {
   try {
     const { query, type } = req.query;
-    console.log('🔍 Patient search request:', { query, type });
-
     if (!query || query.trim().length < 1) {
       return res.status(400).json({ error: 'Search query is required' });
     }
 
     const searchTerm = query.trim();
-    console.log('🔍 Search term:', searchTerm);
 
     // For patient history search, don't filter by status to show all patients
     let whereClause = {};
@@ -174,8 +171,6 @@ exports.searchPatients = async (req, res) => {
     const searchWhereClause = { ...whereClause };
     delete searchWhereClause.status;
 
-    console.log('🔍 Search whereClause:', JSON.stringify(searchWhereClause, null, 2));
-
     // Use raw SQL for more flexible name matching (handles trailing spaces)
     // First try Prisma query
     let patients = await prisma.patient.findMany({
@@ -202,7 +197,6 @@ exports.searchPatients = async (req, res) => {
     // If no results and we're searching by name, try raw SQL with trimmed names
     // This handles trailing spaces in patient names and similar spellings
     if (patients.length === 0 && searchTerm.length >= 2) {
-      console.log('🔍 No results with Prisma, trying raw SQL with trimmed names...');
       try {
         const searchPattern = `%${searchTerm}%`;
         const searchPatternStart = `${searchTerm}%`;
@@ -250,7 +244,6 @@ exports.searchPatients = async (req, res) => {
         const rawPatients = await prisma.$queryRawUnsafe(rawQuery, ...params);
 
         if (rawPatients && rawPatients.length > 0) {
-          console.log('🔍 Found patients with raw SQL:', rawPatients.length);
           patients = rawPatients.map(p => ({
             ...p,
             name: p.name?.trim() || p.name
@@ -267,14 +260,8 @@ exports.searchPatients = async (req, res) => {
       name: patient.name?.trim() || patient.name
     }));
 
-    console.log('🔍 Found patients (first query):', patients.length);
-    if (patients.length > 0) {
-      console.log('🔍 Sample patient:', { id: patients[0].id, name: patients[0].name, status: patients[0].status });
-    }
-
     // If no patients found, try searching by visit ID
     if (patients.length === 0) {
-      console.log('🔍 No patients found, trying visit search...');
       const visits = await prisma.visit.findMany({
         where: {
           visitUid: {
@@ -304,18 +291,11 @@ exports.searchPatients = async (req, res) => {
         take: 20
       });
 
-      console.log('🔍 Found visits:', visits.length);
-
       // Include all patients from visits, not just Active ones
       patients = visits.map(visit => visit.patient).filter((patient, index, self) =>
         patient && self.findIndex(p => p.id === patient.id) === index
       );
-
-      console.log('🔍 Patients from visits:', patients.length);
     }
-
-    console.log('🔍 Final patients count:', patients.length);
-    console.log('🔍 Final patients:', patients.map(p => ({ id: p.id, name: p.name, status: p.status })));
 
 
     res.json({

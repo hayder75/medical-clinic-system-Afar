@@ -279,8 +279,6 @@ exports.removeServiceFromEmergency = async (req, res) => {
 // Process emergency payment - Simplified status update
 exports.processEmergencyPayment = async (req, res) => {
   try {
-    console.log('Emergency payment request body:', JSON.stringify(req.body, null, 2));
-    
     const { billingId, amount, type, bankName, transNumber, notes } = req.body;
     const billingOfficerId = req.user.id;
 
@@ -316,8 +314,6 @@ exports.processEmergencyPayment = async (req, res) => {
 
     const paidAmount = amount ? parseFloat(amount) : billing.totalAmount;
 
-    console.log('Updating emergency billing status...');
-
     // Create bill payment record for proper financial tracking
     await prisma.billPayment.create({
       data: {
@@ -352,8 +348,6 @@ exports.processEmergencyPayment = async (req, res) => {
       data: { status: 'PAID' }
     });
 
-    console.log('Billing status updated');
-
     // Log action
     await prisma.auditLog.create({
       data: {
@@ -364,8 +358,6 @@ exports.processEmergencyPayment = async (req, res) => {
         details: `Emergency payment of ETB ${paidAmount} (${type || 'CASH'}) processed for patient ${billing.patient.name}. Linked orders marked PAID.`
       }
     });
-
-    console.log('Audit log created');
 
     res.json({
       billing: {

@@ -26,18 +26,11 @@ const updateAppointmentSchema = z.object({
  */
 const createAppointment = async (req, res) => {
   try {
-    console.log('=== CREATE APPOINTMENT START ===');
-    console.log('Request body:', req.body);
-    console.log('User ID:', req.user?.id);
-
     const validatedData = createAppointmentSchema.parse(req.body);
-    console.log('Validated data:', validatedData);
 
     const createdById = req.user.id;
-    console.log('Created by ID:', createdById);
 
     // 1. Check if patient exists and has ACTIVE card
-    console.log('Checking patient:', validatedData.patientId);
     const patient = await prisma.patient.findUnique({
       where: { id: validatedData.patientId },
       select: {
@@ -67,10 +60,7 @@ const createAppointment = async (req, res) => {
         }
       }
     });
-    console.log('Patient found:', patient);
-
     if (!patient) {
-      console.log('Patient not found');
       return res.status(404).json({
         success: false,
         message: 'Patient not found'
@@ -78,7 +68,6 @@ const createAppointment = async (req, res) => {
     }
 
     if (patient.cardStatus !== 'ACTIVE') {
-      console.log('Patient card not active:', patient.cardStatus);
       return res.status(400).json({
         success: false,
         message: 'Patient card must be ACTIVE to book an appointment',
@@ -91,18 +80,13 @@ const createAppointment = async (req, res) => {
     if (patient.visits.length > 0 && patient.visits[0].diagnosisNotes.length > 0) {
       lastDiagnosedBy = patient.visits[0].diagnosisNotes[0].doctorId;
     }
-    console.log('Last diagnosed by:', lastDiagnosedBy);
-
     // 3. Check if doctor exists
-    console.log('Checking doctor:', validatedData.doctorId);
     const doctor = await prisma.user.findUnique({
       where: { id: validatedData.doctorId },
       select: { id: true, fullname: true, role: true }
     });
-    console.log('Doctor found:', doctor);
 
     if (!doctor || doctor.role !== 'DOCTOR') {
-      console.log('Doctor not found or not a doctor');
       return res.status(404).json({
         success: false,
         message: 'Doctor not found'
@@ -151,7 +135,6 @@ const createAppointment = async (req, res) => {
       });
 
       if (conflictingAppointment) {
-        console.log('Time conflict detected');
         return res.status(400).json({
           success: false,
           message: `Doctor already has an appointment at ${conflictingAppointment.appointmentTime}. Please schedule at least ${GAP_MINUTES} minutes apart.`,
@@ -161,7 +144,6 @@ const createAppointment = async (req, res) => {
     }
 
     // 5. Create appointment
-    console.log('Creating appointment...');
     const appointment = await prisma.appointment.create({
       data: {
         patientId: validatedData.patientId,
@@ -200,8 +182,6 @@ const createAppointment = async (req, res) => {
         }
       }
     });
-    console.log('Appointment created successfully:', appointment);
-
     res.status(201).json({
       success: true,
       message: 'Appointment created successfully',
@@ -209,13 +189,11 @@ const createAppointment = async (req, res) => {
     });
 
   } catch (error) {
-    console.log('=== CREATE APPOINTMENT ERROR ===');
     console.error('Error details:', error);
     console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
 
     if (error instanceof z.ZodError) {
-      console.log('Zod validation error:', error.errors);
       return res.status(400).json({
         success: false,
         message: 'Validation error',

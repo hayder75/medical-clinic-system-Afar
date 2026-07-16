@@ -250,9 +250,6 @@ exports.getDentalPhotos = async (req, res) => {
     const beforePhotos = photos.filter(photo => photo.photoType === 'BEFORE');
     const afterPhotos = photos.filter(photo => photo.photoType === 'AFTER');
 
-    console.log('🔍 Raw photo filePath examples:', beforePhotos.slice(0, 2).map(p => p.filePath));
-    console.log('🔍 After regex replacement:', beforePhotos.slice(0, 2).map(p => p.filePath.replace(/^.*\/uploads\//, 'uploads/')));
-
     res.json({
       visitId: parseInt(visitId),
       patient: {

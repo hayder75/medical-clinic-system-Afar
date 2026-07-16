@@ -62,8 +62,6 @@ exports.getLoginUsers = async (req, res) => {
 
     if (!users || users.length === 0) {
       console.warn('⚠️ [getLoginUsers] No active users found in database');
-    } else {
-      console.log(`✅ [getLoginUsers] Fetched ${users.length} active users`);
     }
 
     res.json({ users: users || [] });

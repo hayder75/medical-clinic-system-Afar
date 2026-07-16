@@ -196,8 +196,6 @@ exports.fillReport = async (req, res) => {
     const { orderId, testResults, isWalkIn: isWalkInRequest } = req.body;
     const radiologistId = req.user.id;
 
-    console.log(`🔍 [fillReport] Processing order ${orderId}, isWalkInRequest: ${isWalkInRequest}, testResults count: ${testResults?.length || 0}`);
-
     let batchOrder = null;
     let isWalkIn = false;
     let walkInOrders = [];
@@ -228,7 +226,6 @@ exports.fillReport = async (req, res) => {
 
         if (walkInOrders.length > 0) {
           isWalkIn = true;
-          console.log(`✅ [fillReport] Found ${walkInOrders.length} walk-in orders in billing group`);
         }
       }
     } else {
@@ -261,12 +258,10 @@ exports.fillReport = async (req, res) => {
     }
 
     if (!batchOrder && !isWalkIn) {
-      console.log(`❌ [fillReport] Order ${orderId} not found (isWalkInRequest: ${isWalkInRequest})`);
       return res.status(404).json({ error: 'Radiology order not found' });
     }
 
     if (batchOrder && !['QUEUED', 'PAID', 'IN_PROGRESS', 'COMPLETED'].includes(batchOrder.status)) {
-      console.log(`⚠️  [fillReport] Batch order ${orderId} has status '${batchOrder.status}', which is not processable.`);
       return res.status(400).json({
         error: 'Order is not in queue for processing',
         currentStatus: batchOrder.status
@@ -445,8 +440,6 @@ exports.fillReport = async (req, res) => {
       createdResults.push(radiologyResult);
     }
 
-    console.log(`✅ [fillReport] Created ${createdResults.length} radiology results for batch order ${orderId}`);
-
     // Update individual radiology services to COMPLETED
     for (const service of batchOrder.services) {
       if (service.investigationType?.category === 'RADIOLOGY' || service.service?.code?.startsWith('RAD_')) {
@@ -467,7 +460,6 @@ exports.fillReport = async (req, res) => {
     const allServicesCompleted = updatedBatchOrderSnapshot.services.every(s => s.status === 'COMPLETED');
 
     if (allServicesCompleted) {
-      console.log(`🔄 [fillReport] All services done. Updating batch order ${orderId} to 'COMPLETED'...`);
       await prisma.batchOrder.update({
         where: { id: orderId },
         data: {
@@ -475,8 +467,6 @@ exports.fillReport = async (req, res) => {
           updatedAt: new Date()
         }
       });
-    } else {
-      console.log(`ℹ️ [fillReport] Some services still pending in batch order ${orderId}. Keeping status as is.`);
     }
 
     // Assign for the response (using a fresh fetch to be sure)
@@ -553,7 +543,6 @@ exports.fillReport = async (req, res) => {
     // Check if all investigations for this visit are completed
     try {
       const completionResult = await checkVisitInvestigationCompletion(batchOrder.visitId);
-      console.log(`📋 Visit ${batchOrder.visitId} completion check result:`, completionResult.isComplete);
     } catch (error) {
       console.error('Error checking investigation completion:', error);
 
@@ -573,7 +562,6 @@ exports.fillReport = async (req, res) => {
               updatedAt: new Date()
             }
           });
-          console.log(`🔄 Fallback: Visit ${batchOrder.visitId} updated to AWAITING_RESULTS_REVIEW`);
         }
       } catch (fallbackError) {
         console.error('Fallback visit update failed:', fallbackError?.message || fallbackError);
@@ -1140,17 +1128,6 @@ exports.getBatchRadiologyResults = async (req, res) => {
       };
     }));
 
-    // Debug logging
-    console.log(`📋 [getBatchRadiologyResults] Found ${radiologyResults.length} radiology results for batch order ${batchOrderId}`);
-    radiologyResults.forEach((result, idx) => {
-      console.log(`  Result ${idx + 1}: ${result.testType?.name}, attachments: ${result.attachments?.length || 0}`);
-      if (result.attachments && result.attachments.length > 0) {
-        result.attachments.forEach((att, attIdx) => {
-          console.log(`    Attachment ${attIdx + 1}: ${att.fileName} (${att.fileUrl})`);
-        });
-      }
-    });
-
     res.json({ radiologyResults });
 
   } catch (error) {
@@ -1164,8 +1141,6 @@ exports.getTemplate = async (req, res) => {
   try {
     const { investigationTypeId } = req.params;
     const parsedId = parseInt(investigationTypeId);
-
-    console.log(`🔍 [Radiology Template] Fetching template for investigationTypeId: ${parsedId} (raw: ${investigationTypeId})`);
 
     const template = await prisma.radiologyTemplate.findUnique({
       where: { investigationTypeId: parsedId },
@@ -1181,18 +1156,8 @@ exports.getTemplate = async (req, res) => {
     });
 
     if (!template) {
-      console.log(`⚠️  [Radiology Template] Template NOT FOUND for investigationTypeId: ${parsedId}`);
       return res.json({ template: null });
     }
-
-    console.log(`✅ [Radiology Template] Template found for ${template.investigationType.name} (ID: ${template.investigationType.id}):`, {
-      hasClinicalIndication: !!template.clinicalIndicationTemplate,
-      hasTechnique: !!template.techniqueTemplate,
-      hasFindings: !!template.findingsTemplate,
-      findingsLength: template.findingsTemplate?.length || 0,
-      hasConclusion: !!template.conclusionTemplate,
-      conclusionLength: template.conclusionTemplate?.length || 0
-    });
 
     res.json({ template });
   } catch (error) {
@@ -1326,10 +1291,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
     // Always use A4 paper size
     const selectedPaperSize = 'A4';
 
-    console.log(`\n📸 [Radiology PDF] ===== Starting PDF Generation =====`);
-    console.log(`📸 [Radiology PDF] Order ID: ${orderId}, Paper Size: A4`);
-    console.log(`📸 [Radiology PDF] User ID: ${radiologistId}`);
-
     let batchOrder = null;
     let walkInOrders = [];
     let radiologyResults = [];
@@ -1364,10 +1325,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
     });
 
     if (batchOrder) {
-      // This is a batch order
-      console.log(`✅ [Radiology PDF] Found batch order ${orderId}`);
-      console.log(`   Patient: ${batchOrder.patient?.name || 'N/A'}`);
-      console.log(`   Status: ${batchOrder.status}`);
       patient = batchOrder.patient;
       orderDate = batchOrder.createdAt;
       orderStatus = batchOrder.status;
@@ -1381,9 +1338,7 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
         },
         orderBy: { createdAt: 'asc' }
       });
-      console.log(`📸 [Radiology PDF] Found ${radiologyResults.length} radiology results for batch order`);
     } else {
-      console.log(`⚠️  [Radiology PDF] Batch order ${orderId} not found, checking walk-in orders...`);
       // Try walk-in order - the orderId could be from a grouped order
       // First try finding by ID directly
       let firstWalkInOrder = await prisma.radiologyOrder.findFirst({
@@ -1404,7 +1359,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
       // If not found by direct ID, try finding by checking all walk-in orders
       // The frontend might be using a group ID that doesn't match the actual order ID
       if (!firstWalkInOrder) {
-        console.log(`⚠️  [Radiology PDF] Order ${orderId} not found directly, searching all walk-in orders...`);
 
         // Get all walk-in orders to check if any have results
         // This is a fallback for when the ID doesn't match directly
@@ -1429,8 +1383,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
           orderBy: { createdAt: 'desc' },
           take: 10 // Limit to recent orders
         });
-
-        console.log(`🔍 [Radiology PDF] Found ${allWalkInWithResults.length} walk-in orders with results`);
 
         // Try to find an order that might match (maybe by checking if orderId is in a billing group)
         for (const order of allWalkInWithResults) {
@@ -1460,7 +1412,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
               if (order.id === orderId || groupOrders.some(o => o.id === orderId)) {
                 firstWalkInOrder = groupOrders[0] || order;
                 walkInOrders = groupOrders;
-                console.log(`✅ [Radiology PDF] Found matching walk-in order group with ${walkInOrders.length} orders`);
                 break;
               }
             }
@@ -1486,16 +1437,12 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
             },
             orderBy: { createdAt: 'asc' }
           });
-          console.log(`✅ [Radiology PDF] Found ${walkInOrders.length} walk-in orders in billing group ${firstWalkInOrder.billingId}`);
         } else {
           walkInOrders = [firstWalkInOrder];
-          console.log(`✅ [Radiology PDF] Found single walk-in order ${orderId}`);
         }
       }
 
       if (!firstWalkInOrder && walkInOrders.length === 0) {
-        // Last resort: search for any completed radiology order with results
-        console.log(`⚠️  [Radiology PDF] Trying last resort: searching all radiology results...`);
         const allResults = await prisma.radiologyResult.findMany({
           where: {
             OR: [
@@ -1518,7 +1465,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
         });
 
         if (allResults.length > 0) {
-          console.log(`✅ [Radiology PDF] Found ${allResults.length} results by searching radiology results directly`);
           radiologyResults = allResults;
 
           // Get patient from first result
@@ -1532,7 +1478,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
             orderStatus = allResults[0].radiologyOrder.status;
           }
         } else {
-          console.log(`❌ [Radiology PDF] Order ${orderId} not found anywhere`);
           return res.status(404).json({
             error: `Radiology order ${orderId} not found`,
             details: 'Please ensure the order has been completed and results have been saved.'
@@ -1572,16 +1517,12 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
     }
 
     if (radiologyResults.length === 0) {
-      console.log(`⚠️  [Radiology PDF] No radiology results found for order ${orderId}`);
       return res.status(404).json({ error: 'No radiology results found for this order. Please complete the radiology tests first.' });
     }
 
     if (!patient) {
-      console.log(`❌ [Radiology PDF] Patient information not found for order ${orderId}`);
       return res.status(404).json({ error: 'Patient information not found' });
     }
-
-    console.log(`✅ [Radiology PDF] Successfully prepared ${radiologyResults.length} radiology results for order ${orderId}`);
 
     // Get radiologist info
     const radiologist = await prisma.user.findUnique({
@@ -1804,7 +1745,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
 
     // Create PDF document using utility
     try {
-      console.log(`📸 [Radiology PDF] Creating PDF document definition...`);
       const docDefinition = createPDFDocument({
         paperSize: selectedPaperSize,
         clinicName: getDefaultClinicName(),
@@ -1812,23 +1752,16 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
         includeLogo: true,
         footerText: `Generated on: ${formatDateTime(new Date())}`
       });
-      console.log(`✅ [Radiology PDF] PDF document definition created successfully`);
-
       // Generate PDF - ensure uploads directory exists
       const uploadsDir = path.join(__dirname, '../../uploads');
       if (!fs.existsSync(uploadsDir)) {
-        console.log(`📁 [Radiology PDF] Creating uploads directory: ${uploadsDir}`);
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
 
       const fileName = `radiology-results-${orderId}-${Date.now()}.pdf`;
       const filePath = path.join(uploadsDir, fileName);
 
-      console.log(`📸 [Radiology PDF] Generating PDF file for order ${orderId} with paper size ${selectedPaperSize}...`);
-      console.log(`   File path: ${filePath}`);
-
       await generatePDF(docDefinition, filePath);
-      console.log(`✅ [Radiology PDF] PDF file generated successfully: ${filePath}`);
 
       // Check if file was created
       if (!fs.existsSync(filePath)) {
@@ -1837,7 +1770,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
       }
 
       const stats = fs.statSync(filePath);
-      console.log(`📊 [Radiology PDF] PDF file size: ${stats.size} bytes`);
 
       if (stats.size === 0) {
         console.error(`❌ [Radiology PDF] PDF file is empty (0 bytes)`);
@@ -1848,7 +1780,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
       // This is more reliable than sendFile for PDFs
       try {
         const fileBuffer = fs.readFileSync(filePath);
-        console.log(`✅ [Radiology PDF] File read successfully, buffer size: ${fileBuffer.length} bytes`);
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
@@ -1856,7 +1787,6 @@ exports.generateRadiologyResultsPDF = async (req, res) => {
         res.setHeader('Cache-Control', 'no-cache');
 
         res.send(fileBuffer);
-        console.log(`✅ [Radiology PDF] PDF sent successfully to client`);
       } catch (readError) {
         console.error(`❌ [Radiology PDF] Error reading/sending file:`, readError);
         if (!res.headersSent) {

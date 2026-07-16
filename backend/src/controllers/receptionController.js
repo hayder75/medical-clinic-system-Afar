@@ -678,8 +678,6 @@ exports.updatePatient = async (req, res) => {
       // Don't fail the request if audit log fails
     }
 
-    console.log(`✅ Patient ${patientId} updated by ${req.user.username} (${req.user.role})`);
-
     res.json({
       success: true,
       message: 'Patient updated successfully',

@@ -424,8 +424,6 @@ exports.generateWalkInSalePDF = async (req, res) => {
   try {
     const { invoiceId } = req.params;
 
-    console.log('🔍 Generating PDF for invoice:', invoiceId);
-
     const invoice = await prisma.pharmacyInvoice.findUnique({
       where: { id: invoiceId },
       include: {
@@ -440,12 +438,6 @@ exports.generateWalkInSalePDF = async (req, res) => {
     if (invoice.type !== 'WALK_IN_SALE') {
       return res.status(400).json({ error: 'This is not a walk-in sale' });
     }
-
-    console.log('📄 Invoice found:', {
-      id: invoice.id,
-      totalAmount: invoice.totalAmount,
-      itemCount: invoice.pharmacyInvoiceItems?.length || 0
-    });
 
     // Parse customer info from notes
     let customerName = 'Unknown';
@@ -672,8 +664,6 @@ exports.generateWalkInSalePDF = async (req, res) => {
       }
     };
 
-    console.log('📝 PDF document definition created, generating PDF...');
-
     // Verify fonts exist
     const fontNormalPath = fonts.Roboto.normal;
     if (!fs.existsSync(fontNormalPath)) {
@@ -701,7 +691,6 @@ exports.generateWalkInSalePDF = async (req, res) => {
       // Wait for PDF to finish generating
       await new Promise((resolve, reject) => {
         pdfDoc.on('end', () => {
-          console.log('✅ PDF generation completed, chunks:', chunks.length);
           resolve();
     });
 
@@ -724,8 +713,6 @@ exports.generateWalkInSalePDF = async (req, res) => {
 
       // Send the PDF buffer
       res.send(pdfBuffer);
-      console.log('✅ PDF sent successfully, size:', pdfBuffer.length, 'bytes');
-      
     } catch (pdfError) {
       console.error('❌ Error creating PDF document:', pdfError);
       console.error('Error details:', pdfError.stack);

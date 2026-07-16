@@ -20,11 +20,6 @@ const uploadImageSchema = z.object({
  */
 exports.uploadImage = async (req, res) => {
   try {
-    console.log('📸 Gallery upload request:', {
-      body: req.body,
-      file: req.file ? { name: req.file.filename, size: req.file.size } : null
-    });
-
     // Check if file was uploaded
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });

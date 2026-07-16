@@ -110,7 +110,6 @@ const recordAdvanceCashReceipt = async ({ userId, amount, paymentMethod = 'CASH'
 // Get all patient accounts with filters
 exports.getAccounts = async (req, res) => {
   try {
-    console.log('getAccounts called with query:', req.query);
     const { type, search } = req.query;
 
     let whereClause = {};
@@ -136,7 +135,6 @@ exports.getAccounts = async (req, res) => {
       };
     }
 
-    console.log('Querying with whereClause:', JSON.stringify(whereClause));
     const accounts = await prisma.patientAccount.findMany({
       where: whereClause,
       include: {

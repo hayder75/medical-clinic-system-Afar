@@ -245,9 +245,6 @@ exports.recordVitals = async (req, res) => {
           where: { id: data.patientId },
           data: { bloodType: data.bloodType }
         });
-        console.log(`✅ Updated blood type for patient ${data.patientId} to ${data.bloodType}`);
-      } else {
-        console.log(`⚠️ Patient ${data.patientId} already has blood type ${patient.bloodType} - not overwriting`);
       }
     }
 
@@ -286,9 +283,6 @@ exports.recordVitals = async (req, res) => {
         where: { id: data.visitId },
         data: { status: 'TRIAGED' }
       });
-      console.log('🔍 recordVitals: Updated visit status from', visit.status, 'to TRIAGED for visitId:', data.visitId);
-    } else {
-      console.log('🔍 recordVitals: Keeping visit status as', visit.status, 'for visitId:', data.visitId);
     }
 
     res.json({
@@ -445,8 +439,6 @@ exports.assignDoctor = async (req, res) => {
         data: { assignmentId: assignment.id, suggestedDoctorId: doctorId, cardProductId: cardReq.cardProductId, status: 'AWAITING_CARD_BILLING' },
       });
 
-      console.log(`🔍 assignDoctor: Card billing needed — ${cardReq.reason}, visit ${visitId} → AWAITING_CARD_BILLING`);
-
       const messageMap = {
         REGISTRATION: `Patient needs a new ${cardReq.cardProductSlug} card. Card registration billing created (${cardReq.billingAmount} ETB). Patient must pay at billing counter.`,
         UPGRADE: `Doctor requires a ${cardReq.cardProductSlug} card. Upgrade billing created (${cardReq.billingAmount} ETB diff). Patient must pay at billing counter.`,
@@ -462,8 +454,6 @@ exports.assignDoctor = async (req, res) => {
     }
 
     // ─── No card billing needed — normal flow ─────────────────
-    console.log('🔍 assignDoctor: No card billing needed, linking assignment for visitId:', visitId);
-
     await prisma.visit.update({
       where: { id: visitId },
       data: { assignmentId: assignment.id, suggestedDoctorId: doctorId }
@@ -512,8 +502,6 @@ exports.assignDoctor = async (req, res) => {
     } else {
       finalStatus = 'TRIAGED';
     }
-    console.log('🔍 assignDoctor: Active Card 0 ETB billing created → status:', finalStatus);
-
     await prisma.visit.update({
       where: { id: visitId },
       data: {
@@ -522,8 +510,6 @@ exports.assignDoctor = async (req, res) => {
         suggestedDoctorId: doctorId
       }
     });
-
-    console.log('✅ assignDoctor: Visit updated - Status:', finalStatus, 'AssignmentId:', assignment.id, 'DoctorId:', doctorId, 'Waiver:', doctor.waiveConsultationFee);
 
     try {
       getIO().to('role:DOCTOR').emit('queue:new-visit', {
@@ -1503,8 +1489,6 @@ exports.assignNurseService = async (req, res) => {
 
     // Don't update visit status here - keep patient in triage queue
     // Status will be updated when nurse explicitly completes triage
-    console.log('🔍 assignNurseService: Keeping visit status as', visit.status, 'for visitId:', visitId);
-
     // Create billing for nurse service
     const billing = await prisma.billing.create({
       data: {
@@ -1850,11 +1834,6 @@ exports.assignNurseServices = async (req, res) => {
       if (totalAmount === 0) {
         // All services waived → send to nurse daily tasks
         finalStatus = 'WAITING_FOR_NURSE_SERVICE';
-        console.log('🔍 assignNurseServices: All services waived → WAITING_FOR_NURSE_SERVICE');
-      } else {
-        // Some services NOT waived → keep in TRIAGED for billing
-        finalStatus = 'TRIAGED';
-        console.log('🔍 assignNurseServices: Some services NOT waived → TRIAGED (for billing)');
       }
 
       // Update visit status
@@ -1862,8 +1841,6 @@ exports.assignNurseServices = async (req, res) => {
         where: { id: visitId },
         data: { status: finalStatus }
       });
-
-      console.log('🔍 assignNurseServices: Updated visit status to', finalStatus, 'for visitId:', visitId);
 
       return { nurseAssignments, billing };
     });
@@ -1949,8 +1926,6 @@ exports.assignCombined = async (req, res) => {
           where: { id: visitId },
           data: { assignmentId: bareAssignment.id, suggestedDoctorId: doctorId, cardProductId: cardReq.cardProductId, status: 'AWAITING_CARD_BILLING' },
         });
-
-        console.log(`🔍 assignCombined: Card billing needed — ${cardReq.reason}, visit ${visitId} → AWAITING_CARD_BILLING`);
 
         const messageMap = {
           REGISTRATION: `Patient needs a new ${cardReq.cardProductSlug} card. Card registration billing created (${cardReq.billingAmount} ETB).`,
@@ -2302,10 +2277,6 @@ exports.assignCombined = async (req, res) => {
         } else {
           finalStatus = 'TRIAGED'; // Route to billing queue
         }
-        console.log('🔍 assignCombined: Billing services exist → routing to billing desk first, status:', finalStatus);
-      } else {
-        // No services at all, keep current status
-        console.log('🔍 assignCombined: No billing services → keeping status:', finalStatus);
       }
 
       // Update visit status and link doctor assignment
@@ -2321,8 +2292,6 @@ exports.assignCombined = async (req, res) => {
         where: { id: visitId },
         data: updateData
       });
-
-      console.log('🔍 assignCombined: Updated visit status to', finalStatus, 'for visitId:', visitId);
 
       return { assignments, billing };
     });
@@ -2401,8 +2370,6 @@ exports.completeNurseService = async (req, res) => {
     const { assignmentId, notes } = req.body;
     const nurseId = req.user.id;
 
-    console.log('🔍 completeNurseService: Starting completion for assignmentId:', assignmentId, 'nurseId:', nurseId);
-
     // Get current user data
     const currentUser = await prisma.user.findUnique({
       where: { id: nurseId },
@@ -2429,21 +2396,16 @@ exports.completeNurseService = async (req, res) => {
     });
 
     if (!assignment) {
-      console.log('❌ completeNurseService: Assignment not found:', assignmentId);
       return res.status(404).json({ error: 'Assignment not found' });
     }
 
-    console.log('🔍 completeNurseService: Assignment found, visitId:', assignment.visitId, 'current status:', assignment.status);
-
     // Verify assignment belongs to current nurse
     if (assignment.assignedNurseId !== nurseId) {
-      console.log('❌ completeNurseService: Assignment does not belong to nurse. assignedNurseId:', assignment.assignedNurseId, 'current nurseId:', nurseId);
       return res.status(403).json({ error: 'You are not assigned to this service' });
     }
 
     // Verify assignment is in correct status
     if (!['PENDING', 'IN_PROGRESS'].includes(assignment.status)) {
-      console.log('❌ completeNurseService: Assignment already completed. Status:', assignment.status);
       return res.status(400).json({ error: 'Assignment is already completed or cancelled' });
     }
 
@@ -2546,14 +2508,10 @@ exports.completeNurseService = async (req, res) => {
       updateData.assignmentId = doctorAssignment.id;
     }
 
-    console.log('🔍 completeNurseService: Updating visit status from', visitWithAssignment?.status, 'to', newVisitStatus, 'for visitId:', assignment.visitId);
-
     await prisma.visit.update({
       where: { id: assignment.visitId },
       data: updateData
     });
-
-    console.log('✅ completeNurseService: Visit status updated successfully');
 
     // Add to patient history
     try {
@@ -2581,7 +2539,6 @@ exports.completeNurseService = async (req, res) => {
           instructions: notes || assignment.notes
         }
       });
-      console.log('✅ completeNurseService: Medical history created successfully');
     } catch (historyError) {
       console.error('⚠️ completeNurseService: Error creating medical history:', historyError.message);
       // Don't fail the whole operation if history creation fails

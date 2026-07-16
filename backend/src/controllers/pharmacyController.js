@@ -297,7 +297,6 @@ exports.bulkDispense = async (req, res) => {
                 }
               }
             });
-            console.log(`✅ Inventory decremented for ${order.name}: -${numericQuantity} units`);
           }
         }
 

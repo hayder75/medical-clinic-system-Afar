@@ -428,10 +428,8 @@ exports.createBatchOrder = async (req, res) => {
               }
             });
           }
-        }
-
-        console.log(`✅ Emergency services added to billing ${billing.id}`);
-      } catch (error) {
+      }
+    } catch (error) {
         console.error('Error with emergency billing:', error);
         // Fallback to regular billing if emergency system fails
         billing = await prisma.billing.create({
@@ -508,7 +506,6 @@ exports.createBatchOrder = async (req, res) => {
               }
             }
           });
-          console.log(`✅ Created deferred (pre-paid) dental billing: ${billing.id}`);
         } else if (!billing) {
           // No existing billing - create new one
           billing = await prisma.billing.create({
@@ -529,7 +526,6 @@ exports.createBatchOrder = async (req, res) => {
           // Created new billing for dental services
         } else {
           // Merge with existing billing
-          console.log(`🔄 Merging dental services into existing billing: ${billing.id}`);
 
           // Add new services to existing billing
           for (const serviceData of billingServices) {
@@ -689,7 +685,6 @@ exports.createBatchOrder = async (req, res) => {
           // Created new billing for diagnostics
         } else {
           // Merge with existing billing
-          console.log(`🔄 Merging diagnostics services into existing billing: ${billing.id}`);
 
           // Get existing billing services to check for duplicates
           const existingBillingServices = await prisma.billingService.findMany({
@@ -703,7 +698,6 @@ exports.createBatchOrder = async (req, res) => {
           for (const service of newServicesAdded) {
             // Skip if service already exists in billing
             if (existingServiceIds.includes(service.serviceId)) {
-              console.log(`Service ${service.serviceId} already exists in billing ${billing.id}, skipping`);
               continue;
             }
 
@@ -878,15 +872,12 @@ exports.createBatchOrder = async (req, res) => {
     // This ensures patients are removed from queue even if they're in IN_DOCTOR_QUEUE status
     if (type === 'DENTAL' && currentVisit.status === 'IN_DOCTOR_QUEUE') {
       newStatus = 'DENTAL_SERVICES_ORDERED';
-      console.log(`🦷 Updating visit ${visitId} status from ${currentVisit.status} to ${newStatus} for dental services order`);
     }
 
     await prisma.visit.update({
       where: { id: visitId },
       data: { status: newStatus }
     });
-
-    console.log(`✅ Visit ${visitId} status updated to: ${newStatus}`);
 
     // For nurse services or procedures with nurse assignment, create nurse service assignments
     if ((type === 'NURSE' || type === 'PROCEDURE') && assignedNurseId) {
@@ -1226,8 +1217,6 @@ exports.createLabTestOrders = async (req, res) => {
 
     // No duplicate check — allow re-ordering. Each request creates new LabTestOrder records.
     const newTestIds = [...labTestIds];
-    console.log(`✅ [createLabTestOrders] Creating ${newTestIds.length} lab test order(s)`);
-
     const result = await prisma.$transaction(async (tx) => {
       // Create a batch order for grouping (optional, for compatibility)
       const batchOrder = await tx.batchOrder.create({
@@ -1414,7 +1403,6 @@ exports.createLabTestOrders = async (req, res) => {
               });
             }
 
-            console.log(`[createLabTestOrders] Lab test "${order.labTest.name}" (${order.labTest.price}) added to billing via fallback LAB service ${fallbackServiceCode}`);
         }
       }
 
@@ -1444,7 +1432,6 @@ exports.createLabTestOrders = async (req, res) => {
           where: { id: visitId },
           data: { status: newVisitStatus }
         });
-        console.log(`✅ Updated visit ${visitId} status to ${newVisitStatus}`);
       }
 
       return { batchOrder, createdOrders, billing };

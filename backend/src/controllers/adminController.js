@@ -838,7 +838,6 @@ exports.createService = async (req, res) => {
             }
           });
           autoCreated.investigationType = true;
-          console.log(`✅ Auto-created InvestigationType for RADIOLOGY service: ${service.name}${radiologyCategoryId ? ` (category: ${radiologyGroupMap[data.radiologyGroup] || data.radiologyGroup})` : ''}`);
         }
       } else if (data.category === 'LAB') {
         // Check if LabTest already exists for this service
@@ -897,7 +896,6 @@ exports.createService = async (req, res) => {
           });
 
           autoCreated.labTest = true;
-          console.log(`✅ Auto-created LabTest with basic template for LAB service: ${service.name}`);
         }
       }
     } catch (autoCreateError) {
@@ -1039,7 +1037,6 @@ exports.updateService = async (req, res) => {
               ...(radId ? { radiologyCategory: { connect: { id: radId } } } : {})
             }
           });
-          console.log(`✅ Auto-created InvestigationType for updated RADIOLOGY service: ${service.name}`);
         } else {
           // Update existing InvestigationType
           const rg = service.radiologyGroup;
@@ -1118,7 +1115,6 @@ exports.updateService = async (req, res) => {
               }
             ]
           });
-          console.log(`✅ Auto-created LabTest for updated LAB service: ${service.name}`);
         } else {
           // Update existing LabTest
           const updateData = {
@@ -1300,7 +1296,6 @@ exports.getInsurances = async (req, res) => {
       res.json({ insurances });
     } catch (dbError) {
       console.log('Database not available, returning mock insurances data');
-
       // Fallback mock data when database is not available
       const mockInsurances = [
         {
@@ -2972,10 +2967,6 @@ exports.getDoctorPerformanceStats = async (req, res) => {
       });
       const assignmentIds = assignments.map(a => a.id);
 
-      console.log(`🔍 Doctor ${doctor.fullname} (${doctor.id}):`);
-      console.log(`   - Assignment IDs: ${assignmentIds.length}`);
-      console.log(`   - Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
-
       // Get assignments created in the date range for this doctor
       const doctorAssignments = await prisma.assignment.findMany({
         where: {
@@ -3079,8 +3070,6 @@ exports.getDoctorPerformanceStats = async (req, res) => {
         }
       });
 
-      console.log(`   - Doctor report lines found: ${procedureLines.length}`);
-
       // Calculate statistics
       const sectionStats = {
         procedures: { revenue: 0, orders: 0, patientIds: new Set() },
@@ -3164,11 +3153,6 @@ exports.getDoctorPerformanceStats = async (req, res) => {
       const doctorWalkinRevenue = sectionStats.doctorWalkin.revenue;
       const totalRevenue = procedureRevenue + labRevenue + emergencyMedicationRevenue + radiologyRevenue + consultationRevenue + nurseRevenue + doctorWalkinRevenue;
       const avgPerPatient = totalPatients > 0 ? totalRevenue / totalPatients : 0;
-
-      console.log(`   - Procedure Revenue: ${procedureRevenue}`);
-      console.log(`   - Lab Revenue: ${labRevenue}`);
-      console.log(`   - Emergency Medication Revenue: ${emergencyMedicationRevenue}`);
-      console.log(`   - Total Patients: ${totalPatients}`);
 
       const visitMap = new Map();
       procedureLines.forEach((line) => {
@@ -3289,10 +3273,6 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       medicalTreatedByDay.set(key, (medicalTreatedByDay.get(key) || 0) + 1);
     });
-
-    console.log(`🔍 Daily Breakdown - Doctor ID: ${doctorId}`);
-    console.log(`   - Assignment IDs: ${assignmentIds.length}`);
-    console.log(`   - Month: ${m + 1}, Year: ${y}`);
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -5619,12 +5599,6 @@ exports.getLabTestsForOrdering = async (req, res) => {
       }
       result[cat] = data;
     }
-
-    console.log('✅ [getLabTestsForOrdering] Response:', {
-      categories: Object.keys(result),
-      totalPanels: Object.values(result).reduce((s, c) => s + c.panels.length, 0),
-      totalStandalone: Object.values(result).reduce((s, c) => s + c.standalone.length, 0)
-    });
 
     res.json({ organized: result });
   } catch (error) {

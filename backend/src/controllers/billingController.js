@@ -819,14 +819,10 @@ exports.getBankMethodSummary = async (req, res) => {
 
 exports.processPayment = async (req, res) => {
   try {
-    console.log('Payment request body:', JSON.stringify(req.body, null, 2));
-    // Remove Zod validation completely for testing
     const { billingId, amount, type, bankName, transNumber, insuranceId, institutionId, notes, paymentProofPath, isEmergency, waiveRegistrationForOldPatient } = req.body;
 
     // Convert amount to number if it's a string
     let numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-    console.log('Amount conversion:', { original: amount, converted: numericAmount });
-
     // Get billing with all related data
     const billing = await prisma.billing.findUnique({
       where: { id: billingId },
@@ -1440,9 +1436,7 @@ exports.processPayment = async (req, res) => {
                 notes: isCardRegistration ? 'Initial card registration' : 'Card renewal/activation'
               }
             });
-            console.log(`✅ Card activation record created for billing ${billing.id}`);
-          } else {
-            console.log(`Card activation already exists for billing ${billing.id}, skipping creation`);
+                } else {
           }
         } catch (cardActivationError) {
           console.error(`⚠️ Failed to create card activation record for billing ${billing.id}, but continuing with visit creation:`, cardActivationError.message);
@@ -1473,11 +1467,9 @@ exports.processPayment = async (req, res) => {
                 where: { id: billing.visitId, status: 'AWAITING_CARD_BILLING' },
                 data: { status: 'WAITING_FOR_DOCTOR' },
               });
-              console.log(`✅ Visit ${billing.visitId} transitioned AWAITING_CARD_BILLING → WAITING_FOR_DOCTOR after card payment`);
               try {
                 const io = getIO();
                 io.to('role:DOCTOR').emit('queue:new-visit', { visitId: billing.visitId });
-                console.log(`[WS] Emitted queue:new-visit for visit ${billing.visitId} to all doctors`);
               } catch (wsErr) {
                 console.error('[WS] Failed to emit queue:new-visit:', wsErr.message);
               }
@@ -1510,13 +1502,11 @@ exports.processPayment = async (req, res) => {
               if (activeVisit) {
                 visit = activeVisit;
                 await prisma.billing.update({ where: { id: billing.id }, data: { visitId: visit.id } });
-                console.log(`✅ Billing linked to existing visit ${visit.visitUid} for patient ${billing.patient.name}`);
               } else {
                 visit = await generateUniqueVisitUid(async (visitUid) => prisma.visit.create({
                   data: { visitUid, patientId: billing.patientId, createdById: req.user.id, status: 'WAITING_FOR_TRIAGE', queueType: 'CONSULTATION', isEmergency: false, notes: `Automatic visit after ${isCardRegistration ? 'card registration' : 'card activation'} payment` }
                 }), prisma);
                 await prisma.billing.update({ where: { id: billing.id }, data: { visitId: visit.id } });
-                console.log(`✅ Visit ${visit.visitUid} created and sent to triage for patient ${billing.patient.name}`);
               }
             } catch (visitError) {
               console.error(`❌ Failed to create/link visit for patient ${billing.patientId} after card payment:`, visitError.message);
@@ -1548,9 +1538,6 @@ exports.processPayment = async (req, res) => {
 
       // Update walk-in lab orders (no visitId, use billingId) - for walk-ins
       if (isDiagnosticsBilling && !billing.visit) {
-        console.log('💰 [Payment] Updating walk-in lab orders for billing:', billing.id);
-        console.log('   Conditions met: isDiagnosticsBilling=', isDiagnosticsBilling, '!billing.visit=', !billing.visit);
-
         // Check how many orders exist before update
         const ordersBeforeUpdate = await prisma.labTestOrder.count({
           where: {
@@ -1558,8 +1545,6 @@ exports.processPayment = async (req, res) => {
             isWalkIn: true
           }
         });
-        console.log(`   Found ${ordersBeforeUpdate} LabTestOrders for this billing`);
-
         // Update old system lab orders
         const oldLabOrdersUpdated = await prisma.labOrder.updateMany({
           where: {
@@ -1569,8 +1554,6 @@ exports.processPayment = async (req, res) => {
           },
           data: { status: 'QUEUED' }
         });
-        console.log(`   ✅ Updated ${oldLabOrdersUpdated.count} old lab orders to QUEUED`);
-
         // Update new system LabTestOrders
         const labTestOrdersUpdated = await prisma.labTestOrder.updateMany({
           where: {
@@ -1580,8 +1563,6 @@ exports.processPayment = async (req, res) => {
           },
           data: { status: 'PAID' }
         });
-        console.log(`   ✅ Updated ${labTestOrdersUpdated.count} new lab test orders to PAID`);
-
         // Verify update worked
         if (labTestOrdersUpdated.count === 0 && ordersBeforeUpdate > 0) {
           console.warn('   ⚠️  WARNING: Orders exist but update count is 0. Checking order statuses...');
@@ -1592,7 +1573,6 @@ exports.processPayment = async (req, res) => {
             },
             select: { id: true, status: true }
           });
-          console.log('   Existing orders statuses:', existingOrders);
         }
 
         // Update radiology orders: set to PAID (they will be shown in radiology queue)
@@ -1604,12 +1584,10 @@ exports.processPayment = async (req, res) => {
           },
           data: { status: 'PAID' }
         });
-        console.log(`   ✅ Updated ${radOrdersUpdated.count} radiology orders to PAID`);
       }
 
       // Update walk-in nurse service orders
       if (isNurseWalkInBilling && !billing.visit) {
-        console.log('💰 [Payment] Updating walk-in nurse service orders for billing:', billing.id);
 
         const nurseWalkInOrdersUpdated = await prisma.nurseWalkInOrder.updateMany({
           where: {
@@ -1618,12 +1596,10 @@ exports.processPayment = async (req, res) => {
           },
           data: { status: 'PAID' }
         });
-        console.log(`   ✅ Updated ${nurseWalkInOrdersUpdated.count} nurse walk-in orders to PAID`);
       }
 
       // Update emergency drug orders
       if (isEmergencyDrugBilling) {
-        console.log('💰 [Payment] Updating emergency drug orders for billing:', billing.id);
 
         const emergencyDrugOrdersUpdated = await prisma.emergencyDrugOrder.updateMany({
           where: {
@@ -1632,12 +1608,10 @@ exports.processPayment = async (req, res) => {
           },
           data: { status: 'PAID' }
         });
-        console.log(`   ✅ Updated ${emergencyDrugOrdersUpdated.count} emergency drug orders to PAID`);
       }
 
       // Update material needs orders
       if (isMaterialNeedsBilling) {
-        console.log('💰 [Payment] Updating material needs orders for billing:', billing.id);
 
         const materialNeedsOrdersUpdated = await prisma.materialNeedsOrder.updateMany({
           where: {
@@ -1645,15 +1619,6 @@ exports.processPayment = async (req, res) => {
             status: 'UNPAID'
           },
           data: { status: 'PAID' }
-        });
-        console.log(`   ✅ Updated ${materialNeedsOrdersUpdated.count} material needs orders to PAID`);
-      }
-
-      if (!isDiagnosticsBilling && !isNurseWalkInBilling && !isEmergencyDrugBilling && !isMaterialNeedsBilling) {
-        console.log('💰 [Payment] Skipping order update:', {
-          isDiagnosticsBilling,
-          hasVisit: !!billing.visit,
-          billingId: billing.id
         });
       }
 
@@ -1713,12 +1678,10 @@ exports.processPayment = async (req, res) => {
               where: { id: billing.visit.id },
               data: { status: 'IN_DOCTOR_QUEUE' }
             });
-            console.log(`   ✅ Updated dental orders to PAID`);
           }
 
           // 2. Diagnostics (Lab/Radiology)
           if (isDiagnosticsBilling) {
-            console.log('💰 [Payment] Updating diagnostics orders for visit:', billing.visit.id);
 
             // Radiology Logic (BatchOrders)
             const radiologyServices = billing.services.filter(s => s.service.category === 'RADIOLOGY');
@@ -1781,7 +1744,6 @@ exports.processPayment = async (req, res) => {
               where: { visitId: billing.visit.id, status: 'UNPAID' },
               data: { status: 'QUEUED' }
             });
-            console.log(`   ✅ Updated diagnostics orders to PAID/QUEUED`);
           }
 
           // 3. Medical Procedures
@@ -1809,7 +1771,6 @@ exports.processPayment = async (req, res) => {
                 where: { batchOrderId: { in: batchIds }, status: 'UNPAID' },
                 data: { status: 'PAID' }
               });
-              console.log(`   ✅ Updated ${batchIds.length} procedure batch orders to PAID`);
             }
           }
 
@@ -1854,7 +1815,6 @@ exports.processPayment = async (req, res) => {
               data: { status: 'PAID' }
             });
 
-            console.log(`   ✅ Updated medication and related orders to QUEUED/PAID`);
           }
         });
       }
@@ -1938,7 +1898,6 @@ exports.processPayment = async (req, res) => {
       const pdfDoc = printer.createPdfKitDocument(docDefinition);
       pdfDoc.pipe(fs.createWriteStream(filePath));
       pdfDoc.end();
-      console.log(`   📄 Receipt generated: ${filePath}`);
     } catch (pdfError) {
       console.error('❌ Error generating PDF receipt:', pdfError);
       // Don't fail the response if just the PDF failed
@@ -2724,11 +2683,7 @@ exports.deleteVisit = async (req, res) => {
     // The patient can create a new visit if needed
     const paidBills = visit.bills.filter(bill => bill.status === 'PAID');
     if (paidBills.length > 0) {
-      console.log(`Deleting visit ${visit.id} with paid bills:`, paidBills.map(bill => ({
-        id: bill.id,
-        totalAmount: bill.totalAmount,
-        status: bill.status
-      })));
+
     }
 
     // Start a transaction to delete all related records
@@ -3042,8 +2997,6 @@ exports.deleteBillingService = async (req, res) => {
     const { billingId, serviceId } = req.params;
     const userId = req.user.id;
 
-    console.log("🗑️ Deleting billing service: Billing " + billingId + ", Service " + serviceId);
-
     // 1. Find the billing and the specific service
     const billing = await prisma.billing.findUnique({
       where: { id: billingId },
@@ -3097,8 +3050,6 @@ exports.deleteBillingService = async (req, res) => {
       // 4. Sync with doctor's orders
       const visitId = billing.visitId;
       if (visitId) {
-        console.log("🔄 Syncing with doctor's orders for visit " + visitId);
-
         // A. Check for Emergency Drug Orders
         await tx.emergencyDrugOrder.deleteMany({
           where: {
@@ -3246,8 +3197,6 @@ exports.deleteBillingPanel = async (req, res) => {
   try {
     const { billingId, labGroup } = req.params;
     const userId = req.user.id;
-
-    console.log("🗑️ Deleting billing panel: Billing " + billingId + ", LabGroup " + labGroup);
 
     const billing = await prisma.billing.findUnique({
       where: { id: billingId },

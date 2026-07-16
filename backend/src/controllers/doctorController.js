@@ -521,7 +521,6 @@ exports.getQueue = async (req, res) => {
     const filteredQueue = queue.filter(visit => {
       // Never show patients who haven't paid for card registration
       if (visit.status === 'AWAITING_CARD_BILLING') {
-        console.log(`🔍 Visit ${visit.id} (status: AWAITING_CARD_BILLING) EXCLUDED - card not paid`);
         return false;
       }
 
@@ -547,21 +546,8 @@ exports.getQueue = async (req, res) => {
       // Include if: paid consultation OR in doctor queue OR (doctor has waiver AND no pending consultation bill)
       const shouldInclude = hasPaidConsultation || isInDoctorQueue || (doctorHasWaiver && !hasPendingConsultation);
 
-      if (!shouldInclude) {
-        console.log(`🔍 Visit ${visit.id} (status: ${visit.status}, assignmentId: ${visit.assignmentId}) EXCLUDED - no paid consultation (${hasPaidConsultation}), not IN_DOCTOR_QUEUE (${isInDoctorQueue}), and no waiver (${doctorHasWaiver})`);
-        if (visit.assignment) {
-          console.log(`   Assignment found: doctorId=${visit.assignment.doctorId}, waiver=${visit.assignment.doctor?.waiveConsultationFee}`);
-        } else {
-          console.log(`   No assignment found for visit ${visit.id}`);
-        }
-      } else {
-        console.log(`✅ Visit ${visit.id} (status: ${visit.status}) INCLUDED - paid: ${hasPaidConsultation}, IN_DOCTOR_QUEUE: ${isInDoctorQueue}, waiver: ${doctorHasWaiver}`);
-      }
-
       return shouldInclude;
     });
-
-    console.log(`✅ getQueue: Returning ${filteredQueue.length} visits (from ${queue.length} total) for doctor ${doctorId}`);
 
     res.json({ queue: filteredQueue });
   } catch (error) {
@@ -572,237 +558,10 @@ exports.getQueue = async (req, res) => {
 exports.getResultsQueue = async (req, res) => {
   try {
     const doctorId = req.user.id;
-    console.log('🔍 getResultsQueue - Doctor ID:', doctorId);
-
-    // Get visits assigned to this doctor that have results ready for review
-    const resultsQueue = await prisma.visit.findMany({
-      where: {
-        status: 'AWAITING_RESULTS_REVIEW',
-        queueType: 'RESULTS_REVIEW',
-        OR: [
-          { assignmentId: { not: null } },
-          { suggestedDoctorId: doctorId },
-          { batchOrders: { some: { doctorId: doctorId } } }
-        ]
-      },
-      include: {
-        patient: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            mobile: true,
-            email: true,
-            dob: true,
-            gender: true,
-            bloodType: true
-          }
-        },
-        vitals: {
-          orderBy: { createdAt: 'desc' }
-        },
-        labOrders: {
-          include: {
-            type: true,
-            labResults: {
-              include: {
-                testType: true,
-                attachments: true
-              }
-            }
-          }
-        },
-        radiologyOrders: {
-          include: {
-            type: true,
-            radiologyResults: {
-              include: {
-                testType: true,
-                attachments: true
-              }
-            }
-          }
-        },
-        batchOrders: {
-          include: {
-            services: {
-              include: {
-                service: true,
-                investigationType: true
-              }
-            },
-            attachments: true
-          }
-        },
-        medicationOrders: {
-          include: {
-            continuousInfusion: true
-          }
-        },
-        bills: {
-          include: {
-            services: {
-              include: {
-                service: true
-              }
-            },
-            payments: true
-          }
-        }
-      },
-      orderBy: [
-        { createdAt: 'asc' } // First come, first served
-      ]
-    });
-
-    // Add result type labels and include radiology/lab results for each visit
-    const queueWithLabels = await Promise.all(resultsQueue.map(async (visit) => {
-      let resultLabels = [];
-
-      if (visit.labOrders.some(order => order.labResults.length > 0)) {
-        resultLabels.push('Lab Results Available');
-      }
-
-      if (visit.radiologyOrders.some(order => order.radiologyResults.length > 0)) {
-        resultLabels.push('Radiology Results Available');
-      }
-
-      if (visit.batchOrders.some(order => order.status === 'COMPLETED')) {
-        resultLabels.push('Batch Results Available');
-      }
-
-      // Add radiology and lab results to batch orders
-      const batchOrdersWithResults = await Promise.all(visit.batchOrders.map(async (batchOrder) => {
-        let radiologyResults = [];
-        let labResults = [];
-
-        if (batchOrder.type === 'RADIOLOGY') {
-          radiologyResults = await prisma.radiologyResult.findMany({
-            where: { batchOrderId: batchOrder.id },
-            include: {
-              testType: true,
-              attachments: true
-            }
-          });
-
-          // Also add batch order level results if individual results don't exist
-          if (radiologyResults.length === 0 && batchOrder.result) {
-            radiologyResults.push({
-              id: `batch-${batchOrder.id}`,
-              testType: { name: 'Radiology Tests' },
-              resultText: batchOrder.result,
-              additionalNotes: batchOrder.additionalNotes || '',
-              status: batchOrder.status,
-              attachments: batchOrder.attachments || [],
-              createdAt: batchOrder.updatedAt || batchOrder.createdAt
-            });
-          }
-        }
-
-        if (batchOrder.type === 'LAB') {
-          // Get detailed lab results from DetailedLabResult table
-          const detailedLabResults = await prisma.detailedLabResult.findMany({
-            where: {
-              labOrderId: batchOrder.id
-            },
-            include: {
-              template: true
-            },
-            orderBy: { createdAt: 'desc' }
-          });
-
-          // Group results by service for better organization
-          const resultsByService = {};
-          detailedLabResults.forEach(result => {
-            const serviceKey = result.serviceId || 'unknown';
-            if (!resultsByService[serviceKey]) {
-              resultsByService[serviceKey] = [];
-            }
-            resultsByService[serviceKey].push(result);
-          });
-
-          // Convert detailed lab results to the expected format, grouped by service
-          Object.keys(resultsByService).forEach(serviceId => {
-            const serviceResults = resultsByService[serviceId];
-            serviceResults.forEach(result => {
-              // Get service name from batch order services
-              const service = batchOrder.services.find(s => s.id === parseInt(serviceId));
-              const serviceName = service ? service.service.name : 'Unknown Service';
-
-              labResults.push({
-                id: result.id,
-                serviceId: result.serviceId,
-                serviceName: serviceName,
-                testType: {
-                  name: result.template.name,
-                  category: result.template.category
-                },
-                resultText: `Detailed results for ${result.template.name}`,
-                detailedResults: result.results, // Include the actual detailed results
-                additionalNotes: result.additionalNotes || '',
-                status: result.status,
-                attachments: [], // Detailed lab results don't have separate attachments
-                createdAt: result.createdAt,
-                verifiedBy: result.verifiedBy,
-                verifiedAt: result.verifiedAt,
-                template: result.template
-              });
-            });
-          });
-
-          // If no detailed results, fall back to batch order result
-          if (labResults.length === 0) {
-            labResults.push({
-              id: `batch-${batchOrder.id}`,
-              testType: { name: 'Lab Tests' },
-              resultText: batchOrder.result || 'No result provided',
-              additionalNotes: batchOrder.additionalNotes || '',
-              status: batchOrder.status,
-              attachments: batchOrder.attachments || [],
-              createdAt: batchOrder.updatedAt || batchOrder.createdAt,
-              services: batchOrder.services.map(service => ({
-                name: service.investigationType?.name || service.service?.name || 'Test',
-                result: service.result || 'No result'
-              }))
-            });
-          }
-        }
-
-        return {
-          ...batchOrder,
-          radiologyResults,
-          labResults
-        };
-      }));
-
-      return {
-        ...visit,
-        batchOrders: batchOrdersWithResults,
-        resultLabels
-      };
-    }));
-
-    // Filter to only show visits assigned to this doctor
-    const doctorAssignments = await prisma.assignment.findMany({
-      where: {
-        doctorId: doctorId,
-        status: {
-          in: ['Active', 'Pending']
-        }
-      },
-      select: { id: true }
-    });
-
-    console.log('🔍 Doctor assignments:', doctorAssignments);
-    console.log('🔍 Raw results queue count:', resultsQueue.length);
-
     const assignmentIds = doctorAssignments.map(a => a.id);
     const filteredQueue = queueWithLabels.filter(visit =>
       assignmentIds.includes(visit.assignmentId)
     );
-
-    console.log('🔍 Filtered queue count:', filteredQueue.length);
-    console.log('🔍 Assignment IDs:', assignmentIds);
 
     res.json({ queue: filteredQueue });
   } catch (error) {
@@ -1328,7 +1087,7 @@ exports.getUnifiedQueue = async (req, res) => {
         }
       });
       if (staleResult.count > 0) {
-        console.log(`🧹 Auto-completed ${staleResult.count} stale visits older than 7 days`);
+        // Auto-completed stale visits
       }
     } catch (staleError) {
       console.error('Error auto-completing stale visits:', staleError.message);
@@ -2723,7 +2482,6 @@ exports.getVisitDetails = async (req, res) => {
     // Auto-assign doctor if not assigned (ensures access to notes and orders)
     let userAssignment = assignment;
     if (!userAssignment) {
-      console.log(`🔍 Auto-assigning doctor ${doctorId} to patient ${visit.patientId} for visit access`);
       userAssignment = await prisma.assignment.create({
         data: {
           patientId: visit.patientId,
@@ -2815,7 +2573,6 @@ exports.getVisitDetails = async (req, res) => {
       const paidBills = visit.bills.filter(b => b.status === 'PAID');
 
       if (unpaidProcedures.length > 0 && paidBills.length > 0) {
-        console.log(`🔄 [Self-Healing] Checking sync for ${unpaidProcedures.length} unpaid procedure(s) for visit ${visitId}`);
         for (const batch of unpaidProcedures) {
           let allPaid = true;
           for (const service of batch.services) {
@@ -2824,7 +2581,6 @@ exports.getVisitDetails = async (req, res) => {
                 bill.services.some(bs => bs.serviceId === service.serviceId)
               );
               if (isPaidInBill) {
-                console.log(`✅ [Self-Healing] Marking service ${service.serviceId} as PAID for batch ${batch.id}`);
                 await prisma.batchOrderService.update({
                   where: { id: service.id },
                   data: { status: 'PAID' }
@@ -3034,7 +2790,6 @@ exports.selectVisit = async (req, res) => {
     let currentAssignmentId = visit.assignmentId;
 
     if (!currentAssignmentId) {
-      console.log('🔍 Visit has no assignment, creating new assignment for doctor:', doctorId);
       const newAssignment = await prisma.assignment.create({
         data: {
           patientId: visit.patientId,
@@ -3056,7 +2811,6 @@ exports.selectVisit = async (req, res) => {
       });
 
       if (!existingAssignment || existingAssignment.doctorId !== doctorId) {
-        console.log(`🔍 Visit was assigned to ${existingAssignment?.doctorId}, re-assigning to ${doctorId}`);
         const updatedAssignment = await prisma.assignment.update({
           where: { id: currentAssignmentId },
           data: { doctorId: doctorId }
@@ -3904,8 +3658,6 @@ exports.createMultipleRadiologyOrders = async (req, res) => {
 
 exports.createMedicationOrder = async (req, res) => {
   try {
-    console.log('🔍 Medication Order Request Body:', JSON.stringify(req.body, null, 2));
-
     let data;
     try {
       data = medicationOrderSchema.parse(req.body);
@@ -3913,8 +3665,6 @@ exports.createMedicationOrder = async (req, res) => {
       console.error('❌ Validation Error:', JSON.stringify(parseError.errors, null, 2));
       return res.status(400).json({ error: 'Validation error', details: parseError.errors });
     }
-    console.log('✅ Parsed medication order data:', JSON.stringify(data, null, 2));
-
     const doctorId = req.user.id;
 
     // Check if visit exists and is under doctor review
@@ -4015,7 +3765,6 @@ exports.createMedicationOrder = async (req, res) => {
             }
           });
 
-          console.log(`Linked order to catalog for ${data.name}: ${orderedQuantity} ${medicationCatalog.unit || 'units'} (Available: ${medicationCatalog.availableQuantity})`);
         } else {
           console.warn(`Insufficient inventory for ${data.name}. Available: ${medicationCatalog.availableQuantity}, Ordered: ${orderedQuantity}`);
           // Still link to catalog but warn about insufficient stock
@@ -4030,7 +3779,6 @@ exports.createMedicationOrder = async (req, res) => {
           });
         }
       } else {
-        console.log(`Medication ${data.name} not found in catalog - custom medication`);
         // Try to parse quantity for custom medications too
         const orderedQuantity = parseFloat(data.quantity) || 0;
         if (orderedQuantity > 0) {
@@ -4146,7 +3894,6 @@ exports.createMedicationOrder = async (req, res) => {
     if (data.isContinuousInfusion && data.continuousInfusionDays && data.dailyDose) {
       // Note: Continuous infusion billing is handled by the pharmacy when dispensing
       // The daily administration tasks are created above for nurse tracking
-      console.log(`Continuous infusion created for ${data.continuousInfusionDays} days`);
     }
 
     // Update visit status to IN_DOCTOR_QUEUE if not already in a valid main queue status
@@ -4158,9 +3905,6 @@ exports.createMedicationOrder = async (req, res) => {
         where: { id: data.visitId },
         data: { status: 'IN_DOCTOR_QUEUE' }
       });
-      console.log('🔍 createMedicationOrder: Updated visit status to IN_DOCTOR_QUEUE to keep patient in main queue');
-    } else {
-      console.log('🔍 createMedicationOrder: Keeping visit status as', visit.status, '- patient stays in main queue');
     }
 
     res.json({
@@ -4354,8 +4098,6 @@ exports.searchCustomMedications = async (req, res) => {
 // Create doctor service order (for custom services like Booth Cleaning, Special Treatments, etc.)
 exports.createDoctorServiceOrder = async (req, res) => {
   try {
-    console.log('🔍 Doctor Service Order Request Body:', JSON.stringify(req.body, null, 2));
-
     const { visitId, patientId, serviceIds, assignedNurseId, instructions, customPrices, servicePrices, isDeferred } = req.body;
     const effectiveCustomPrices = customPrices || servicePrices;
     const doctorId = req.user.id;
@@ -4930,12 +4672,6 @@ exports.getPatientHistory = async (req, res) => {
     // Add radiology and lab results to each visit
     const visitsWithResults = await Promise.all(visits.map(async (visit) => {
       // Debug: Log batch orders for this visit
-      console.log(`🔍 Visit ${visit.id}: batchOrders count = ${visit.batchOrders?.length || 0}`);
-      if (visit.batchOrders && visit.batchOrders.length > 0) {
-        visit.batchOrders.forEach(bo => {
-          console.log(`  - BatchOrder ${bo.id}: type=${bo.type}, services count=${bo.services?.length || 0}`);
-        });
-      }
       // Get radiology results for batch orders
       const radiologyBatchOrderIds = visit.batchOrders
         .filter(bo => bo.type === 'RADIOLOGY')
@@ -5089,7 +4825,6 @@ exports.getPatientHistory = async (req, res) => {
 
         // Skip if it's already in labResults or a batch order (to avoid duplicates)
         if (isInLabResults || isInBatchOrder) {
-          console.log(`🔍 Skipping LabOrder ${labOrder.id} - already represented`);
           continue;
         }
 
@@ -5405,13 +5140,6 @@ exports.getPatientHistory = async (req, res) => {
       });
 
       // Debug: Log final labResults count
-      console.log(`🔍 Visit ${visit.id}: Final labResults count = ${labResults.length}`);
-      if (labResults.length > 0) {
-        labResults.forEach(lr => {
-          console.log(`  - LabResult: id=${lr.id}, testType=${lr.testType?.name || 'N/A'}, status=${lr.status}`);
-        });
-      }
-
       // Fetch compound prescriptions for this visit separately
       let compoundPrescriptions = [];
       try {
@@ -5972,8 +5700,6 @@ exports.completeVisit = async (req, res) => {
     const { visitId, diagnosis, diagnosisDetails, instructions, finalNotes, countAsMedicalTreated, needsAppointment, appointmentDate, appointmentTime, appointmentNotes } = completeVisitSchema.parse(req.body);
     const doctorId = req.user.id;
 
-    console.log('🔍 Completing visit:', visitId, 'by doctor:', doctorId, 'countAsMedicalTreated:', countAsMedicalTreated);
-
     // Check if visit exists
     const visit = await prisma.visit.findUnique({
       where: { id: visitId }
@@ -6062,7 +5788,6 @@ exports.completeVisit = async (req, res) => {
       console.error('[WS] Failed to emit completeVisit event:', e.message);
     }
 
-    console.log('✅ Visit completed successfully:', visitId);
     res.json({
       message: 'Visit completed successfully',
       visitId: visit.id,
@@ -6302,10 +6027,8 @@ exports.getVisitOrderStatus = async (req, res) => {
 // Batch prescription submission
 exports.createBatchPrescription = async (req, res) => {
   try {
-    console.log('🔍 createBatchPrescription - Request body:', req.body);
     const { visitId, patientId, medications } = req.body;
     const doctorId = req.user.id;
-    console.log('🔍 createBatchPrescription - Extracted:', { visitId, patientId, medications, doctorId });
 
     // Validate required fields
     if (!visitId || !patientId || !medications || !Array.isArray(medications) || medications.length === 0) {
@@ -6339,7 +6062,6 @@ exports.createBatchPrescription = async (req, res) => {
       try {
         medicationSchema.parse(medication);
       } catch (validationError) {
-        console.log('🔍 Validation error:', validationError);
         return res.status(400).json({
           success: false,
           error: `Invalid medication data: ${validationError.errors?.[0]?.message || validationError.message}`,
@@ -6349,15 +6071,12 @@ exports.createBatchPrescription = async (req, res) => {
     }
 
     // Check if visit exists and doctor is assigned
-    console.log('🔍 createBatchPrescription - Looking up visit:', parseInt(visitId));
     const visit = await prisma.visit.findUnique({
       where: { id: parseInt(visitId) },
       include: {
         patient: true
       }
     });
-    console.log('🔍 createBatchPrescription - Visit found:', !!visit);
-
     if (!visit) {
       return res.status(404).json({
         success: false,
@@ -6373,8 +6092,6 @@ exports.createBatchPrescription = async (req, res) => {
         status: { in: ['Active', 'Pending'] }
       }
     });
-    console.log('🔍 createBatchPrescription - Assignment found:', !!assignment);
-
     if (!assignment) {
       return res.status(403).json({
         success: false,
@@ -6427,7 +6144,6 @@ exports.createBatchPrescription = async (req, res) => {
     }
 
     // Create medication orders
-    console.log('🔍 createBatchPrescription - Creating medication orders...');
     const medicationData = medications.map(medication => ({
       visitId: parseInt(visitId),
       patientId,
@@ -6449,13 +6165,9 @@ exports.createBatchPrescription = async (req, res) => {
       unitPrice: medication.unitPrice || null,
       status: 'UNPAID'
     }));
-    console.log('🔍 createBatchPrescription - Medication data:', medicationData);
-
     const createdOrders = await prisma.medicationOrder.createMany({
       data: medicationData
     });
-    console.log('🔍 createBatchPrescription - Created orders:', createdOrders);
-
     // Create pharmacy invoice for the medications
     const totalAmount = medications.reduce((total, med) => {
       return total + ((med.unitPrice || 0) * med.quantity);
@@ -6509,9 +6221,6 @@ exports.createBatchPrescription = async (req, res) => {
         where: { id: parseInt(visitId) },
         data: { status: 'IN_DOCTOR_QUEUE' }
       });
-      console.log('🔍 createBatchPrescription: Updated visit status to IN_DOCTOR_QUEUE to keep patient in main queue');
-    } else {
-      console.log('🔍 createBatchPrescription: Keeping visit status as', visit.status, '- patient stays in main queue');
     }
 
     res.status(201).json({
@@ -6731,9 +6440,6 @@ exports.saveDiagnosisNotes = async (req, res) => {
     const { notes } = req.body;
     const doctorId = req.user.id;
 
-    console.log('🔍 Saving diagnosis notes for visit:', visitId);
-    console.log('📝 Notes data:', Object.keys(notes).map(key => `${key}: ${(notes[key] || '').length} chars`));
-
     // Sanitize notes data - convert null/undefined to empty strings
     const sanitizedNotes = Object.keys(notes).reduce((acc, key) => {
       acc[key] = notes[key] || '';
@@ -6803,8 +6509,6 @@ exports.saveDiagnosisNotes = async (req, res) => {
       });
     }
 
-    console.log('✅ Diagnosis notes saved successfully');
-
     res.json({
       message: 'Diagnosis notes saved successfully',
       notes: diagnosisNotes
@@ -6820,8 +6524,6 @@ exports.getDiagnosisNotes = async (req, res) => {
   try {
     const { visitId } = req.params;
     const doctorId = req.user.id;
-
-    console.log('🔍 Getting diagnosis notes for visit:', visitId);
 
     // Check if visit exists
     const visit = await prisma.visit.findUnique({
@@ -6870,8 +6572,6 @@ exports.getDiagnosisNotes = async (req, res) => {
       }
     });
 
-    console.log('✅ Diagnosis notes retrieved successfully');
-
     res.json({
       notes: diagnosisNotes || {
         chiefComplaint: '',
@@ -6900,8 +6600,6 @@ exports.updateDiagnosisNotes = async (req, res) => {
     const { visitId, noteId } = req.params;
     const { notes } = req.body;
     const doctorId = req.user.id;
-
-    console.log('🔍 Updating diagnosis notes for visit:', visitId, 'noteId:', noteId);
 
     // Validate visitId
     const visit = await prisma.visit.findUnique({
@@ -6950,7 +6648,6 @@ exports.updateDiagnosisNotes = async (req, res) => {
       }
     });
 
-    console.log('✅ Diagnosis notes updated successfully');
     res.json({
       message: 'Diagnosis notes updated successfully',
       notes: diagnosisNotes
@@ -7748,8 +7445,6 @@ exports.bulkCompleteActiveVisits = async (req, res) => {
       select: { id: true }
     });
     const assignmentIds = assignments.map(a => a.id);
-    console.log('Doctor ID:', doctorId, 'Found assignments:', assignmentIds.length);
-
     const activeVisits = await prisma.visit.findMany({
       where: {
         OR: [
@@ -7761,8 +7456,6 @@ exports.bulkCompleteActiveVisits = async (req, res) => {
       },
       select: { id: true, visitUid: true, status: true, patientId: true }
     });
-    console.log('Active visits found:', activeVisits.length, 'IDs:', activeVisits.map(v => v.id + ':' + v.status));
-
     // Check for active bed admissions — skip those patients
     const visitPatientIds = [...new Set(activeVisits.filter(v => v.patientId).map(v => v.patientId))];
     let patientIdsWithBeds = new Set();

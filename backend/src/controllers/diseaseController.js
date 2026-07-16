@@ -293,8 +293,6 @@ const getAgeGenderDistribution = async (req, res) => {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
 
-        console.log('Fetching age-gender distribution from', start, 'to', end);
-
         // Get all diagnoses within date range with patient data
         const diagnoses = await prisma.patientDiagnosis.findMany({
             where: {
@@ -323,18 +321,6 @@ const getAgeGenderDistribution = async (req, res) => {
                 }
             }
         });
-
-        console.log('Found', diagnoses.length, 'diagnoses');
-        if (diagnoses.length > 0) {
-            console.log('Sample diagnosis:', {
-                disease: diagnoses[0].disease?.name,
-                patientName: diagnoses[0].patient?.name,
-                patientAge: diagnoses[0].patient?.age,
-                patientDob: diagnoses[0].patient?.dob,
-                patientGender: diagnoses[0].patient?.gender,
-                createdAt: diagnoses[0].createdAt
-            });
-        }
 
         // Define age groups
         const ageGroups = [
@@ -367,8 +353,6 @@ const getAgeGenderDistribution = async (req, res) => {
             const diseaseName = diagnosis.disease?.name || 'Unknown';
             const patientAge = calculateAge(diagnosis.patient);
             const gender = diagnosis.patient?.gender;
-            
-            console.log('Processing:', diseaseName, 'Age:', patientAge, 'Gender:', gender);
             
             if (!diseaseMap[diseaseName]) {
                 diseaseMap[diseaseName] = {
@@ -422,8 +406,6 @@ const getAgeGenderDistribution = async (req, res) => {
             }
         });
         
-        console.log('Skipped', skippedCount, 'diagnoses due to missing age or gender');
-
         // Convert to array and sort by total count descending
         const result = Object.values(diseaseMap).sort((a, b) => b.total - a.total);
 
