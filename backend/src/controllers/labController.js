@@ -4,6 +4,7 @@ const { createPDFDocument, generatePDF } = require('../utils/pdfGenerator');
 const fs = require('fs');
 const path = require('path');
 const { getIO, emitToRole } = require('../config/socket');
+const { getEthiopianDateRange } = require('../utils/dateUtils');
 
 const individualLabResultSchema = z.object({
   labOrderId: z.number(),
@@ -57,13 +58,10 @@ const getOrders = async (req, res) => {
         };
     
     if (date) {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
+      const { startOfDayUTC, endOfDayUTC } = getEthiopianDateRange(date);
       where.createdAt = {
-        gte: startOfDay,
-        lte: endOfDay
+        gte: startOfDayUTC,
+        lte: endOfDayUTC
       };
     }
 
@@ -761,12 +759,11 @@ const saveLabTestResult = async (req, res) => {
 const getLabStats = async (req, res) => {
   try {
     const { date } = req.query;
-    const dateFilter = date ? {
-      createdAt: {
-        gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
-        lte: new Date(new Date(date).setHours(23, 59, 59, 999))
-      }
-    } : {};
+    const dateFilter = {};
+    if (date) {
+      const { startOfDayUTC, endOfDayUTC } = getEthiopianDateRange(date);
+      dateFilter.createdAt = { gte: startOfDayUTC, lte: endOfDayUTC };
+    }
 
     const pendingStatuses = ['PAID', 'QUEUED'];
     const inProgressStatuses = ['IN_PROGRESS'];

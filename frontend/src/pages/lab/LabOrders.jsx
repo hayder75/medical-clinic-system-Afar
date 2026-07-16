@@ -63,31 +63,11 @@ const LabOrders = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/labs/orders', {
-        params: { status: statusFilter, date: dateFilter }
-      });
-      console.log('📋 [fetchOrders] Raw response:', {
-        batchOrders: response.data.batchOrders?.length || 0,
-        walkInOrders: response.data.walkInOrders?.length || 0,
-        labTestOrders: response.data.labTestOrders?.length || 0
-      });
-
-      // Log sample lab test orders structure
-      if (response.data.labTestOrders && response.data.labTestOrders.length > 0) {
-        const sample = response.data.labTestOrders[0];
-        console.log('📋 [fetchOrders] Sample lab test order group:', {
-          id: sample.id,
-          visitId: sample.visitId,
-          patientId: sample.patientId,
-          ordersCount: sample.orders?.length,
-          firstOrder: sample.orders?.[0] ? {
-            id: sample.orders[0].id,
-            hasLabTest: !!sample.orders[0].labTest,
-            labTestName: sample.orders[0].labTest?.name,
-            resultFieldsCount: sample.orders[0].labTest?.resultFields?.length
-          } : null
-        });
+      const params = { status: statusFilter };
+      if (statusFilter === 'COMPLETED') {
+        params.date = dateFilter;
       }
+      const response = await api.get('/labs/orders', { params });
 
       // Group labTestOrders by patient+visit to show all tests for same patient in one card
       const labTestOrders = (response.data.labTestOrders || []).filter((order) => Boolean(order.labTest));
@@ -138,8 +118,6 @@ const LabOrders = () => {
         }
       });
       
-      console.log('📋 [fetchOrders] Grouped lab test orders:', groupedLabOrders.length, 'groups with', labTestOrders.length, 'total tests');
-
       const groupedWalkInKeys = new Set(
         groupedLabOrders
           .filter((group) => group.isWalkIn)
@@ -160,7 +138,6 @@ const LabOrders = () => {
         ...groupedLabOrders
       ];
       setOrders(allOrders);
-      console.log('📋 [fetchOrders] Total orders set:', allOrders.length);
     } catch (error) {
       toast.error('Failed to fetch lab orders');
       console.error('Error fetching orders:', error);
@@ -1606,15 +1583,17 @@ const LabOrders = () => {
           />
         </div>
         <div className="flex items-center space-x-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-500" />
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+          {statusFilter === 'COMPLETED' && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-500" />
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
           <label className="text-sm font-medium text-gray-700">Filter by Status:</label>
           <select
             value={statusFilter}
