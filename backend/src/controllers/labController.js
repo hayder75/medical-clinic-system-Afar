@@ -772,7 +772,7 @@ const getLabStats = async (req, res) => {
     const [
       batchPending, batchInProgress, batchCompleted,
       walkInPending, walkInInProgress, walkInCompleted,
-      testPending, testInProgress, testCompleted
+      testPendingGroup, testInProgressGroup, testCompletedGroup
     ] = await Promise.all([
       prisma.batchOrder.count({ where: { type: 'LAB', status: { in: pendingStatuses }, ...dateFilter } }),
       prisma.batchOrder.count({ where: { type: 'LAB', status: { in: inProgressStatuses }, ...dateFilter } }),
@@ -780,10 +780,14 @@ const getLabStats = async (req, res) => {
       prisma.labOrder.count({ where: { isWalkIn: true, status: { in: pendingStatuses }, ...dateFilter } }),
       prisma.labOrder.count({ where: { isWalkIn: true, status: { in: inProgressStatuses }, ...dateFilter } }),
       prisma.labOrder.count({ where: { isWalkIn: true, status: { in: completedStatuses }, ...dateFilter } }),
-      prisma.labTestOrder.count({ where: { batchOrderId: null, status: { in: pendingStatuses }, ...dateFilter } }),
-      prisma.labTestOrder.count({ where: { batchOrderId: null, status: { in: inProgressStatuses }, ...dateFilter } }),
-      prisma.labTestOrder.count({ where: { batchOrderId: null, status: { in: completedStatuses }, ...dateFilter } }),
+      prisma.labTestOrder.groupBy({ by: ['labTestId'], where: { batchOrderId: null, status: { in: pendingStatuses }, ...dateFilter } }),
+      prisma.labTestOrder.groupBy({ by: ['labTestId'], where: { batchOrderId: null, status: { in: inProgressStatuses }, ...dateFilter } }),
+      prisma.labTestOrder.groupBy({ by: ['labTestId'], where: { batchOrderId: null, status: { in: completedStatuses }, ...dateFilter } }),
     ]);
+
+    const testPending = testPendingGroup.length;
+    const testInProgress = testInProgressGroup.length;
+    const testCompleted = testCompletedGroup.length;
 
     res.json({
       total: batchPending + batchInProgress + batchCompleted

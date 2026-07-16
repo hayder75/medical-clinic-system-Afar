@@ -33,6 +33,30 @@ const toSmallSequence = (raw) => {
 
 const formatDisplayOrderId = (order) => `${getDateToken(order?.createdAt)}-${toSmallSequence(order?.id)}`;
 
+const countTests = (orders) => {
+  if (!orders || orders.length === 0) return 0;
+  const panelGroups = new Set();
+  const singles = new Set();
+  orders.forEach(o => {
+    const t = o.labTest;
+    if (!t) return;
+    if (t.group) panelGroups.add(t.group.id);
+    else singles.add(t.id);
+  });
+  return panelGroups.size + singles.size;
+};
+
+const getRelativeDayTag = (createdAt) => {
+  const now = new Date();
+  const eatNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+  const eatOrderDate = new Date(new Date(createdAt).getTime() + 3 * 60 * 60 * 1000);
+  const diffDays = Math.round((Date.UTC(eatNow.getFullYear(), eatNow.getMonth(), eatNow.getDate()) - Date.UTC(eatOrderDate.getFullYear(), eatOrderDate.getMonth(), eatOrderDate.getDate())) / 86400000);
+  if (diffDays === 0) return { label: 'Today', color: 'bg-green-100 text-green-800' };
+  if (diffDays === 1) return { label: 'Yesterday', color: 'bg-yellow-100 text-yellow-800' };
+  if (diffDays <= 3) return { label: `${diffDays} days ago`, color: 'bg-orange-100 text-orange-800' };
+  return { label: `${diffDays} days ago`, color: 'bg-red-100 text-red-800' };
+};
+
 const LabOrders = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
@@ -1642,7 +1666,7 @@ const LabOrders = () => {
                       </span>
                       {order.__kind === 'labtest_group' && (
                         <span className="px-1.5 sm:px-2 py-0.5 bg-purple-100 text-purple-800 text-xs sm:text-sm rounded flex-shrink-0">
-                          {order.orders?.length || 0} Tests
+                          {countTests(order.orders)} Tests
                         </span>
                       )}
                     </div>
@@ -1695,6 +1719,10 @@ const LabOrders = () => {
                 <div className="flex items-center">
                   <Calendar className="h-5 w-5 mr-2" />
                   <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+                  {(() => {
+                    const tag = getRelativeDayTag(order.createdAt);
+                    return <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${tag.color}`}>{tag.label}</span>;
+                  })()}
                 </div>
               </div>
 
