@@ -43,9 +43,13 @@ function getIO() {
   return io;
 }
 
-function emitQueueEvent(event, data) {
+function emitQueueEvent(event, data, roles) {
   if (!io) return;
-  io.emit(event, data);
+  if (roles && roles.length > 0) {
+    roles.forEach(role => io.to(`role:${role}`).emit(event, data));
+  } else {
+    io.emit(event, data);
+  }
 }
 
 function emitToRole(role, event, data) {

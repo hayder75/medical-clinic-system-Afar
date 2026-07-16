@@ -1305,7 +1305,7 @@ exports.processPayment = async (req, res) => {
       // Auto-process any transfer linked to this billing
       const pendingTransfer = await prisma.patientTransfer.findFirst({
         where: { billingId },
-        include: { visit: true, fromDoctor: { select: { fullname: true } } }
+        include: { visit: { include: { patient: { select: { name: true } } } }, fromDoctor: { select: { fullname: true } } }
       });
       if (pendingTransfer && pendingTransfer.status === 'AWAITING_PAYMENT') {
         // Update patient card type if needed
@@ -1318,6 +1318,16 @@ exports.processPayment = async (req, res) => {
             });
           }
         }
+        // Original visit was already COMPLETED by transferController.js — just create sub-visit
+        // Find or create assignment for receiving doctor
+        let assignment = await prisma.assignment.findFirst({
+          where: { patientId: pendingTransfer.patientId, doctorId: pendingTransfer.toDoctorId }
+        });
+        if (!assignment) {
+          assignment = await prisma.assignment.create({
+            data: { patientId: pendingTransfer.patientId, doctorId: pendingTransfer.toDoctorId, status: 'Pending' }
+          });
+        }
         // Create sub-visit now that payment is done
         const newVisit = await prisma.visit.create({
           data: {
@@ -1325,6 +1335,7 @@ exports.processPayment = async (req, res) => {
             patientId: pendingTransfer.patientId,
             createdById: pendingTransfer.fromDoctorId,
             suggestedDoctorId: pendingTransfer.toDoctorId,
+            assignmentId: assignment.id,
             parentVisitId: pendingTransfer.visitId,
             status: 'IN_DOCTOR_QUEUE',
             queueType: 'CONSULTATION',
@@ -1335,6 +1346,20 @@ exports.processPayment = async (req, res) => {
           where: { id: pendingTransfer.id },
           data: { subVisitId: newVisit.id, status: 'ACCEPTED' }
         });
+        // Notify receiving doctor about the new visit
+        try {
+          const io = getIO();
+          io.to(`doctor:${pendingTransfer.toDoctorId}`).emit('queue:new-visit', {
+            visitId: newVisit.id,
+            patientId: pendingTransfer.patientId,
+            patientName: pendingTransfer.visit?.patient?.name,
+            doctorId: pendingTransfer.toDoctorId,
+            status: 'IN_DOCTOR_QUEUE',
+            timestamp: new Date().toISOString()
+          });
+        } catch (e) {
+          console.error('[WS] Failed to notify receiving doctor of transfer:', e.message);
+        }
         console.log(`Transfer ${pendingTransfer.id} auto-completed after billing payment, subVisit: ${newVisit.id}`);
       }
     } else if (newTotalPaid > 0) {

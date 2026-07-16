@@ -230,6 +230,52 @@ const PatientManagement = () => {
     }
   };
 
+  const getVisitStatusColor = (status) => {
+    switch (status) {
+      case 'AWAITING_RESULTS_REVIEW': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'RETURNED_WITH_RESULTS': return 'bg-green-100 text-green-800 border-green-300';
+      case 'UNDER_DOCTOR_REVIEW': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'WAITING_FOR_DOCTOR': return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+      case 'SENT_TO_LAB': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'SENT_TO_RADIOLOGY': return 'bg-pink-100 text-pink-800 border-pink-300';
+      case 'SENT_TO_BOTH': return 'bg-red-100 text-red-800 border-red-300';
+      case 'SENT_TO_PHARMACY': return 'bg-purple-100 text-purple-800 border-purple-300';
+      case 'COMPLETED': return 'bg-green-100 text-green-800 border-green-300';
+      case 'CANCELLED': return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'TRANSFERRED': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'WAITING_FOR_TRIAGE': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'TRIAGED': return 'bg-teal-100 text-teal-800 border-teal-300';
+      case 'IN_DOCTOR_QUEUE': return 'bg-blue-100 text-blue-800 border-blue-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getVisitStatusLabel = (status) => {
+    switch (status) {
+      case 'AWAITING_RESULTS_REVIEW': return 'In Lab – Awaiting Results';
+      case 'RETURNED_WITH_RESULTS': return 'Returned with Results';
+      case 'UNDER_DOCTOR_REVIEW': return 'Under Doctor Review';
+      case 'WAITING_FOR_DOCTOR': return 'Waiting for Doctor';
+      case 'SENT_TO_LAB': return 'Sent to Lab';
+      case 'SENT_TO_RADIOLOGY': return 'Sent to Radiology';
+      case 'SENT_TO_BOTH': return 'Sent to Lab & Radiology';
+      case 'SENT_TO_PHARMACY': return 'Sent to Pharmacy';
+      case 'COMPLETED': return 'Completed';
+      case 'CANCELLED': return 'Cancelled';
+      case 'TRANSFERRED': return 'Transferred';
+      case 'WAITING_FOR_TRIAGE': return 'Waiting for Triage';
+      case 'TRIAGED': return 'Triaged';
+      case 'IN_DOCTOR_QUEUE': return 'In Doctor Queue';
+      default: return status?.replace(/_/g, ' ') || 'Unknown';
+    }
+  };
+
+  const getTransferToDoctor = (visit, transfers) => {
+    if (!transfers || !transfers.length) return null;
+    const transfer = transfers.find(t => t.visitId === visit.id);
+    return transfer?.toDoctor || null;
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString();
@@ -624,10 +670,25 @@ const PatientManagement = () => {
                                   <span className="text-sm text-gray-500">No doctor assigned</span>
                                 </div>
                               )}
-                              <div className="text-xs text-gray-500">
-                                <strong>Visit ID:</strong> {visit.visitUid || visit.id} |
-                                <strong> Status:</strong> {visit.status.replace(/_/g, ' ')}
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-gray-500">
+                                  <strong>Visit ID:</strong> {visit.visitUid || visit.id}
+                                </span>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getVisitStatusColor(visit.status)}`}>
+                                  {getVisitStatusLabel(visit.status)}
+                                </span>
                               </div>
+                              {(() => {
+                                const transferDoctor = getTransferToDoctor(visit, patientHistory.transfers);
+                                if (transferDoctor) {
+                                  return (
+                                    <div className="mt-1.5 text-xs text-yellow-700 bg-yellow-50 px-2 py-1 rounded">
+                                      <strong>→ Transferred to:</strong> Dr. {transferDoctor.fullname}
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
                               {index === 0 && (
                                 <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-800">
                                   <strong>Most Recent Visit:</strong> Last time you had this before, you saw Dr. {visit.assignedDoctor?.fullname || 'No doctor assigned'}

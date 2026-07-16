@@ -919,8 +919,9 @@ exports.createBatchOrder = async (req, res) => {
 
     if (billing && billing.id) {
       try {
-        const { getIO } = require('../config/socket');
-        getIO().emit('billing:update', { billingId: billing.id });
+        const { emitToRole } = require('../config/socket');
+        emitToRole('BILLING_OFFICER', 'billing:update', { billingId: billing.id });
+        emitToRole('DOCTOR', 'billing:update', { billingId: billing.id });
       } catch (err) {
         console.error('Failed to emit billing:update socket event:', err.message);
       }

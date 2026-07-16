@@ -241,9 +241,27 @@ exports.getPatientHistory = async (req, res) => {
       })
     );
 
+    // Get transfer records for showing receiving doctor on transferred visits
+    let transfers = [];
+    try {
+      transfers = await prisma.patientTransfer.findMany({
+        where: { patientId },
+        select: {
+          id: true, fromDoctorId: true, toDoctorId: true, visitId: true, subVisitId: true,
+          status: true, reason: true, createdAt: true,
+          fromDoctor: { select: { id: true, fullname: true } },
+          toDoctor: { select: { id: true, fullname: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    } catch (err) {
+      console.warn('Could not fetch transfers for patient history:', err.message);
+    }
+
     res.json({
       patient,
-      visits: visitsWithDoctors
+      visits: visitsWithDoctors,
+      transfers
     });
   } catch (error) {
     console.error('Error fetching patient history:', error);

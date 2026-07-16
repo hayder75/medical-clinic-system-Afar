@@ -2,7 +2,7 @@ const prisma = require('../config/database');
 const { z } = require('zod');
 const { getEthiopianDateRange, getEthiopianMonthRange } = require('../utils/dateUtils');
 const { checkMedicationOrderingAllowed } = require('../utils/investigationUtils');
-const { getIO } = require('../config/socket');
+const { getIO, emitToRole } = require('../config/socket');
 
 // Doctor roles that have unrestricted access to patient data
 const DOCTOR_ROLES = ['DOCTOR', 'HEALTH_OFFICER', 'DERMATOLOGY'];
@@ -463,6 +463,10 @@ exports.getQueue = async (req, res) => {
       status: statusFilter,
       assignmentId: {
         not: null
+      },
+      // Exclude visits with pending transfers (avoids showing transferred patients on refresh)
+      transfersFrom: {
+        none: { status: 'AWAITING_PAYMENT' }
       }
     };
 
@@ -577,6 +581,7 @@ exports.getResultsQueue = async (req, res) => {
         queueType: 'RESULTS_REVIEW',
         OR: [
           { assignmentId: { not: null } },
+          { suggestedDoctorId: doctorId },
           { batchOrders: { some: { doctorId: doctorId } } }
         ]
       },
@@ -947,115 +952,59 @@ exports.getDashboardStats = async (req, res) => {
           }
         ]
       },
-      include: {
+      select: {
+        id: true,
+        status: true,
+        isEmergency: true,
+        assignmentId: true,
+        patientId: true,
         bills: {
-          include: {
+          where: { status: 'PAID' },
+          select: {
             services: {
-              include: {
-                service: true
-              }
+              where: { service: { category: 'CONSULTATION' } },
+              select: { id: true }
             }
           }
         }
       }
     });
 
-    // Fetch assignments separately and map them to visits
-    const visitAssignmentIds = mainQueueVisits
+    // Fetch assignments for waiver check
+    const visitAssignmentIds = [...new Set(mainQueueVisits
       .map(v => v.assignmentId)
-      .filter(id => id !== null);
+      .filter(id => id !== null))];
 
-    let assignmentMap = {};
+    const waiverMap = {};
     if (visitAssignmentIds.length > 0) {
       const assignments = await prisma.assignment.findMany({
         where: { id: { in: visitAssignmentIds } },
-        include: {
-          doctor: {
-            select: {
-              id: true,
-              waiveConsultationFee: true
-            }
-          }
-        }
+        select: { id: true, patientId: true, doctor: { select: { waiveConsultationFee: true } } }
       });
-
-      assignments.forEach(a => {
-        assignmentMap[a.id] = a;
-      });
+      assignments.forEach(a => { waiverMap[a.id] = a.doctor.waiveConsultationFee; });
     }
 
-    // Also fetch assignments for IN_DOCTOR_QUEUE visits that might not have assignmentId set
-    const inDoctorQueueVisitsWithoutAssignment = mainQueueVisits.filter(
+    // Also check assignments for IN_DOCTOR_QUEUE visits without assignmentId
+    const inDoctorQueueWithoutAssignment = mainQueueVisits.filter(
       v => v.status === 'IN_DOCTOR_QUEUE' && !v.assignmentId
     );
-    const patientIdsForINDoctorQueue = inDoctorQueueVisitsWithoutAssignment.map(v => v.patientId);
-
+    const patientIdsForINDoctorQueue = [...new Set(inDoctorQueueWithoutAssignment.map(v => v.patientId))];
     if (patientIdsForINDoctorQueue.length > 0) {
       const additionalAssignments = await prisma.assignment.findMany({
-        where: {
-          patientId: { in: patientIdsForINDoctorQueue },
-          doctorId: doctorId
-        },
-        include: {
-          doctor: {
-            select: {
-              id: true,
-              waiveConsultationFee: true
-            }
-          }
-        }
+        where: { patientId: { in: patientIdsForINDoctorQueue }, doctorId },
+        select: { patientId: true, doctor: { select: { waiveConsultationFee: true } } }
       });
-
-      // Map by patientId
-      const patientAssignmentMap = {};
-      additionalAssignments.forEach(a => {
-        if (!patientAssignmentMap[a.patientId]) {
-          patientAssignmentMap[a.patientId] = a;
-        }
-      });
-
-      // Add to assignmentMap
-      additionalAssignments.forEach(a => {
-        assignmentMap[`patient_${a.patientId}`] = a;
-      });
+      additionalAssignments.forEach(a => { waiverMap[`patient_${a.patientId}`] = a.doctor.waiveConsultationFee; });
     }
 
-    // Map assignments to visits
-    const visitsWithAssignments = mainQueueVisits.map(visit => {
-      let assignment = null;
-      if (visit.assignmentId) {
-        assignment = assignmentMap[visit.assignmentId] || null;
-      } else if (visit.status === 'IN_DOCTOR_QUEUE') {
-        // For IN_DOCTOR_QUEUE visits without assignmentId, check patient assignment
-        assignment = assignmentMap[`patient_${visit.patientId}`] || null;
-      }
-      return {
-        ...visit,
-        assignment: assignment
-      };
-    });
-
-    // Filter using same logic as unified queue
-    const waitingPatients = visitsWithAssignments.filter(visit => {
-      // Never show patients who haven't paid for card registration
+    const waitingPatients = mainQueueVisits.filter(visit => {
       if (visit.status === 'AWAITING_CARD_BILLING') return false;
-
-      // Emergency patients always included
       if (visit.isEmergency) return true;
-
-      // IN_DOCTOR_QUEUE status always included
       if (visit.status === 'IN_DOCTOR_QUEUE') return true;
-
-      // Check if consultation is paid
       const hasPaidConsultation = visit.bills && visit.bills.some(bill =>
-        bill.status === 'PAID' &&
-        bill.services &&
-        bill.services.some(bs => bs.service && bs.service.category === 'CONSULTATION')
+        bill.services && bill.services.length > 0
       );
-
-      // Check if doctor has waived consultation
-      const doctorHasWaiver = visit.assignment?.doctor?.waiveConsultationFee || false;
-
+      const doctorHasWaiver = waiverMap[visit.assignmentId] || waiverMap[`patient_${visit.patientId}`] || false;
       return hasPaidConsultation || doctorHasWaiver;
     }).length;
 
@@ -1346,7 +1295,6 @@ exports.getUnifiedQueue = async (req, res) => {
     }
 
     const doctorId = req.query.doctorId || req.user.id;
-    console.log('🔍 getUnifiedQueue - Doctor ID:', doctorId);
 
     if (!doctorId || typeof doctorId !== 'string') {
       return res.status(400).json({
@@ -1362,24 +1310,38 @@ exports.getUnifiedQueue = async (req, res) => {
     });
 
     const assignmentIds = doctorAssignments.map(a => a.id);
-    console.log('🔍 Assignment IDs:', assignmentIds);
+
+    // Auto-complete stale visits older than 7 days (they're abandoned)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    try {
+      const staleResult = await prisma.visit.updateMany({
+        where: {
+          status: {
+            notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED']
+          },
+          updatedAt: { lt: sevenDaysAgo }
+        },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date()
+        }
+      });
+      if (staleResult.count > 0) {
+        console.log(`🧹 Auto-completed ${staleResult.count} stale visits older than 7 days`);
+      }
+    } catch (staleError) {
+      console.error('Error auto-completing stale visits:', staleError.message);
+    }
 
     // Get filter parameter from query (main or sent)
     const queueFilter = req.query.filter || 'main'; // 'main' or 'sent'
-    console.log('🔍 ========================================');
-    console.log('🔍 Queue filter requested:', queueFilter);
-    console.log('🔍 Query params:', JSON.stringify(req.query));
-    console.log('🔍 Full request URL:', req.url);
-    console.log('🔍 ========================================');
 
     // Define statuses that indicate patient is sent to lab/radiology/nurse
     const sentStatuses = ['SENT_TO_LAB', 'SENT_TO_RADIOLOGY', 'SENT_TO_BOTH', 'NURSE_SERVICES_ORDERED'];
 
     // Define statuses for patients who have returned with results
     const returnedStatuses = ['RETURNED_WITH_RESULTS', 'AWAITING_RESULTS_REVIEW'];
-
-    console.log('🔍 Sent statuses:', sentStatuses);
-    console.log('🔍 Returned statuses:', returnedStatuses);
 
     // Build status filter based on queue type
     let statusFilter = {
@@ -1391,25 +1353,21 @@ exports.getUnifiedQueue = async (req, res) => {
       statusFilter = {
         notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED', ...sentStatuses, ...returnedStatuses]
       };
-      console.log('🔍 Main queue filter: excluding', [...sentStatuses, ...returnedStatuses]);
     } else if (queueFilter === 'sent') {
       // Sent queue: ONLY include patients sent to lab/radiology/nurse
       statusFilter = {
         in: sentStatuses
       };
-      console.log('🔍 Sent queue filter: ONLY including', sentStatuses);
     } else if (queueFilter === 'returned') {
       // Returned queue: ONLY include patients with results ready
       statusFilter = {
         in: returnedStatuses
       };
-      console.log('🔍 Returned queue filter: ONLY including', returnedStatuses);
     } else if (queueFilter === 'all') {
       // All queue for searching: include all active statuses
       statusFilter = {
         notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED']
       };
-      console.log('🔍 All queue filter: including all active statuses');
     }
 
     // Get all visits assigned to this doctor (both new consultations and results)
@@ -1421,14 +1379,13 @@ exports.getUnifiedQueue = async (req, res) => {
     let visitsWithAssignments = [];
 
     if (assignmentIds.length > 0) {
-      console.log('🔍 Executing initial query with statusFilter:', JSON.stringify(statusFilter));
-      console.log('🔍 Queue filter:', queueFilter);
-      console.log('🔍 Assignment IDs:', assignmentIds);
 
       visitsWithAssignments = await prisma.visit.findMany({
         where: {
           status: statusFilter,
           AND: [
+            // Exclude visits with pending transfers (avoids showing transferred-but-unpaid patients)
+            { transfersFrom: { none: { status: 'AWAITING_PAYMENT' } } },
             {
               OR: [
                 { assignmentId: { in: assignmentIds } },
@@ -1544,7 +1501,6 @@ exports.getUnifiedQueue = async (req, res) => {
         });
 
         if (additionalINDoctorQueueVisits.length > 0) {
-          console.log(`🔍 Found ${additionalINDoctorQueueVisits.length} additional IN_DOCTOR_QUEUE visits with assignments but no assignmentId link`);
 
           // Fetch assignments for these visits
           const patientIds = additionalINDoctorQueueVisits.map(v => v.patientId);
@@ -1587,7 +1543,6 @@ exports.getUnifiedQueue = async (req, res) => {
           const existingVisitIds = new Set(visitsWithAssignments.map(v => v.id));
           const newVisits = visitsWithAdditionalAssignments.filter(v => !existingVisitIds.has(v.id));
           visitsWithAssignments = [...visitsWithAssignments, ...newVisits];
-          console.log(`🔍 Added ${newVisits.length} additional IN_DOCTOR_QUEUE visits to queue`);
         }
       }
     } else {
@@ -1656,8 +1611,6 @@ exports.getUnifiedQueue = async (req, res) => {
       }
     }
 
-    console.log('🔍 Visits with assignments found:', visitsWithAssignments.length);
-
     // Debug: Check for all IN_DOCTOR_QUEUE visits in database for this doctor
     if (queueFilter === 'main') {
       const allINDoctorQueueVisits = await prisma.visit.findMany({
@@ -1679,11 +1632,6 @@ exports.getUnifiedQueue = async (req, res) => {
           }
         }
       });
-      console.log(`🔍 DEBUG: Found ${allINDoctorQueueVisits.length} total IN_DOCTOR_QUEUE visits in database`);
-      allINDoctorQueueVisits.forEach(v => {
-        console.log(`   Visit ${v.id} (${v.visitUid}): assignmentId=${v.assignmentId}, suggestedDoctorId=${v.suggestedDoctorId}, patient=${v.patient?.name}`);
-      });
-
       // Check which ones have assignments for this doctor
       const patientIds = allINDoctorQueueVisits.map(v => v.patientId);
       const allAssignmentsForPatients = await prisma.assignment.findMany({
@@ -1697,14 +1645,9 @@ exports.getUnifiedQueue = async (req, res) => {
           doctorId: true
         }
       });
-      console.log(`🔍 DEBUG: Found ${allAssignmentsForPatients.length} assignments for this doctor for these patients`);
-      allAssignmentsForPatients.forEach(a => {
-        console.log(`   Assignment ${a.id}: patientId=${a.patientId}, doctorId=${a.doctorId}`);
-      });
     }
 
     if (visitsWithAssignments.length > 0) {
-      console.log('🔍 Visit statuses from initial query:', visitsWithAssignments.map(v => ({ id: v.id, status: v.status, assignmentId: v.assignmentId })));
       // CRITICAL CHECK: If queueFilter is 'sent', verify all visits have sent statuses
       if (queueFilter === 'sent') {
         const invalidVisits = visitsWithAssignments.filter(v => !sentStatuses.includes(v.status));
@@ -1722,21 +1665,18 @@ exports.getUnifiedQueue = async (req, res) => {
     // For 'main' filter, we need to ensure they're not in sent statuses (already filtered) and have payment/waiver
     const filteredVisits = visitsWithAssignments.filter(visit => {
       try {
-        // For 'sent' queue, include ALL visits with sent statuses (they're already sent)
-        if (queueFilter === 'sent' && sentStatuses.includes(visit.status)) {
-          console.log(`🔍 Visit ${visit.id} included - is in sent queue (status: ${visit.status})`);
+        // Always include sent/returned visits regardless of payment — they're already in the workflow
+        if (sentStatuses.includes(visit.status) || returnedStatuses.includes(visit.status)) {
           return true;
         }
 
         // Never show patients who haven't paid for card registration
         if (visit.status === 'AWAITING_CARD_BILLING') {
-          console.log(`🔍 Visit ${visit.id} EXCLUDED - AWAITING_CARD_BILLING (card not paid)`);
           return false;
         }
 
         // Emergency patients always included
         if (visit.isEmergency) {
-          console.log(`🔍 Visit ${visit.id} included - is emergency`);
           return true;
         }
 
@@ -1755,32 +1695,22 @@ exports.getUnifiedQueue = async (req, res) => {
         );
 
         // Check if doctor has waived consultation
-        // Handle case where assignment might be null
         let doctorHasWaiver = false;
         if (visit.assignment && visit.assignment.doctor) {
           doctorHasWaiver = visit.assignment.doctor.waiveConsultationFee || false;
         }
 
         // If patient has WAITING_FOR_NURSE_SERVICE status and doctor has waiver, include them
-        // This handles the case where services were assigned first, then doctor was assigned
         if (visit.status === 'WAITING_FOR_NURSE_SERVICE' && doctorHasWaiver && !hasPendingConsultation) {
-          console.log(`🔍 Including visit ${visit.id} with WAITING_FOR_NURSE_SERVICE status - doctor has waiver`);
           return true;
         }
 
         // IN_DOCTOR_QUEUE status means doctor is already working on patient - always include
-        // This ensures patients don't disappear from main queue when doctor is actively working
         if (visit.status === 'IN_DOCTOR_QUEUE') {
-          console.log(`🔍 Including visit ${visit.id} with IN_DOCTOR_QUEUE status - doctor is working on patient`);
           return true;
         }
 
         const included = hasPaidConsultation || (doctorHasWaiver && !hasPendingConsultation);
-        if (!included) {
-          console.log(`🔍 Visit ${visit.id} (status: ${visit.status}) EXCLUDED - no paid consultation (${hasPaidConsultation}) and no waiver (${doctorHasWaiver}) or pending bill exists`);
-        } else {
-          console.log(`🔍 Visit ${visit.id} (status: ${visit.status}) INCLUDED - hasPaidConsultation: ${hasPaidConsultation}, doctorHasWaiver: ${doctorHasWaiver}`);
-        }
 
         return included;
       } catch (filterError) {
@@ -1821,26 +1751,18 @@ exports.getUnifiedQueue = async (req, res) => {
     }
 
     const visitIds = finalFilteredVisits.map(v => v.id).filter(id => id != null);
-    console.log(`🔍 Final filtered visit IDs for ${queueFilter} queue:`, visitIds);
-    console.log('🔍 Filtered visit IDs:', visitIds);
 
     // Now fetch full visit data for filtered visits
-    console.log('🔍 Fetching full visit data for', visitIds.length, 'visits');
     let allVisits = [];
 
     try {
       // Ensure visitIds is not empty and contains valid IDs
       if (!visitIds || visitIds.length === 0) {
-        console.log('🔍 No valid visit IDs to fetch');
         allVisits = [];
       } else {
         // Ensure we also filter by status here to prevent any completed/cancelled visits from appearing
         // Also ensure we don't get visits with wrong statuses
         // CRITICAL: This is the final database query - must match the queue filter exactly
-        console.log('🔍 Final database query - queueFilter:', queueFilter);
-        console.log('🔍 Final database query - statusFilter:', JSON.stringify(statusFilter));
-        console.log('🔍 Final database query - visitIds:', visitIds);
-        console.log('🔍 Final database query - sentStatuses:', sentStatuses);
 
         // CRITICAL: For sent queue, we MUST ensure statusFilter only includes sentStatuses
         // Double-check that statusFilter is correct before querying
@@ -1875,104 +1797,11 @@ exports.getUnifiedQueue = async (req, res) => {
             vitals: {
               orderBy: { createdAt: 'desc' },
               take: 1
-            },
-            labOrders: {
-              include: {
-                type: true,
-                labResults: {
-                  include: {
-                    testType: true,
-                    attachments: true
-                  }
-                }
-              }
-            },
-            radiologyOrders: {
-              include: {
-                type: true,
-                radiologyResults: {
-                  include: {
-                    testType: true,
-                    attachments: true
-                  }
-                }
-              }
-            },
-            batchOrders: {
-              include: {
-                services: {
-                  include: {
-                    service: true,
-                    investigationType: true
-                  }
-                },
-                attachments: true
-              }
-            },
-            medicationOrders: {
-              include: {
-                continuousInfusion: true
-              }
-            },
-            labTestOrders: {
-              include: {
-                labTest: {
-                  include: {
-                    resultFields: {
-                      orderBy: { displayOrder: 'asc' }
-                    },
-                    group: true
-                  }
-                },
-                results: {
-                  include: {
-                    attachments: true
-                  },
-                  orderBy: { createdAt: 'desc' }
-                },
-                doctor: {
-                  select: {
-                    id: true,
-                    fullname: true
-                  }
-                }
-              },
-              orderBy: { createdAt: 'asc' }
-            },
-            bills: {
-              include: {
-                services: {
-                  include: {
-                    service: true
-                  }
-                },
-                payments: true
-              }
-            },
-            dentalRecords: true,
-            nurseServiceAssignments: {
-              where: {
-                status: 'COMPLETED'
-              },
-              include: {
-                service: true,
-                assignedNurse: {
-                  select: {
-                    id: true,
-                    fullname: true
-                  }
-                }
-              },
-              orderBy: {
-                completedAt: 'desc'
-              }
             }
           },
           orderBy: { createdAt: 'asc' }
         });
       }
-
-      console.log('🔍 Successfully fetched', allVisits.length, 'visits');
 
       // Fetch assignments separately for visits that have assignmentId
       const allVisitAssignmentIds = allVisits
@@ -2013,15 +1842,6 @@ exports.getUnifiedQueue = async (req, res) => {
       throw queryError; // Re-throw to be caught by outer catch
     }
 
-    console.log('🔍 Found visits before final filter:', allVisits.length);
-    console.log('🔍 Queue filter:', queueFilter);
-    console.log('🔍 Sent statuses:', sentStatuses);
-
-    // Log all visit statuses before filtering
-    if (allVisits.length > 0) {
-      console.log('🔍 Visit statuses before filter:', allVisits.map(v => ({ id: v.id, status: v.status })));
-    }
-
     // Final safety check: Filter out any visits that don't match the queue filter
     // This is CRITICAL - the sent queue should ONLY show patients sent to lab/radiology/nurse
     // A patient with WAITING_FOR_DOCTOR should NEVER appear in the sent queue
@@ -2034,8 +1854,6 @@ exports.getUnifiedQueue = async (req, res) => {
         }
         return isSent;
       });
-      console.log(`🔍 After sent status filter: ${allVisits.length} visits (removed ${beforeCount - allVisits.length})`);
-
       // Double-check: If any visits remain that don't have sent statuses, this is a critical error
       const invalidRemaining = allVisits.filter(v => !sentStatuses.includes(v.status));
       if (invalidRemaining.length > 0) {
@@ -2054,52 +1872,31 @@ exports.getUnifiedQueue = async (req, res) => {
         }
         return isNotSent;
       });
-      console.log(`🔍 After main status filter: ${allVisits.length} visits (removed ${beforeCount - allVisits.length})`);
     }
 
     // Always exclude COMPLETED and CANCELLED
     const beforeCompletedFilter = allVisits.length;
     allVisits = allVisits.filter(v => v.status !== 'COMPLETED' && v.status !== 'CANCELLED');
-    if (beforeCompletedFilter !== allVisits.length) {
-      console.log(`🔍 Removed ${beforeCompletedFilter - allVisits.length} completed/cancelled visits`);
-    }
 
-    // Final verification log
-    console.log('🔍 Final visit count:', allVisits.length);
-    if (allVisits.length > 0) {
-      console.log('🔍 Final visit statuses:', allVisits.map(v => ({ id: v.id, status: v.status })));
+    // CRITICAL FINAL CHECK: If queueFilter is 'sent', verify NO visits have WAITING_FOR_DOCTOR
+    if (queueFilter === 'sent') {
+      const invalidStatuses = ['WAITING_FOR_DOCTOR', 'UNDER_DOCTOR_REVIEW', 'AWAITING_RESULTS_REVIEW'];
+      const invalidVisits = allVisits.filter(v => invalidStatuses.includes(v.status));
+      if (invalidVisits.length > 0) {
+        console.error(`❌ CRITICAL ERROR: Found ${invalidVisits.length} visits with invalid statuses in sent queue!`);
+        console.error('❌ Invalid visits:', invalidVisits.map(v => ({ id: v.id, status: v.status })));
+        allVisits = allVisits.filter(v => !invalidStatuses.includes(v.status));
+        console.error(`❌ Removed ${invalidVisits.length} invalid visits. Final count: ${allVisits.length}`);
+      }
 
-      // CRITICAL FINAL CHECK: If queueFilter is 'sent', verify NO visits have WAITING_FOR_DOCTOR
-      if (queueFilter === 'sent') {
-        const invalidStatuses = ['WAITING_FOR_DOCTOR', 'UNDER_DOCTOR_REVIEW', 'AWAITING_RESULTS_REVIEW'];
-        const invalidVisits = allVisits.filter(v => invalidStatuses.includes(v.status));
-        if (invalidVisits.length > 0) {
-          console.error(`❌ CRITICAL ERROR: Found ${invalidVisits.length} visits with invalid statuses in sent queue!`);
-          console.error('❌ Invalid visits:', invalidVisits.map(v => ({ id: v.id, status: v.status })));
-          // Remove them immediately
-          allVisits = allVisits.filter(v => !invalidStatuses.includes(v.status));
-          console.error(`❌ Removed ${invalidVisits.length} invalid visits. Final count: ${allVisits.length}`);
-        }
-
-        // Double-check: Only sentStatuses should remain
-        const stillInvalid = allVisits.filter(v => !sentStatuses.includes(v.status));
-        if (stillInvalid.length > 0) {
-          console.error(`❌ CRITICAL: ${stillInvalid.length} visits still have wrong statuses!`,
-            stillInvalid.map(v => ({ id: v.id, status: v.status }))
-          );
-          allVisits = allVisits.filter(v => sentStatuses.includes(v.status));
-        }
+      const stillInvalid = allVisits.filter(v => !sentStatuses.includes(v.status));
+      if (stillInvalid.length > 0) {
+        console.error(`❌ CRITICAL: ${stillInvalid.length} visits still have wrong statuses!`,
+          stillInvalid.map(v => ({ id: v.id, status: v.status }))
+        );
+        allVisits = allVisits.filter(v => sentStatuses.includes(v.status));
       }
     }
-
-    allVisits.forEach(visit => {
-      try {
-        const doctorWaiver = visit.assignment?.doctor?.waiveConsultationFee ? 'YES' : 'NO';
-        console.log(`  - Visit ${visit.id}: ${visit.patient?.name || 'Unknown'}, Status: ${visit.status}, AssignmentId: ${visit.assignmentId}, Doctor Waiver: ${doctorWaiver}`);
-      } catch (logError) {
-        console.error('Error logging visit:', visit.id, logError);
-      }
-    });
 
     // Additional safety check: Find visits from appointments that might not be properly linked
     // First, find appointments for this doctor that are in progress and have a visitId
@@ -2141,7 +1938,6 @@ exports.getUnifiedQueue = async (req, res) => {
     });
 
     if (visitsToFix.length > 0) {
-      console.log(`🔧 Found ${visitsToFix.length} appointment visits missing assignment links - fixing...`);
 
       for (const visit of visitsToFix) {
         // Find or create assignment
@@ -2168,8 +1964,6 @@ exports.getUnifiedQueue = async (req, res) => {
           where: { id: visit.id },
           data: { assignmentId: assignment.id }
         });
-
-        console.log(`✅ Fixed visit ${visit.id} - linked to assignment ${assignment.id}`);
       }
     }
 
@@ -2186,7 +1980,6 @@ exports.getUnifiedQueue = async (req, res) => {
     });
 
     if (visitsWithWrongStatus.length > 0) {
-      console.log(`🔧 Found ${visitsWithWrongStatus.length} visits with WAITING_FOR_NURSE_SERVICE status but waived doctor - fixing...`);
 
       try {
         for (const visit of visitsWithWrongStatus) {
@@ -2194,7 +1987,6 @@ exports.getUnifiedQueue = async (req, res) => {
             where: { id: visit.id },
             data: { status: 'WAITING_FOR_DOCTOR' }
           });
-          console.log(`✅ Fixed visit ${visit.id} - updated status from WAITING_FOR_NURSE_SERVICE to WAITING_FOR_DOCTOR`);
         }
 
         // Update status in the allVisits array directly instead of re-fetching
@@ -2205,8 +1997,6 @@ exports.getUnifiedQueue = async (req, res) => {
           }
           return v;
         });
-
-        console.log('🔍 Updated visit statuses in memory:', visitsWithWrongStatus.length);
       } catch (fixError) {
         console.error('Error fixing visit statuses:', fixError);
         // Continue with existing allVisits - don't fail the whole request
@@ -2373,15 +2163,16 @@ exports.getUnifiedQueue = async (req, res) => {
     const allQualifyingVisits = await prisma.visit.findMany({
       where: {
         status: {
-          notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED'] // Only exclude completed/cancelled
+          notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED']
         },
         AND: [
+          // Exclude visits with pending transfers
+          { transfersFrom: { none: { status: 'AWAITING_PAYMENT' } } },
           {
             OR: [
               { assignmentId: { in: assignmentIds } },
               { batchOrders: { some: { doctorId: doctorId } } },
               { labTestOrders: { some: { doctorId: doctorId } } },
-              // Include IN_DOCTOR_QUEUE visits assigned to this doctor
               {
                 AND: [
                   { status: 'IN_DOCTOR_QUEUE' },
@@ -2406,6 +2197,10 @@ exports.getUnifiedQueue = async (req, res) => {
               }
             }
           }
+        },
+        vitals: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
         }
       }
     });
@@ -2494,6 +2289,8 @@ exports.getUnifiedQueue = async (req, res) => {
     const qualifyingVisits = allQualifyingVisitsWithAssignments.filter(visit => {
       // Never show patients who haven't paid for card registration
       if (visit.status === 'AWAITING_CARD_BILLING') return false;
+      // Always include sent/returned visits regardless of payment
+      if (sentStatuses.includes(visit.status) || returnedStatuses.includes(visit.status)) return true;
       if (visit.isEmergency) return true;
       if (visit.status === 'IN_DOCTOR_QUEUE') return true;
       const hasPaidConsultation = visit.bills && visit.bills.some(bill =>
@@ -2539,18 +2336,6 @@ exports.getUnifiedQueue = async (req, res) => {
     }).length;
     const allResultsCount = returnedQueueVisits.length;
     const allMainCount = mainQueueVisits.length;
-
-    console.log('🔍 Unified queue count:', unifiedQueue.length);
-    console.log('🔍 Queue breakdown:', {
-      main: mainQueueVisits.length,
-      sent: sentQueueVisits.length,
-      returned: returnedQueueVisits.length,
-      triage: triageQueueCount,
-      urgent: allUrgentCount,
-      results: allResultsCount,
-      new: allMainCount - allUrgentCount,
-      awaiting: sentQueueVisits.length
-    });
 
     res.json({
       success: true,
@@ -2671,7 +2456,7 @@ exports.getVisitDetails = async (req, res) => {
         labTestOrders: { take: 20, orderBy: { createdAt: 'desc' }, include: { labTest: { select: { id: true, name: true, category: true, resultFields: true } }, results: { take: 3, select: { id: true, status: true, results: true, additionalNotes: true } } } },
         radiologyOrders: { take: 20, orderBy: { createdAt: 'desc' }, include: { type: { select: { id: true, name: true } }, attachments: { select: { id: true, path: true } }, radiologyResults: { take: 3, select: { id: true, resultText: true, clinicalIndication: true, technique: true, findings: true, conclusion: true, additionalNotes: true, createdAt: true, status: true, attachments: { select: { id: true, fileUrl: true, fileName: true } } } } } },
         medicationOrders: { take: 20, orderBy: { createdAt: 'desc' }, include: { doctor: { select: { id: true, fullname: true } }, medicationCatalog: { select: { id: true, name: true, genericName: true, unitPrice: true } } } },
-        batchOrders: { take: 20, orderBy: { createdAt: 'desc' }, include: { services: { include: { investigationType: true, service: true } } } },
+        batchOrders: { take: 20, orderBy: { createdAt: 'desc' }, include: { services: { include: { investigationType: true, service: true } }, detailedResults: { include: { template: true } } } },
         diagnosisNotes: { take: 10, orderBy: { createdAt: 'desc' }, include: { doctor: { select: { id: true, fullname: true, role: true } } } },
         patientDiagnoses: { include: { disease: true } },
       }
@@ -3296,7 +3081,7 @@ exports.selectVisit = async (req, res) => {
       : 'PRE_DIAGNOSTICS';
 
     try {
-      getIO().emit('queue:visit-update', {
+      emitToRole('DOCTOR', 'queue:visit-update', {
         visitId,
         patientId: visit.patientId,
         patientName: visit.patient?.name,
@@ -3529,7 +3314,8 @@ exports.createLabOrder = async (req, res) => {
 
     if (billing && billing.id) {
       try {
-        getIO().emit('billing:update', { billingId: billing.id });
+        emitToRole('BILLING_OFFICER', 'billing:update', { billingId: billing.id });
+        emitToRole('DOCTOR', 'billing:update', { billingId: billing.id });
       } catch (err) {
         console.error('Failed to emit billing:update socket event:', err.message);
       }
@@ -3832,7 +3618,8 @@ exports.createRadiologyOrder = async (req, res) => {
 
     if (billing && billing.id) {
       try {
-        getIO().emit('billing:update', { billingId: billing.id });
+        emitToRole('BILLING_OFFICER', 'billing:update', { billingId: billing.id });
+        emitToRole('DOCTOR', 'billing:update', { billingId: billing.id });
       } catch (err) {
         console.error('Failed to emit billing:update socket event:', err.message);
       }
@@ -6264,7 +6051,7 @@ exports.completeVisit = async (req, res) => {
     }
 
     try {
-      getIO().emit('queue:visit-update', {
+      emitToRole('DOCTOR', 'queue:visit-update', {
         visitId,
         patientId: visit.patientId,
         doctorId,

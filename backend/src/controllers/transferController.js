@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { getIO, emitToRole } = require('../config/socket');
 
 exports.getAvailableDoctors = async (req, res) => {
   try {
@@ -43,15 +44,15 @@ exports.transferPatient = async (req, res) => {
     ]);
     const hasOrders = labOrders > 0 || radiologyOrders > 0 || medicationOrders > 0 || batchOrders > 0;
 
-    // Mark original visit as TRANSFERRED (keeps it accessible for history/referencing)
-    await prisma.visit.update({
-      where: { id: visitId },
-      data: { status: 'TRANSFERRED' }
-    });
-
     // Determine if consultation fee is needed
     const consultationFee = toDoctor.consultationFee || 0;
     const needsPayment = hasOrders && consultationFee > 0;
+
+    // Doctor A's work is done — mark original visit COMPLETED regardless of payment
+    await prisma.visit.update({
+      where: { id: visitId },
+      data: { status: 'COMPLETED', completedAt: new Date() }
+    });
 
     if (needsPayment) {
       // Find consultation service
@@ -69,7 +70,7 @@ exports.transferPatient = async (req, res) => {
           totalAmount: consultationFee,
           paidAmount: 0,
           status: 'PENDING',
-          billingType: 'CONSULTATION',
+          billingType: 'REGULAR',
           notes: `Transfer consultation fee — ${toDoctor.fullname}`,
           services: {
             create: { serviceId: consultationService.id, quantity: 1, unitPrice: consultationFee, totalPrice: consultationFee }
@@ -87,6 +88,14 @@ exports.transferPatient = async (req, res) => {
         }
       });
 
+      // Notify old doctor that patient left their queue
+      try {
+        const io = getIO();
+        io.to(`doctor:${fromDoctorId}`).emit('queue:visit-removed', { visitId, patientId });
+      } catch (e) {
+        console.error('Socket notification error (non-fatal):', e.message);
+      }
+
       res.json({
         transfer: { ...transfer, id: transfer.id, status: 'AWAITING_PAYMENT' },
         billing,
@@ -96,11 +105,23 @@ exports.transferPatient = async (req, res) => {
       });
     } else {
       // Free transfer — create sub-visit immediately
+
+      // Find or create assignment to ensure sub-visit is visible in receiving doctor's queue
+      let assignment = await prisma.assignment.findFirst({
+        where: { patientId, doctorId: toDoctorId }
+      });
+      if (!assignment) {
+        assignment = await prisma.assignment.create({
+          data: { patientId, doctorId: toDoctorId, status: 'Pending' }
+        });
+      }
+
       const subVisit = await prisma.visit.create({
         data: {
           visitUid: `${visit.visitUid}-T${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
           patientId, createdById: fromDoctorId,
           suggestedDoctorId: toDoctorId,
+          assignmentId: assignment.id,
           parentVisitId: visitId,
           status: 'IN_DOCTOR_QUEUE',
           queueType: 'CONSULTATION',
@@ -115,6 +136,23 @@ exports.transferPatient = async (req, res) => {
           paymentRequired: false, paymentAmount: 0, status: 'ACCEPTED'
         }
       });
+
+      // Notify doctors via socket
+      try {
+        // Notify old doctor (patient removed from their queue)
+        emitToRole('DOCTOR', 'queue:visit-removed', { visitId, patientId });
+        // Notify new doctor (patient added to their queue)
+        emitToRole('DOCTOR', 'queue:new-visit', {
+          visitId: subVisit.id,
+          patientId,
+          patientName: patient.name,
+          doctorId: toDoctorId,
+          status: 'IN_DOCTOR_QUEUE',
+          timestamp: new Date().toISOString()
+        });
+      } catch (e) {
+        console.error('Socket notification error (non-fatal):', e.message);
+      }
 
       res.json({
         transfer: { ...transfer, id: transfer.id, subVisitId: subVisit.id, status: 'ACCEPTED' },

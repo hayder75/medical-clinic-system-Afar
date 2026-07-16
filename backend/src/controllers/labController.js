@@ -3,7 +3,7 @@ const { z } = require('zod');
 const { createPDFDocument, generatePDF } = require('../utils/pdfGenerator');
 const fs = require('fs');
 const path = require('path');
-const { getIO } = require('../config/socket');
+const { getIO, emitToRole } = require('../config/socket');
 
 const individualLabResultSchema = z.object({
   labOrderId: z.number(),
@@ -236,10 +236,12 @@ const sendToDoctor = async (req, res) => {
     let updatedVisit;
     if (batchOrder.visitId) {
       updatedVisit = await checkAndUpdateVisitStatus(batchOrder.visitId);
+      // If this visit was transferred, also route results to the receiving doctor's sub-visit
+      await routeResultsToSubVisits(batchOrder.visitId, orderId);
     }
 
     try {
-      getIO().emit('queue:results-ready', {
+      emitToRole('DOCTOR', 'queue:results-ready', {
         visitId: batchOrder.visitId,
         patientId: batchOrder.patientId,
         batchOrderId: orderId,
@@ -414,6 +416,37 @@ async function checkAndUpdateVisitStatus(visitId) {
     return visit;
   } catch (error) {
     console.error(`Error checking/updating visit status for visit ${visitId}:`, error);
+  }
+}
+
+// When lab results are finalized for a transferred visit, also route the notification
+// to the receiving doctor's sub-visit so they see results in their queue.
+async function routeResultsToSubVisits(originalVisitId, batchOrderId) {
+  try {
+    const subVisits = await prisma.visit.findMany({
+      where: { parentVisitId: originalVisitId, status: { notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED'] } },
+      select: { id: true, suggestedDoctorId: true, patientId: true }
+    });
+    for (const sv of subVisits) {
+      await prisma.visit.update({
+        where: { id: sv.id },
+        data: { status: 'AWAITING_RESULTS_REVIEW', queueType: 'RESULTS_REVIEW' }
+      });
+      try {
+        emitToRole('DOCTOR', 'queue:results-ready', {
+          visitId: sv.id,
+          patientId: sv.patientId,
+          batchOrderId: batchOrderId,
+          timestamp: new Date().toISOString()
+        });
+      } catch (e) {
+        console.error('[WS] Failed to emit results-ready for sub-visit:', e.message);
+      }
+    }
+    return subVisits.length;
+  } catch (error) {
+    console.error(`Error routing results to sub-visits for visit ${originalVisitId}:`, error);
+    return 0;
   }
 }
 
@@ -709,6 +742,8 @@ const saveLabTestResult = async (req, res) => {
 
       if (order.visitId) {
         await checkAndUpdateVisitStatus(order.visitId);
+        // If this visit was transferred, also route results to the receiving doctor's sub-visit
+        await routeResultsToSubVisits(order.visitId, orderId);
       }
     } else if (reopen) {
       await prisma.labTestOrder.update({ where: { id: orderId }, data: { status: 'IN_PROGRESS' } });
@@ -780,5 +815,6 @@ const uploadLabImage = async (req, res) => {
 
 module.exports = {
   getTemplates, getOrders, saveIndividualLabResult, getDetailedResults,
-  sendToDoctor, updateLabOrderStatus, generateLabResultsPDF, getLabReports, saveLabTestResult, getLabStats, uploadLabImage
+  sendToDoctor, updateLabOrderStatus, generateLabResultsPDF, getLabReports, saveLabTestResult, getLabStats, uploadLabImage,
+  routeResultsToSubVisits
 };

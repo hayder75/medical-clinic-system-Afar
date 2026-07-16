@@ -31,7 +31,7 @@ prisma.$use(async (params, next) => {
           status: visit.status,
           patientId: visit.patientId,
           timestamp: new Date().toISOString()
-        });
+        }, ['DOCTOR', 'RECEPTIONIST', 'BILLING_OFFICER', 'NURSE', 'ADMIN']);
       }
     } catch { }
   }
