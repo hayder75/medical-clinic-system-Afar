@@ -1,64 +1,64 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ClinicSettingsProvider } from './contexts/ClinicSettingsContext';
 import Layout from './components/common/Layout';
 
-// Import pages
+// Import pages (LoginPage eager for instant load; all others lazy)
 import LoginPage from './pages/LoginPage';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminExpenseTracker from './pages/admin/AdminExpenseTracker';
-import DiseaseReports from './pages/admin/DiseaseReports';
-import SelectedDiseaseReportPage from './pages/admin/SelectedDiseaseReportPage';
-import AgeGenderDiseaseDistribution from './pages/admin/AgeGenderDiseaseDistribution';
-import AdminLabReports from './pages/admin/AdminLabReports';
-import PatientRegistration from './pages/patient/PatientRegistration';
-import NurseDashboard from './pages/nurse/NurseDashboard';
-import NurseAppointments from './pages/nurse/NurseAppointments';
-import AdminAppointments from './pages/admin/AdminAppointments';
-import DoctorDashboard from './pages/doctor/DoctorDashboard';
-import PatientConsultationPage from './pages/doctor/PatientConsultationPage';
-import BillingDashboard from './pages/billing/BillingDashboard';
-import EmergencyBilling from './pages/billing/EmergencyBilling';
-import DailyCashManagement from './pages/billing/DailyCashManagement';
-import DoctorQueueManagement from './pages/billing/DoctorQueueManagement';
-import RadiologyDashboard from './pages/radiology/RadiologyDashboard';
-import LabDashboard from './pages/lab/LabDashboard';
-import LabOrders from './pages/lab/LabOrders';
-import LabReports from './pages/lab/LabReports';
-import WalkInOrders from './pages/lab/WalkInOrders';
-import RadiologyWalkInOrders from './pages/radiology/WalkInOrders';
-import PharmacyDashboard from './pages/pharmacy/PharmacyDashboard';
-import SalesReport from './components/pharmacy/SalesReport';
-import AppointmentsPage from './pages/appointments/AppointmentsPage';
-import DoctorAppointments from './pages/doctor/DoctorAppointments';
-import ReceptionDashboard from './pages/reception/ReceptionDashboard';
-import ReceptionPatientRegistration from './pages/reception/ReceptionPatientRegistration';
-import PatientManagement from './pages/reception/PatientManagement';
-import ReceptionAppointments from './pages/reception/ReceptionAppointments';
-import PreRegistration from './pages/reception/PreRegistration';
-import ReceptionDoctorQueueManagement from './pages/reception/DoctorQueueManagement';
-import PatientGallery from './pages/shared/PatientGallery';
-import FamilyPlanningPage from './pages/nurse/FamilyPlanningPage';
-import NursePatientManagement from './pages/nurse/NursePatientManagement';
-import AbortionCarePage from './pages/doctor/AbortionCarePage';
-import Loans from './components/shared/Loans';
-import AdmissionManagement from './pages/accommodation/AdmissionManagement';
-import PatientAccounts from './components/admin/PatientAccounts';
-import SystemView from './pages/admin/SystemView';
-import CentralRegisterPage from './pages/admin/CentralRegisterPage';
-import DiseaseTallySheetPage from './pages/admin/DiseaseTallySheetPage';
-import DiseaseManagement from './pages/admin/DiseaseManagement';
-import ReportDashboard from './pages/report/ReportDashboard';
-import BillingPatientHistory from './components/billing/BillingPatientHistory';
-import InstitutionManagement from './pages/admin/InstitutionManagement';
-import InstitutionDetail from './pages/admin/InstitutionDetail';
-import InventoryDashboard from './pages/inventory/InventoryDashboard';
-import WarehouseStock from './pages/inventory/WarehouseStock';
-import StockRequestsInv from './pages/inventory/StockRequests';
-import StockMovements from './pages/inventory/StockMovements';
-import PharmacyStockRequests from './pages/pharmacy/PharmacyStockRequests';
+const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminExpenseTracker = React.lazy(() => import('./pages/admin/AdminExpenseTracker'));
+const DiseaseReports = React.lazy(() => import('./pages/admin/DiseaseReports'));
+const SelectedDiseaseReportPage = React.lazy(() => import('./pages/admin/SelectedDiseaseReportPage'));
+const AgeGenderDiseaseDistribution = React.lazy(() => import('./pages/admin/AgeGenderDiseaseDistribution'));
+const AdminLabReports = React.lazy(() => import('./pages/admin/AdminLabReports'));
+const PatientRegistration = React.lazy(() => import('./pages/patient/PatientRegistration'));
+const NurseDashboard = React.lazy(() => import('./pages/nurse/NurseDashboard'));
+const NurseAppointments = React.lazy(() => import('./pages/nurse/NurseAppointments'));
+const AdminAppointments = React.lazy(() => import('./pages/admin/AdminAppointments'));
+const DoctorDashboard = React.lazy(() => import('./pages/doctor/DoctorDashboard'));
+const PatientConsultationPage = React.lazy(() => import('./pages/doctor/PatientConsultationPage'));
+const BillingDashboard = React.lazy(() => import('./pages/billing/BillingDashboard'));
+const EmergencyBilling = React.lazy(() => import('./pages/billing/EmergencyBilling'));
+const DailyCashManagement = React.lazy(() => import('./pages/billing/DailyCashManagement'));
+const DoctorQueueManagement = React.lazy(() => import('./pages/billing/DoctorQueueManagement'));
+const RadiologyDashboard = React.lazy(() => import('./pages/radiology/RadiologyDashboard'));
+const LabDashboard = React.lazy(() => import('./pages/lab/LabDashboard'));
+const LabOrders = React.lazy(() => import('./pages/lab/LabOrders'));
+const LabReports = React.lazy(() => import('./pages/lab/LabReports'));
+const WalkInOrders = React.lazy(() => import('./pages/lab/WalkInOrders'));
+const RadiologyWalkInOrders = React.lazy(() => import('./pages/radiology/WalkInOrders'));
+const PharmacyDashboard = React.lazy(() => import('./pages/pharmacy/PharmacyDashboard'));
+const SalesReport = React.lazy(() => import('./components/pharmacy/SalesReport'));
+const AppointmentsPage = React.lazy(() => import('./pages/appointments/AppointmentsPage'));
+const DoctorAppointments = React.lazy(() => import('./pages/doctor/DoctorAppointments'));
+const ReceptionDashboard = React.lazy(() => import('./pages/reception/ReceptionDashboard'));
+const ReceptionPatientRegistration = React.lazy(() => import('./pages/reception/ReceptionPatientRegistration'));
+const PatientManagement = React.lazy(() => import('./pages/reception/PatientManagement'));
+const ReceptionAppointments = React.lazy(() => import('./pages/reception/ReceptionAppointments'));
+const PreRegistration = React.lazy(() => import('./pages/reception/PreRegistration'));
+const ReceptionDoctorQueueManagement = React.lazy(() => import('./pages/reception/DoctorQueueManagement'));
+const PatientGallery = React.lazy(() => import('./pages/shared/PatientGallery'));
+const FamilyPlanningPage = React.lazy(() => import('./pages/nurse/FamilyPlanningPage'));
+const NursePatientManagement = React.lazy(() => import('./pages/nurse/NursePatientManagement'));
+const AbortionCarePage = React.lazy(() => import('./pages/doctor/AbortionCarePage'));
+const Loans = React.lazy(() => import('./components/shared/Loans'));
+const AdmissionManagement = React.lazy(() => import('./pages/accommodation/AdmissionManagement'));
+const PatientAccounts = React.lazy(() => import('./components/admin/PatientAccounts'));
+const SystemView = React.lazy(() => import('./pages/admin/SystemView'));
+const CentralRegisterPage = React.lazy(() => import('./pages/admin/CentralRegisterPage'));
+const DiseaseTallySheetPage = React.lazy(() => import('./pages/admin/DiseaseTallySheetPage'));
+const DiseaseManagement = React.lazy(() => import('./pages/admin/DiseaseManagement'));
+const ReportDashboard = React.lazy(() => import('./pages/report/ReportDashboard'));
+const BillingPatientHistory = React.lazy(() => import('./components/billing/BillingPatientHistory'));
+const InstitutionManagement = React.lazy(() => import('./pages/admin/InstitutionManagement'));
+const InstitutionDetail = React.lazy(() => import('./pages/admin/InstitutionDetail'));
+const InventoryDashboard = React.lazy(() => import('./pages/inventory/InventoryDashboard'));
+const WarehouseStock = React.lazy(() => import('./pages/inventory/WarehouseStock'));
+const StockRequestsInv = React.lazy(() => import('./pages/inventory/StockRequests'));
+const StockMovements = React.lazy(() => import('./pages/inventory/StockMovements'));
+const PharmacyStockRequests = React.lazy(() => import('./pages/pharmacy/PharmacyStockRequests'));
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -139,6 +139,11 @@ const AppRoutes = () => {
 
   return (
     <Router basename={getBasename()}>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-600"></div>
+        </div>
+      }>
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />
@@ -759,6 +764,7 @@ const AppRoutes = () => {
           </div>
         } />
       </Routes>
+      </Suspense>
     </Router>
   );
 };
