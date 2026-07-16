@@ -916,10 +916,10 @@ exports.getDoctorsQueueStatus = async (req, res) => {
 exports.getDashboardStats = async (req, res) => {
   try {
     const doctorId = req.user.id;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const { getEthiopianDateRange } = require('../utils/dateUtils');
+    const range = getEthiopianDateRange(new Date());
+    const today = range.startOfDayUTC;
+    const tomorrow = range.endOfDayUTC;
 
     // Get doctor assignments (same as unified queue)
     const doctorAssignments = await prisma.assignment.findMany({

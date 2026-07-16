@@ -38,20 +38,13 @@ const getDoctorWorkspaceSettingsFallback = async (req, res) => {
 };
 
 const getCompletedDateRange = (dateInput) => {
-	const normalized = String(dateInput || '').trim();
-	if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-		const startDate = new Date(`${normalized}T00:00:00`);
-		const endDate = new Date(startDate);
-		endDate.setDate(endDate.getDate() + 1);
-		return { startDate, endDate, selectedDate: normalized };
-	}
-
-	const startDate = new Date();
-	startDate.setHours(0, 0, 0, 0);
-	const endDate = new Date(startDate);
-	endDate.setDate(endDate.getDate() + 1);
-	const selectedDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
-	return { startDate, endDate, selectedDate };
+	const { getEthiopianDateRange } = require('../utils/dateUtils');
+	const range = getEthiopianDateRange(dateInput || new Date());
+	return {
+		startDate: range.startOfDayUTC,
+		endDate: range.endOfDayUTC,
+		selectedDate: range.dateStr
+	};
 };
 
 const normalizeCompletedAt = (value) => {
