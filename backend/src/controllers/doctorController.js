@@ -464,10 +464,6 @@ exports.getQueue = async (req, res) => {
       assignmentId: {
         not: null
       },
-      // Exclude visits with pending transfers (avoids showing transferred patients on refresh)
-      transfersFrom: {
-        none: { status: 'AWAITING_PAYMENT' }
-      }
     };
 
     const queue = await prisma.visit.findMany({
@@ -1143,8 +1139,6 @@ exports.getUnifiedQueue = async (req, res) => {
         where: {
           status: statusFilter,
           AND: [
-            // Exclude visits with pending transfers (avoids showing transferred-but-unpaid patients)
-            { transfersFrom: { none: { status: 'AWAITING_PAYMENT' } } },
             {
               OR: [
                 { assignmentId: { in: assignmentIds } },
@@ -1925,8 +1919,6 @@ exports.getUnifiedQueue = async (req, res) => {
           notIn: ['COMPLETED', 'CANCELLED', 'TRANSFERRED']
         },
         AND: [
-          // Exclude visits with pending transfers
-          { transfersFrom: { none: { status: 'AWAITING_PAYMENT' } } },
           {
             OR: [
               { assignmentId: { in: assignmentIds } },
