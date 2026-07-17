@@ -733,7 +733,7 @@ const TriageQueue = () => {
                 </div>
                 <div className="flex items-center gap-1.5">
                   {(() => {
-                    const tag = getDayTag(visit.patient.createdAt);
+                    const tag = getDayTag(visit.createdAt);
                     return tag ? (
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tag.color}`}>
                         {tag.label}
