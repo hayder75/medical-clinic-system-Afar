@@ -495,12 +495,12 @@ exports.assignDoctor = async (req, res) => {
       });
     }
 
-    // Active Card Visit: Patient must go to billing first to process 0 ETB bill
+    // Route to billing queue so the 0 ETB consultation bill is processed
     let finalStatus = visit.status;
     if (visit.status === 'WAITING_FOR_NURSE_SERVICE') {
       finalStatus = 'WAITING_FOR_NURSE_SERVICE';
     } else {
-      finalStatus = 'TRIAGED';
+      finalStatus = 'AWAITING_CARD_BILLING';
     }
     await prisma.visit.update({
       where: { id: visitId },
@@ -549,7 +549,8 @@ exports.getPatientQueue = async (req, res) => {
     // This allows patients to stay in queue even after vitals are recorded
     const queue = await prisma.visit.findMany({
       where: {
-        status: { in: ['WAITING_FOR_TRIAGE', 'TRIAGED'] }
+        status: { in: ['WAITING_FOR_TRIAGE', 'TRIAGED'] },
+        suggestedDoctorId: null
       },
       include: {
         patient: {
@@ -2276,7 +2277,7 @@ exports.assignCombined = async (req, res) => {
         if (visit.status === 'WAITING_FOR_NURSE_SERVICE') {
           finalStatus = 'WAITING_FOR_NURSE_SERVICE'; // Keep in nurse service until billing is done
         } else {
-          finalStatus = 'TRIAGED'; // Route to billing queue
+          finalStatus = 'AWAITING_CARD_BILLING'; // Route to billing queue
         }
       }
 
