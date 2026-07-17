@@ -91,6 +91,24 @@ const formatAssessmentText = (status, value, extras = []) => {
   return lines.join('\n');
 };
 
+const getDaysSinceCreated = (createdAt) => {
+  if (!createdAt) return null;
+  const now = new Date();
+  const created = new Date(createdAt);
+  const diffMs = now - created;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return diffDays;
+};
+
+const getDayTag = (createdAt) => {
+  const days = getDaysSinceCreated(createdAt);
+  if (days === null) return null;
+  if (days === 0) return { label: 'Today', color: 'bg-green-100 text-green-800' };
+  if (days === 1) return { label: '1 day', color: 'bg-yellow-100 text-yellow-800' };
+  if (days <= 7) return { label: `${days} days`, color: 'bg-orange-100 text-orange-800' };
+  return { label: `${days} days`, color: 'bg-red-100 text-red-800' };
+};
+
 const TriageQueue = () => {
   const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
@@ -713,7 +731,17 @@ const TriageQueue = () => {
                     <p className="text-sm text-gray-500">ID: {visit.patient.id}</p>
                   </div>
                 </div>
-                <span className="badge badge-warning">Waiting</span>
+                <div className="flex items-center gap-1.5">
+                  {(() => {
+                    const tag = getDayTag(visit.patient.createdAt);
+                    return tag ? (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tag.color}`}>
+                        {tag.label}
+                      </span>
+                    ) : null;
+                  })()}
+                  <span className="badge badge-warning">Waiting</span>
+                </div>
               </div>
 
               <div className="space-y-2 mb-4">

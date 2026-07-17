@@ -562,7 +562,8 @@ exports.getPatientQueue = async (req, res) => {
             gender: true,
             dob: true,
             bloodType: true,
-            address: true
+            address: true,
+            createdAt: true
           }
         },
         vitals: {
