@@ -27,6 +27,7 @@ router.post('/administer-task', nurseController.administerTask);
 router.get('/walk-in-orders', auth, roleGuard(['NURSE', 'ADMIN']), nurseController.getWalkInNurseOrders);
 router.post('/walk-in-orders/complete', auth, roleGuard(['NURSE', 'ADMIN']), nurseController.completeWalkInNurseOrder);
 router.delete('/service-assignment/:id', auth, roleGuard(['DOCTOR', 'NURSE', 'ADMIN']), nurseController.deleteServiceAssignment);
+router.delete('/queue/:visitId', auth, roleGuard(['NURSE', 'ADMIN']), nurseController.deleteTriageVisit);
 
 // Nurse reassignment — change patient's doctor before any orders are placed
 router.get('/assigned-patients', auth, roleGuard(['NURSE', 'ADMIN']), nurseController.getAssignedPatients);

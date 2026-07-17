@@ -19,7 +19,8 @@ import {
   FileText,
   ClipboardList,
   Search,
-  Package
+  Package,
+  XCircle
 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -118,6 +119,7 @@ const TriageQueue = () => {
   const [selectedNurse, setSelectedNurse] = useState('');
   const [nurseServiceNotes, setNurseServiceNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
   const [nurseServiceSearchQuery, setNurseServiceSearchQuery] = useState('');
   const [nurseServiceSearchType, setNurseServiceSearchType] = useState('name'); // 'name' or 'code'
   const [dentalServiceSearchQuery, setDentalServiceSearchQuery] = useState('');
@@ -213,6 +215,22 @@ const TriageQueue = () => {
       console.error('Error fetching patients:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRemoveFromQueue = async (visitId) => {
+    if (removingId === visitId) {
+      try {
+        await api.delete(`/nurses/queue/${visitId}`);
+        toast.success('Patient removed from queue');
+        fetchPatients();
+      } catch (error) {
+        toast.error(error.response?.data?.error || 'Failed to remove patient');
+      } finally {
+        setRemovingId(null);
+      }
+    } else {
+      setRemovingId(visitId);
     }
   };
 
@@ -737,6 +755,13 @@ const TriageQueue = () => {
                 >
                   <Stethoscope className="h-4 w-4 mr-1" />
                   Record Vitals
+                </button>
+                <button
+                  onClick={() => handleRemoveFromQueue(visit.id)}
+                  className={`btn btn-sm flex items-center ${removingId === visit.id ? 'btn-danger' : 'btn-outline'}`}
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  {removingId === visit.id ? 'Confirm?' : 'Remove'}
                 </button>
               </div>
             </div>

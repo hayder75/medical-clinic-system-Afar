@@ -2913,3 +2913,43 @@ exports.reassignDoctor = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.deleteTriageVisit = async (req, res) => {
+  try {
+    const { visitId } = req.params;
+
+    const visit = await prisma.visit.findUnique({
+      where: { id: parseInt(visitId) },
+      include: {
+        _count: { select: { labOrders: true, radiologyOrders: true, medicationOrders: true, bills: true } },
+      },
+    });
+
+    if (!visit) return res.status(404).json({ error: 'Visit not found' });
+
+    if (!['WAITING_FOR_TRIAGE', 'TRIAGED'].includes(visit.status)) {
+      return res.status(400).json({ error: 'Can only delete visits in triage queue' });
+    }
+
+    if (visit._count.bills > 0) return res.status(400).json({ error: 'Cannot delete — billing records exist' });
+    if (visit._count.labOrders > 0) return res.status(400).json({ error: 'Cannot delete — lab orders exist' });
+    if (visit._count.radiologyOrders > 0) return res.status(400).json({ error: 'Cannot delete — radiology orders exist' });
+    if (visit._count.medicationOrders > 0) return res.status(400).json({ error: 'Cannot delete — medication orders exist' });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.vitalSign.deleteMany({ where: { visitId: visit.id } });
+      await tx.nurseServiceAssignment.deleteMany({ where: { visitId: visit.id } });
+      await tx.patientTransfer.deleteMany({ where: { visitId: visit.id } });
+      await tx.visit.delete({ where: { id: visit.id } });
+    });
+
+    const { getIO } = require('../config/socket');
+    const io = getIO();
+    if (io) io.to('nurses').emit('queue:updated');
+
+    res.json({ message: 'Visit removed from triage queue' });
+  } catch (error) {
+    console.error('Error deleting triage visit:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
