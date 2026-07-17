@@ -809,10 +809,15 @@ const getLabStats = async (req, res) => {
         }
         if (o.doctor) grouped[o.patientId].doctors[o.doctor.id] = o.doctor.fullname;
         const name = o.labTest?.name || 'Unknown';
-        if (!grouped[o.patientId].tests.some(t => t.name === name)) {
+        const groupId = o.labTest?.group?.id || null;
+        const exists = groupId
+          ? grouped[o.patientId].tests.some(t => t.groupId === groupId)
+          : grouped[o.patientId].tests.some(t => t.name === name);
+        if (!exists) {
           grouped[o.patientId].tests.push({
             id: o.id,
             name,
+            groupId,
             groupName: o.labTest?.group?.name || null,
             status: o.status,
           });
