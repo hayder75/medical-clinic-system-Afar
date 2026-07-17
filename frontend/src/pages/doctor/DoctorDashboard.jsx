@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import PatientQueue from '../../components/doctor/PatientQueue';
 import PatientHistory from '../../components/doctor/PatientHistory';
@@ -11,6 +11,7 @@ import InternationalMedicalCertificatePage from './InternationalMedicalCertifica
 import DoctorDailyWork from './DoctorDailyWork';
 
 import api from '../../services/api';
+import toast from 'react-hot-toast';
 import {
   Stethoscope,
   FileText,
@@ -18,7 +19,9 @@ import {
   Activity,
   Clock,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  X,
+  ArrowRight
 } from 'lucide-react';
 
 const DoctorDashboard = () => {
@@ -26,10 +29,15 @@ const DoctorDashboard = () => {
     waitingPatients: 0,
     completedVisits: 0,
     pendingOrders: 0,
-    todayAppointments: 0
+    todayAppointments: 0,
+    pendingResultsPatients: 0,
   });
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dismissedBanner, setDismissedBanner] = useState(
+    sessionStorage.getItem('dismissedResultsBanner') === 'true'
+  );
+  const toastShownRef = useRef(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -37,6 +45,21 @@ const DoctorDashboard = () => {
     const interval = setInterval(fetchDashboardData, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!loading && stats.pendingResultsPatients >= 5 && !toastShownRef.current) {
+      toastShownRef.current = true;
+      toast(`📋 You have ${stats.pendingResultsPatients} patients with results waiting for completion`, {
+        duration: 6000,
+        position: 'top-right',
+      });
+    }
+  }, [stats.pendingResultsPatients, loading]);
+
+  const dismissBanner = () => {
+    setDismissedBanner(true);
+    sessionStorage.setItem('dismissedResultsBanner', 'true');
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -123,6 +146,40 @@ const DoctorDashboard = () => {
             </div>
           ))}
         </div>
+
+        {/* Pending Results Banner */}
+        {!dismissedBanner && stats.pendingResultsPatients >= 5 && (
+          <div className="flex items-center justify-between p-4 rounded-lg border bg-amber-50 border-amber-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-amber-100">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  {stats.pendingResultsPatients} patients with results waiting for completion
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Results received — review and complete these patients
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/doctor/queue')}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 transition-colors flex items-center gap-1"
+              >
+                Complete Now
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={dismissBanner}
+                className="p-1.5 rounded-md text-amber-400 hover:text-amber-600 hover:bg-amber-100 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

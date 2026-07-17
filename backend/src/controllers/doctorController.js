@@ -835,11 +835,24 @@ exports.getDashboardStats = async (req, res) => {
       }
     });
 
+    // Results queue count — patients with results back but not completed
+    const pendingResultsPatients = await prisma.visit.count({
+      where: {
+        status: { in: returnedStatuses },
+        OR: [
+          { assignmentId: { in: assignmentIds } },
+          { suggestedDoctorId: doctorId },
+          { batchOrders: { some: { doctorId } } },
+        ],
+      },
+    });
+
     res.json({
       waitingPatients,
       completedVisits,
       pendingOrders,
-      todayAppointments
+      todayAppointments,
+      pendingResultsPatients,
     });
   } catch (error) {
     console.error('Error fetching doctor dashboard stats:', error);
