@@ -137,7 +137,6 @@ const TriageQueue = () => {
   const [selectedNurse, setSelectedNurse] = useState('');
   const [nurseServiceNotes, setNurseServiceNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [removingId, setRemovingId] = useState(null);
   const [nurseServiceSearchQuery, setNurseServiceSearchQuery] = useState('');
   const [nurseServiceSearchType, setNurseServiceSearchType] = useState('name'); // 'name' or 'code'
   const [dentalServiceSearchQuery, setDentalServiceSearchQuery] = useState('');
@@ -237,18 +236,13 @@ const TriageQueue = () => {
   };
 
   const handleRemoveFromQueue = async (visitId) => {
-    if (removingId === visitId) {
-      try {
-        await api.delete(`/nurses/queue/${visitId}`);
-        toast.success('Patient removed from queue');
-        fetchPatients();
-      } catch (error) {
-        toast.error(error.response?.data?.error || 'Failed to remove patient');
-      } finally {
-        setRemovingId(null);
-      }
-    } else {
-      setRemovingId(visitId);
+    if (!window.confirm('Are you sure you want to remove this patient from the queue?')) return;
+    try {
+      await api.delete(`/nurses/queue/${visitId}`);
+      toast.success('Patient removed from queue');
+      fetchPatients();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to remove patient');
     }
   };
 
@@ -786,10 +780,10 @@ const TriageQueue = () => {
                 </button>
                 <button
                   onClick={() => handleRemoveFromQueue(visit.id)}
-                  className={`btn btn-sm flex items-center ${removingId === visit.id ? 'btn-danger' : 'btn-outline'}`}
+                  className="btn btn-outline btn-sm flex items-center"
                 >
                   <XCircle className="h-4 w-4 mr-1" />
-                  {removingId === visit.id ? 'Confirm?' : 'Remove'}
+                  Remove
                 </button>
               </div>
             </div>
