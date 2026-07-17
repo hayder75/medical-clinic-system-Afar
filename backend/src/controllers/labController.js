@@ -758,44 +758,74 @@ const saveLabTestResult = async (req, res) => {
 
 const getLabStats = async (req, res) => {
   try {
-    const { date } = req.query;
-    const dateFilter = {};
-    if (date) {
-      const { startOfDayUTC, endOfDayUTC } = getEthiopianDateRange(date);
-      dateFilter.createdAt = { gte: startOfDayUTC, lte: endOfDayUTC };
-    }
-
     const pendingStatuses = ['PAID', 'QUEUED'];
-    const inProgressStatuses = ['IN_PROGRESS'];
-    const completedStatuses = ['COMPLETED', 'VERIFIED'];
+    const overdueMs = 24 * 60 * 60 * 1000;
+    const overdueThreshold = new Date(Date.now() - overdueMs);
 
-    const [
-      batchPending, batchInProgress, batchCompleted,
-      walkInPending, walkInInProgress, walkInCompleted,
-      testPendingGroup, testInProgressGroup, testCompletedGroup
-    ] = await Promise.all([
-      prisma.batchOrder.count({ where: { type: 'LAB', status: { in: pendingStatuses }, ...dateFilter } }),
-      prisma.batchOrder.count({ where: { type: 'LAB', status: { in: inProgressStatuses }, ...dateFilter } }),
-      prisma.batchOrder.count({ where: { type: 'LAB', status: { in: completedStatuses }, ...dateFilter } }),
-      prisma.labOrder.count({ where: { isWalkIn: true, status: { in: pendingStatuses }, ...dateFilter } }),
-      prisma.labOrder.count({ where: { isWalkIn: true, status: { in: inProgressStatuses }, ...dateFilter } }),
-      prisma.labOrder.count({ where: { isWalkIn: true, status: { in: completedStatuses }, ...dateFilter } }),
-      prisma.labTestOrder.groupBy({ by: ['labTestId'], where: { batchOrderId: null, status: { in: pendingStatuses }, ...dateFilter } }),
-      prisma.labTestOrder.groupBy({ by: ['labTestId'], where: { batchOrderId: null, status: { in: inProgressStatuses }, ...dateFilter } }),
-      prisma.labTestOrder.groupBy({ by: ['labTestId'], where: { batchOrderId: null, status: { in: completedStatuses }, ...dateFilter } }),
+    const [pendingGroup, inProgressGroup, overdueGroup, oldestPerPatient] = await Promise.all([
+      prisma.labTestOrder.groupBy({
+        by: ['patientId'],
+        where: { status: { in: pendingStatuses } },
+      }),
+      prisma.labTestOrder.groupBy({
+        by: ['patientId'],
+        where: { status: 'IN_PROGRESS' },
+      }),
+      prisma.labTestOrder.groupBy({
+        by: ['patientId'],
+        where: { status: { in: pendingStatuses }, createdAt: { lt: overdueThreshold } },
+      }),
+      prisma.labTestOrder.groupBy({
+        by: ['patientId'],
+        where: { status: { in: pendingStatuses } },
+        _min: { createdAt: true },
+        orderBy: { _min: { createdAt: 'asc' } },
+        take: 10,
+      }),
     ]);
 
-    const testPending = testPendingGroup.length;
-    const testInProgress = testInProgressGroup.length;
-    const testCompleted = testCompletedGroup.length;
+    let oldestPending = [];
+    if (oldestPerPatient.length > 0) {
+      const patientIds = oldestPerPatient.map(o => o.patientId);
+      const orders = await prisma.labTestOrder.findMany({
+        where: { patientId: { in: patientIds }, status: { in: pendingStatuses } },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          patient: { select: { id: true, name: true, mobile: true } },
+          labTest: { select: { id: true, name: true, group: { select: { id: true, name: true } } } },
+        },
+      });
+
+      const grouped = {};
+      orders.forEach(o => {
+        if (!grouped[o.patientId]) {
+          grouped[o.patientId] = {
+            patient: o.patient,
+            oldestCreatedAt: o.createdAt,
+            tests: [],
+          };
+        }
+        const name = o.labTest?.name || 'Unknown';
+        if (!grouped[o.patientId].tests.some(t => t.name === name)) {
+          grouped[o.patientId].tests.push({
+            id: o.id,
+            name,
+            groupName: o.labTest?.group?.name || null,
+            status: o.status,
+          });
+        }
+      });
+
+      oldestPending = Object.values(grouped).sort(
+        (a, b) => new Date(a.oldestCreatedAt) - new Date(b.oldestCreatedAt)
+      );
+    }
 
     res.json({
-      total: batchPending + batchInProgress + batchCompleted
-           + walkInPending + walkInInProgress + walkInCompleted
-           + testPending + testInProgress + testCompleted,
-      pending: batchPending + walkInPending + testPending,
-      inProgress: batchInProgress + walkInInProgress + testInProgress,
-      completed: batchCompleted + walkInCompleted + testCompleted
+      pending: pendingGroup.length,
+      inProgress: inProgressGroup.length,
+      overdue: overdueGroup.length,
+      oldestPending,
     });
   } catch (error) {
     console.error('Error fetching lab stats:', error);
