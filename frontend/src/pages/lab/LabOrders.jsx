@@ -1589,209 +1589,189 @@ const LabOrders = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-          <TestTube className="h-6 w-6 mr-2" />
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-bold text-gray-900 flex items-center">
+          <TestTube className="h-5 w-5 mr-2" />
           Lab Orders
         </h1>
         <button
           onClick={fetchOrders}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           Refresh
         </button>
       </div>
 
       {/* Search and Filter */}
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="flex-1">
           <input
             type="text"
             placeholder="Search by patient name, doctor, or order ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-3 flex-shrink-0">
           {statusFilter === 'COMPLETED' && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <Calendar className="h-4 w-4 text-gray-500" />
               <input
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           )}
-          <label className="text-sm font-medium text-gray-700">Filter by Status:</label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className={`px-4 py-2.5 border-2 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 text-base ${statusFilter === 'PENDING' ? 'border-gray-300 bg-white text-gray-700' : statusFilter === 'COMPLETED' ? 'border-red-400 bg-red-50 text-red-700' : 'border-blue-300 bg-blue-50 text-blue-700'}`}
+            className={`px-3 py-2 text-sm border rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${statusFilter === 'PENDING' ? 'border-gray-300 bg-white text-gray-700' : statusFilter === 'COMPLETED' ? 'border-red-400 bg-red-50 text-red-700' : 'border-blue-300 bg-blue-50 text-blue-700'}`}
           >
-            <option value="PENDING">Pending Orders</option>
-            <option value="COMPLETED">Completed Orders</option>
-            <option value="ALL">All Orders</option>
+            <option value="PENDING">Pending</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="ALL">All</option>
           </select>
-          <span className="text-sm text-gray-500">
-            Showing {getFilteredOrders().length} of {orders.length} orders
+          <span className="text-xs text-gray-500 whitespace-nowrap">
+            {getFilteredOrders().length}/{orders.length}
           </span>
         </div>
       </div>
 
       {getFilteredOrders().length === 0 ? (
         <div className="text-center py-12">
-          <TestTube className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">
-            {statusFilter === 'PENDING' ? 'No pending lab orders found' :
-              statusFilter === 'COMPLETED' ? 'No completed lab orders found' :
+          <TestTube className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">
+            {statusFilter === 'PENDING' ? 'No pending lab orders' :
+              statusFilter === 'COMPLETED' ? 'No completed lab orders' :
                 'No lab orders found'}
           </p>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {getFilteredOrders().map((order) => (
             <div
               key={`${order.__kind}-${order.id}`}
-              className={`bg-white rounded-lg shadow-md border p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow duration-200 ${order.status === 'QUEUED' ? 'border-yellow-200' :
+              className={`bg-white rounded-lg border cursor-pointer hover:shadow-md transition-shadow ${order.status === 'QUEUED' ? 'border-yellow-200' :
                 order.status === 'COMPLETED' ? 'border-green-200' : 'border-gray-200'
                 }`}
               onClick={() => handleOrderClick(order)}
             >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
-                <div className="flex items-start space-x-3 min-w-0">
-                  <div className="flex-shrink-0 mt-1">{getStatusIcon(order.status)}</div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <h3 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
-                        {order.patient.name}
-                      </h3>
-                      <span className="text-xs sm:text-sm text-gray-500 font-normal flex-shrink-0">
-                        ({formatDisplayOrderId(order)})
-                      </span>
-                      {order.__kind === 'labtest_group' && (
-                        <span className="px-1.5 sm:px-2 py-0.5 bg-purple-100 text-purple-800 text-xs sm:text-sm rounded flex-shrink-0">
-                          {countTests(order.orders)} Tests
+              <div className="p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <div className="flex-shrink-0 mt-0.5">{getStatusIcon(order.status)}</div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                        <span className="text-sm font-semibold text-gray-900 truncate max-w-[160px]">
+                          {order.patient.name}
                         </span>
+                        <span className="text-xs text-gray-400">
+                          ({formatDisplayOrderId(order)})
+                        </span>
+                        {order.__kind === 'labtest_group' && (
+                          <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-medium rounded">
+                            {countTests(order.orders)} tests
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                        {order.orders && order.orders.length > 0
+                          ? (() => {
+                              const panels = {}, singles = [];
+                              order.orders.forEach(o => {
+                                const t = o.labTest;
+                                if (!t) return;
+                                if (t.group) {
+                                  if (!panels[t.group.id]) panels[t.group.id] = { name: t.group.name, count: 0 };
+                                  panels[t.group.id].count++;
+                                } else singles.push(t.name);
+                              });
+                              const parts = Object.values(panels).map(p => p.name + (p.count > 1 ? '' : ''));
+                              return [...parts, ...singles].filter(Boolean).join(', ') || 'Loading...';
+                            })()
+                          : order.services && order.services.length > 0
+                            ? order.services.map(service => service.service?.name).filter(name => name).join(', ')
+                            : order.type?.name || 'Lab Test'}
+                      </p>
+                      {order.doctor?.fullname && (
+                        <p className="text-xs text-indigo-600 font-medium mt-1">Dr. {order.doctor.fullname}</p>
                       )}
+                      <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-400">
+                        <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+                        {(() => {
+                          const tag = getRelativeDayTag(order.createdAt);
+                          return <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${tag.color}`}>{tag.label}</span>;
+                        })()}
+                      </div>
                     </div>
-                    <p className="text-xs sm:text-base text-gray-700 font-medium mt-1">
-                      {order.orders && order.orders.length > 0
-                        ? (() => {
-                            const panels = {}, singles = [];
-                            order.orders.forEach(o => {
-                              const t = o.labTest;
-                              if (!t) return;
-                              if (t.group) {
-                                if (!panels[t.group.id]) panels[t.group.id] = { name: t.group.name, count: 0 };
-                                panels[t.group.id].count++;
-                              } else singles.push(t.name);
-                            });
-                            const parts = Object.values(panels).map(p => p.name + (p.count > 1 ? '' : ''));
-                            return [...parts, ...singles].filter(Boolean).join(', ') || 'Loading...';
-                          })()
-                        : order.services && order.services.length > 0
-                          ? order.services.map(service => service.service?.name).filter(name => name).join(', ')
-                          : order.type?.name || 'Lab Test'}
-                      {order.isWalkIn && <span className="ml-1.5 px-1.5 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">WALK-IN</span>}
-                      {order.__kind === 'labtest' && (!order.orders || order.orders.length === 0) && (
-                        <span className="ml-1.5 px-1.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded">Loading tests...</span>
-                      )}
-                    </p>
-                    {order.doctor?.fullname && (
-                      <p className="text-xs sm:text-base text-indigo-700 font-semibold mt-1">Requested By: Dr. {order.doctor.fullname}</p>
-                    )}
                   </div>
-                </div>
-                <div className="flex items-center flex-shrink-0 self-start sm:self-auto">
-                  <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-base font-semibold ${getStatusColor(order.status)}`}>
-                    {order.status}
+                  <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusColor(order.status)}`}>
+                    {order.status === 'IN_PROGRESS' ? 'Active' : order.status}
                   </span>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-base text-gray-700">
-                <div className="flex items-center">
-                  <User className="h-5 w-5 mr-2" />
-                  <span>{order.patient.name}</span>
-                </div>
-                {order.doctor && (
-                  <div className="flex items-center">
-                    <Stethoscope className="h-5 w-5 mr-2" />
-                    <span>{order.doctor.fullname}</span>
+                {order.status === 'QUEUED' && (
+                  <div className="mt-2 p-1.5 rounded bg-yellow-50">
+                    <p className="text-[11px] font-medium text-yellow-700">Click to process</p>
                   </div>
                 )}
-                <div className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2" />
-                  <span>{new Date(order.createdAt).toLocaleDateString()}</span>
-                  {(() => {
-                    const tag = getRelativeDayTag(order.createdAt);
-                    return <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${tag.color}`}>{tag.label}</span>;
-                  })()}
-                </div>
-              </div>
-
-              {order.status === 'QUEUED' && (
-                <div className="mt-3 sm:mt-4 p-2 sm:p-3 rounded-lg bg-yellow-50">
-                  <p className="text-xs sm:text-base font-semibold text-yellow-800">
-                    Click to process tests
-                  </p>
-                </div>
-              )}
-              {order.status === 'COMPLETED' && (
-                <div className="mt-3 sm:mt-4 flex gap-2">
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const orderId = order.id || order._orderId;
-                      setReopeningOrders(prev => [...prev, orderId]);
-                      try {
-                        for (const o of order.orders || [order]) {
-                          const r = o.results?.[0];
-                          if (r && r.id) {
-                            await api.post('/labs/results/lab-test', {
-                              orderId: o.id,
-                              labTestId: o.labTestId,
-                              results: r.results || {},
-                              additionalNotes: r.additionalNotes || '',
-                              reopen: true
-                            });
+                {order.status === 'COMPLETED' && (
+                  <div className="mt-2 flex gap-1.5">
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const orderId = order.id || order._orderId;
+                        setReopeningOrders(prev => [...prev, orderId]);
+                        try {
+                          for (const o of order.orders || [order]) {
+                            const r = o.results?.[0];
+                            if (r && r.id) {
+                              await api.post('/labs/results/lab-test', {
+                                orderId: o.id,
+                                labTestId: o.labTestId,
+                                results: r.results || {},
+                                additionalNotes: r.additionalNotes || '',
+                                reopen: true
+                              });
+                            }
                           }
+                          fetchOrders();
+                          handleOrderClick({ ...order, status: 'IN_PROGRESS' });
+                        } catch (err) {
+                          toast.error('Failed to reopen: ' + (err.response?.data?.error || err.message));
+                        } finally {
+                          setReopeningOrders(prev => prev.filter(id => id !== orderId));
                         }
-                        fetchOrders();
-                        handleOrderClick({ ...order, status: 'IN_PROGRESS' });
-                      } catch (err) {
-                        toast.error('Failed to reopen: ' + (err.response?.data?.error || err.message));
-                      } finally {
-                        setReopeningOrders(prev => prev.filter(id => id !== orderId));
-                      }
-                    }}
-                    disabled={reopeningOrders.includes(order.id || order._orderId)}
-                    className="px-3 py-1.5 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors text-sm flex items-center gap-1.5 disabled:bg-amber-400 disabled:cursor-not-allowed"
-                  >
-                    {reopeningOrders.includes(order.id || order._orderId) ? <Loader className="h-4 w-4 animate-spin" /> : <Edit className="h-4 w-4" />}
-                    {reopeningOrders.includes(order.id || order._orderId) ? 'Reopening...' : 'Edit'}
-                  </button>
-                  <button
-                    onClick={(e) => handlePrintResults(e, order)}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center gap-1.5"
-                  >
-                    <FileText className="h-4 w-4" />
-                    Print
-                  </button>
-                </div>
-              )}
+                      }}
+                      disabled={reopeningOrders.includes(order.id || order._orderId)}
+                      className="px-2 py-1 text-[11px] bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors disabled:bg-amber-300 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      {reopeningOrders.includes(order.id || order._orderId) ? <Loader className="h-3 w-3 animate-spin" /> : <Edit className="h-3 w-3" />}
+                      {reopeningOrders.includes(order.id || order._orderId) ? 'Opening...' : 'Edit'}
+                    </button>
+                    <button
+                      onClick={(e) => handlePrintResults(e, order)}
+                      className="px-2 py-1 text-[11px] bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center gap-1"
+                    >
+                      <FileText className="h-3 w-3" />
+                      Print
+                    </button>
+                  </div>
+                )}
 
-              {order.instructions && (
-                <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs sm:text-base text-gray-700">
-                    <strong>Instructions:</strong> {order.instructions}
-                  </p>
-                </div>
-              )}
+                {order.instructions && (
+                  <div className="mt-2 p-1.5 bg-gray-50 rounded">
+                    <p className="text-[11px] text-gray-600">
+                      <strong>Note:</strong> {order.instructions}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
