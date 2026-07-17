@@ -579,7 +579,7 @@ exports.getPatientQueue = async (req, res) => {
         }
       },
       orderBy: [
-        { createdAt: 'asc' } // First come, first served
+        { createdAt: 'desc' } // Most recent first
       ]
     });
 
