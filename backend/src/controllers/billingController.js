@@ -1774,6 +1774,20 @@ exports.processPayment = async (req, res) => {
             }
           }
 
+          // 5. Consultation billing from nurse triage — advance to doctor queue
+          if (billing.visit.status === 'AWAITING_CARD_BILLING') {
+            await tx.visit.update({
+              where: { id: billing.visit.id },
+              data: { status: 'WAITING_FOR_DOCTOR' }
+            });
+            try {
+              const io = getIO();
+              if (io) io.to('role:DOCTOR').emit('queue:new-visit', { visitId: billing.visit.id });
+            } catch (wsErr) {
+              console.error('[WS] Failed to emit queue:new-visit:', wsErr.message);
+            }
+          }
+
           // 4. Medication & Emergency Drugs (Normal/Emergency)
           const hasMedication = billing.services.some(s => ['MEDICATION', 'EMERGENCY_DRUG', 'NURSE_WALKIN', 'MATERIAL_NEEDS'].includes(s.service.category));
           if (hasMedication) {
