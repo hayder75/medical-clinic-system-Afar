@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { TestTube, Clock, CheckCircle, AlertTriangle, FileText, User, Calendar, Stethoscope, X, Eye, Edit, Loader } from 'lucide-react';
 import ImageUpload from '../../components/lab/ImageUpload';
 import api from '../../services/api';
@@ -59,6 +60,7 @@ const getRelativeDayTag = (createdAt) => {
 
 const LabOrders = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -78,6 +80,12 @@ const LabOrders = () => {
   const [savingResults, setSavingResults] = useState(false);
   const [reopeningOrders, setReopeningOrders] = useState([]);
   const [savingPanel, setSavingPanel] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.searchPatient) {
+      setSearchTerm(location.state.searchPatient);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     fetchOrders();

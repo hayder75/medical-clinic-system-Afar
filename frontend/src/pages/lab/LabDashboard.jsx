@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Clock, AlertTriangle, RefreshCw, ArrowRight, CheckCircle } from 'lucide-react';
+import { Users, Clock, AlertTriangle, RefreshCw, ArrowRight, CheckCircle, Stethoscope } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -28,10 +28,12 @@ const PatientCard = ({ item, onClick }) => {
   else if (hours >= 6) { borderColor = 'border-orange-200 bg-orange-50'; textColor = 'text-orange-700'; }
   else if (hours >= 2) { borderColor = 'border-yellow-200 bg-yellow-50'; textColor = 'text-yellow-700'; }
 
+  const doctorText = item.doctors?.length === 1 ? item.doctors[0] : item.doctors?.length > 1 ? `${item.doctors[0]} +${item.doctors.length - 1}` : null;
+
   return (
     <button
       onClick={onClick}
-      className="bg-white rounded-lg border border-gray-100 shadow-sm p-3 hover:shadow-md hover:border-gray-200 transition-all text-left w-full"
+      className="bg-white rounded-lg border border-gray-100 shadow-sm p-3 hover:shadow-md hover:border-gray-200 hover:border-indigo-200 transition-all text-left w-full"
     >
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -44,6 +46,12 @@ const PatientCard = ({ item, onClick }) => {
           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 mt-1">
             {item.tests.length} test{item.tests.length !== 1 ? 's' : ''}
           </span>
+          {doctorText && (
+            <p className="text-xs text-gray-400 truncate mt-1 flex items-center gap-1">
+              <Stethoscope className="w-3 h-3 flex-shrink-0" />
+              {doctorText}
+            </p>
+          )}
         </div>
       </div>
       <div className={`mt-2 px-2 py-1 rounded border text-xs font-semibold text-center ${borderColor} ${textColor}`}>
@@ -143,7 +151,7 @@ const LabDashboard = () => {
               <PatientCard
                 key={item.patient.id}
                 item={item}
-                onClick={() => navigate(`/lab/orders?patientId=${item.patient.id}`)}
+                onClick={() => navigate('/lab/orders', { state: { searchPatient: item.patient.name } })}
               />
             ))}
           </div>

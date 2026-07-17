@@ -792,6 +792,7 @@ const getLabStats = async (req, res) => {
         orderBy: { createdAt: 'asc' },
         include: {
           patient: { select: { id: true, name: true, mobile: true } },
+          doctor: { select: { id: true, fullname: true } },
           labTest: { select: { id: true, name: true, group: { select: { id: true, name: true } } } },
         },
       });
@@ -802,9 +803,11 @@ const getLabStats = async (req, res) => {
           grouped[o.patientId] = {
             patient: o.patient,
             oldestCreatedAt: o.createdAt,
+            doctors: {},
             tests: [],
           };
         }
+        if (o.doctor) grouped[o.patientId].doctors[o.doctor.id] = o.doctor.fullname;
         const name = o.labTest?.name || 'Unknown';
         if (!grouped[o.patientId].tests.some(t => t.name === name)) {
           grouped[o.patientId].tests.push({
@@ -816,7 +819,10 @@ const getLabStats = async (req, res) => {
         }
       });
 
-      oldestPending = Object.values(grouped).sort(
+      oldestPending = Object.values(grouped).map(g => ({
+        ...g,
+        doctors: Object.values(g.doctors),
+      })).sort(
         (a, b) => new Date(a.oldestCreatedAt) - new Date(b.oldestCreatedAt)
       );
     }
