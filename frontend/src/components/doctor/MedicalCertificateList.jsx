@@ -4,8 +4,10 @@ import { Search, Plus, Edit, Trash2, Eye, Download, Calendar, User, FileText, Pr
 import api from '../../services/api';
 import MedicalCertificateForm from './MedicalCertificateForm';
 import { getImageUrl } from '../../utils/imageUrl';
+import { useClinicSettings } from '../../contexts/ClinicSettingsContext';
 
 const MedicalCertificateList = () => {
+  const { settings: clinicSettings } = useClinicSettings();
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -379,10 +381,10 @@ const MedicalCertificateList = () => {
 
       <div class="certificate-header">
         <div class="header-left">
-          <img src="${window.__CS__?.logoUrl || '/clinic-logo.jpg'}" alt="Clinic Logo" class="logo" onerror="this.style.display='none'">
+          <img src="${clinicSettings?.logoUrl || '/clinic-logo.jpg'}" alt="Clinic Logo" class="logo" onerror="this.style.display='none'">
           <div class="clinic-info">
-            <h1 class="clinic-name">${window.__CS__?.name || 'Clinic'}</h1>
-            <p class="clinic-tagline">${window.__CS__?.tagline || 'Quality Healthcare You Can Trust'}</p>
+            <h1 class="clinic-name">${clinicSettings?.name || 'Clinic'}</h1>
+            <p class="clinic-tagline">${clinicSettings?.tagline || 'Quality Healthcare You Can Trust'}</p>
           </div>
         </div>
         <div class="header-right">

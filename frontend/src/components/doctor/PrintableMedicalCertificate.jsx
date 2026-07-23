@@ -1,7 +1,9 @@
 import React from 'react';
 import { X, Printer } from 'lucide-react';
+import { useClinicSettings } from '../../contexts/ClinicSettingsContext';
 
 const PrintableMedicalCertificate = ({ certificate, onClose }) => {
+  const { settings: clinicSettings } = useClinicSettings();
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -78,11 +80,11 @@ const PrintableMedicalCertificate = ({ certificate, onClose }) => {
         {/* Header */}
         <div className="text-center py-4 border-b border-gray-300">
           <img
-            src={window.__CS__?.logoUrl || '/clinic-logo.jpg'}
-            alt={`${window.__CS__?.name || 'Clinic'} Logo`}
+            src={clinicSettings?.logoUrl || '/clinic-logo.jpg'}
+            alt={`${clinicSettings?.name || 'Clinic'} Logo`}
             className="h-16 w-16 mx-auto mb-2 rounded-full object-cover border-2 border-gray-300"
           />
-          <h1 className="text-xl font-bold text-black">{window.__CS__?.name || 'Clinic'}</h1>
+          <h1 className="text-xl font-bold text-black">{clinicSettings?.name || 'Clinic'}</h1>
         </div>
 
         {/* Certificate Title */}
@@ -219,7 +221,7 @@ const PrintableMedicalCertificate = ({ certificate, onClose }) => {
           /* Ensure proper page margins */
           @page {
             margin: 0.25in;
-            size: A5;
+            size: A4;
           }
           
           /* Hide all navigation elements */
