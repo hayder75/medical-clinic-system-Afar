@@ -1437,25 +1437,26 @@ model VirtualQueue {
 }
 
 model MedicalCertificate {
-  id              String            @id @default(uuid())
-  certificateNo   String            @unique
-  patientId       String
-  doctorId        String
-  visitId         Int?
-  certificateDate DateTime          @default(now())
-  restStartDate   DateTime?
-  restEndDate     DateTime?
-  totalDays       Int?
-  appointmentDate DateTime?
-  diagnosis       String
-  treatment       String?
-  recommendations String?
-  status          CertificateStatus @default(ACTIVE)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  doctor          User              @relation(fields: [doctorId], references: [id])
-  patient         Patient           @relation(fields: [patientId], references: [id])
-  visit           Visit?            @relation(fields: [visitId], references: [id])
+  id                           String            @id @default(uuid())
+  certificateNo                String            @unique
+  patientId                    String
+  doctorId                     String
+  visitId                      Int?
+  certificateDate              DateTime          @default(now())
+  restStartDate                DateTime?
+  restEndDate                  DateTime?
+  totalDays                    Int?
+  appointmentDate              DateTime?
+  diagnosis                    String
+  treatment                    String?
+  recommendations              String?
+  historyAndPhysicalExamination String?
+  status                       CertificateStatus @default(ACTIVE)
+  createdAt                    DateTime          @default(now())
+  updatedAt                    DateTime          @updatedAt
+  doctor                       User              @relation(fields: [doctorId], references: [id])
+  patient                      Patient           @relation(fields: [patientId], references: [id])
+  visit                        Visit?            @relation(fields: [visitId], references: [id])
 
   @@index([patientId])
   @@index([doctorId])

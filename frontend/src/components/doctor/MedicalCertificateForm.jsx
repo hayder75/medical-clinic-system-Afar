@@ -18,6 +18,7 @@ const MedicalCertificateForm = ({ certificate, onSave, onCancel, isEditing = fal
     diagnosis: '',
     treatment: '',
     recommendations: '',
+    historyAndPhysicalExamination: '',
   });
 
   const [showPatientSearch, setShowPatientSearch] = useState(false);
@@ -62,6 +63,7 @@ const MedicalCertificateForm = ({ certificate, onSave, onCancel, isEditing = fal
         diagnosis: certificate.diagnosis || '',
         treatment: certificate.treatment || '',
         recommendations: certificate.recommendations || '',
+        historyAndPhysicalExamination: certificate.historyAndPhysicalExamination || '',
       });
       fetchPatientVisits(certificate.patientId);
     }
@@ -236,6 +238,7 @@ const MedicalCertificateForm = ({ certificate, onSave, onCancel, isEditing = fal
         diagnosis: formData.diagnosis,
         treatment: formData.treatment,
         recommendations: formData.recommendations,
+        historyAndPhysicalExamination: formData.historyAndPhysicalExamination,
       };
 
       let response;
@@ -436,6 +439,20 @@ const MedicalCertificateForm = ({ certificate, onSave, onCancel, isEditing = fal
               {errors.diagnosis && (
                 <p className="text-sm text-red-500">{errors.diagnosis}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium" style={{ color: '#0C0E0B' }}>
+                History and Physical Examination
+              </label>
+              <textarea
+                name="historyAndPhysicalExamination"
+                value={formData.historyAndPhysicalExamination}
+                onChange={handleInputChange}
+                rows={5}
+                placeholder="Enter history and physical examination..."
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
             <div className="space-y-2">

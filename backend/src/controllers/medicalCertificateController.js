@@ -24,6 +24,7 @@ const createCertificateSchema = z.object({
   diagnosis: z.string().min(1, 'Diagnosis is required'),
   treatment: z.string().optional(),
   recommendations: z.string().optional(),
+  historyAndPhysicalExamination: z.string().optional(),
 });
 
 const updateCertificateSchema = z.object({
@@ -34,6 +35,7 @@ const updateCertificateSchema = z.object({
   diagnosis: z.string().optional(),
   treatment: z.string().optional(),
   recommendations: z.string().optional(),
+  historyAndPhysicalExamination: z.string().optional(),
   status: z.enum(['ACTIVE', 'EXPIRED', 'CANCELLED']).optional(),
 });
 
@@ -131,6 +133,7 @@ exports.createCertificate = async (req, res) => {
             id: true,
             fullname: true,
             qualifications: true,
+            specialty: true,
           }
         },
         visit: {
@@ -212,6 +215,7 @@ exports.getCertificates = async (req, res) => {
               id: true,
               fullname: true,
               qualifications: true,
+              specialty: true,
             }
           },
           visit: {
@@ -267,6 +271,7 @@ exports.getCertificate = async (req, res) => {
             id: true,
             fullname: true,
             qualifications: true,
+            specialty: true,
             email: true,
             phone: true,
           }
@@ -346,6 +351,7 @@ exports.updateCertificate = async (req, res) => {
             id: true,
             fullname: true,
             qualifications: true,
+            specialty: true,
           }
         },
         visit: {
@@ -423,6 +429,7 @@ exports.generatePDF = async (req, res) => {
             id: true,
             fullname: true,
             qualifications: true,
+            specialty: true,
             email: true,
             phone: true,
           }
@@ -551,6 +558,11 @@ exports.generatePDF = async (req, res) => {
           style: 'fieldLabel',
           margin: [0, 0, 0, 8]
         },
+        ...(certificate.historyAndPhysicalExamination ? [{
+          text: `History and Physical Examination: ${certificate.historyAndPhysicalExamination}`,
+          style: 'fieldLabel',
+          margin: [0, 0, 0, 8]
+        }] : []),
         ...(certificate.treatment ? [{
           text: `Treatment: ${certificate.treatment}`,
           style: 'fieldLabel',
@@ -621,7 +633,7 @@ exports.generatePDF = async (req, res) => {
               style: 'fieldLabel'
             },
             {
-              text: `Specialization: ${certificate.doctor.qualifications?.join(', ') || 'General Practitioner'}`,
+              text: `Specialization: ${certificate.doctor.specialty || certificate.doctor.qualifications?.join(', ') || 'General Practitioner'}`,
               style: 'fieldLabel'
             }
           ],

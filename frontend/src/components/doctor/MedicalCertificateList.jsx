@@ -419,7 +419,7 @@ const MedicalCertificateList = () => {
           </div>
           <div class="info-row">
             <span class="info-label">Qualification:</span>
-            <span class="info-value">${certificate.doctor.qualifications?.join(', ') || 'General Practitioner'}</span>
+            <span class="info-value">${certificate.doctor.specialty || certificate.doctor.qualifications?.join(', ') || 'General Practitioner'}</span>
           </div>
         </div>
       </div>
@@ -429,6 +429,12 @@ const MedicalCertificateList = () => {
           <div class="diagnosis-label">Diagnosis / Clinical Findings</div>
           <div class="diagnosis-text">${certificate.diagnosis}</div>
         </div>
+        ${certificate.historyAndPhysicalExamination ? `
+          <div class="diagnosis-box">
+            <div class="diagnosis-label">History and Physical Examination</div>
+            <div class="diagnosis-text">${certificate.historyAndPhysicalExamination}</div>
+          </div>
+        ` : ''}
         ${certificate.treatment ? `
           <div class="diagnosis-box">
             <div class="diagnosis-label">Treatment Provided</div>

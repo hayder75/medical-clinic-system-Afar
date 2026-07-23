@@ -484,7 +484,17 @@ const Reports = ({ revenueTypeOverride }) => {
                         ))}
                       </div>
                     </td>
-                    <td className="py-3 pr-2 text-sm font-semibold text-emerald-700">{formatCurrency(row.amount || 0)}</td>
+                    <td className="py-3 pr-2 text-sm font-semibold text-emerald-700 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span>{formatCurrency(row.amount || 0)}</span>
+                        {row.paymentStatus === 'PENDING' && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-red-100 text-red-700 border border-red-200">UNPAID</span>
+                        )}
+                        {row.paymentStatus === 'PAID' && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-green-100 text-green-700 border border-green-200">PAID</span>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -3117,17 +3117,9 @@ exports.getDoctorPerformanceStats = async (req, res) => {
         }
 
         if (!targetSection) return;
+        if ((cashByBilling.get(line.billing?.id) || 0) <= 0) return;
 
-        // Revenue = proportional share of actual CASH/BANK payments
-        const bid = line.billing?.id;
-        const totalCash = cashByBilling.get(bid) || 0;
-        const svcSum = svcSumByBilling.get(bid) || line.totalPrice || 0;
-        let cashRevenue = 0;
-        if (totalCash > 0 && svcSum > 0) {
-          cashRevenue = (line.totalPrice || 0) * (totalCash / svcSum);
-        }
-
-        targetSection.revenue += cashRevenue;
+        targetSection.revenue += (line.totalPrice || 0);
         targetSection.orders += 1;
         if (visit.patientId) {
           targetSection.patientIds.add(visit.patientId);
@@ -3419,15 +3411,8 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
           targetSection = sectionStats.doctorWalkin;
         }
 
-        if (targetSection) {
-          const bid = line.billing?.id;
-          const totalCash = cashByBilling.get(bid) || 0;
-          const svcSum = svcSumByBilling.get(bid) || line.totalPrice || 0;
-          let cashRevenue = 0;
-          if (totalCash > 0 && svcSum > 0) {
-            cashRevenue = (line.totalPrice || 0) * (totalCash / svcSum);
-          }
-          targetSection.revenue += cashRevenue;
+        if (targetSection && (cashByBilling.get(line.billing?.id) || 0) > 0) {
+          targetSection.revenue += (line.totalPrice || 0);
           targetSection.orders += 1;
           if (visitData.patientId) {
             targetSection.patientIds.add(visitData.patientId);
@@ -3435,7 +3420,7 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
         }
 
         const current = detailsByVisit.get(visitId);
-        current.amount += line.totalPrice || 0;
+        current.amount += (line.totalPrice || 0);
         current.ordersCount += 1;
       }
 
@@ -3469,18 +3454,12 @@ exports.getDoctorDailyBreakdown = async (req, res) => {
       let docSameDayRev = 0;
       let docCarryOverRev = 0;
       procedureLines.forEach((line) => {
-        const bid = line.billing?.id;
-        const totalCash = cashByBilling.get(bid) || 0;
-        const svcSum = svcSumByBilling.get(bid) || line.totalPrice || 0;
-        let cashRevenue = 0;
-        if (totalCash > 0 && svcSum > 0) {
-          cashRevenue = (line.totalPrice || 0) * (totalCash / svcSum);
-        }
+        if ((cashByBilling.get(line.billing?.id) || 0) <= 0) return;
         const vDate = line.billing?.visit?.createdAt;
         if (vDate && new Date(vDate) < dayStart) {
-          docCarryOverRev += cashRevenue;
+          docCarryOverRev += (line.totalPrice || 0);
         } else {
-          docSameDayRev += cashRevenue;
+          docSameDayRev += (line.totalPrice || 0);
         }
       });
 
@@ -3618,14 +3597,7 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
       svcSumByBilling.set(bid, (svcSumByBilling.get(bid) || 0) + (line.totalPrice || 0));
     });
 
-    const cashRevenue = (line) => {
-      const bid = line.billing?.id;
-      const totalCash = cashByBilling.get(bid) || 0;
-      if (totalCash <= 0) return 0;
-      const svcSum = svcSumByBilling.get(bid) || line.totalPrice || 0;
-      if (svcSum <= 0) return 0;
-      return (line.totalPrice || 0) * (totalCash / svcSum);
-    };
+    const cashRevenue = (line) => (cashByBilling.get(line.billing?.id) || 0) > 0 ? (line.totalPrice || 0) : 0;
 
     // Build full category breakdown from all lines
     const categoryBreakdown = {};
@@ -3735,7 +3707,7 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
           patientId: visit.patientId,
           patientName: visit.patient?.name || 'Unknown',
           billingIds: new Set(),
-          paymentStatus: line.billing?.status || 'PENDING',
+          paymentStatuses: new Set(),
           amount: 0,
           ordersCount: 0,
           items: []
@@ -3747,6 +3719,9 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
       current.ordersCount += 1;
       if (line.billing?.id) {
         current.billingIds.add(line.billing.id);
+        current.paymentStatuses.add(line.billing.status || 'PENDING');
+      } else {
+        current.paymentStatuses.add('PENDING');
       }
       current.items.push({
         serviceId: line.service?.id || null,
@@ -3779,10 +3754,24 @@ exports.getDoctorDayProcedureDetails = async (req, res) => {
     const buildSectionResponse = (sectionKey) => {
       const section = sectionAccumulator[sectionKey];
       const details = Array.from(section.detailsByVisit.values())
-        .map((item) => ({
-          ...item,
-          billingIds: Array.from(item.billingIds)
-        }))
+        .map((item) => {
+          const statuses = Array.from(item.paymentStatuses).filter(Boolean);
+          let displayStatus;
+          if (statuses.length === 0) {
+            displayStatus = 'PENDING';
+          } else if (statuses.every(s => s === 'PAID')) {
+            displayStatus = 'PAID';
+          } else if (statuses.every(s => s === 'PENDING')) {
+            displayStatus = 'PENDING';
+          } else {
+            displayStatus = 'PENDING';
+          }
+          return {
+            ...item,
+            billingIds: Array.from(item.billingIds),
+            paymentStatus: displayStatus
+          };
+        })
         .sort((a, b) => b.amount - a.amount);
 
       const topItems = Array.from(section.topItemsByName.values())

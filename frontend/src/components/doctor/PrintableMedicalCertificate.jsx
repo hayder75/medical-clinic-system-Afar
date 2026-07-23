@@ -117,6 +117,9 @@ const PrintableMedicalCertificate = ({ certificate, onClose }) => {
           <h3 className="text-sm font-bold text-black underline mb-2">Medical Information</h3>
           <div className="space-y-1 text-sm">
             <p className="text-black"><strong>Diagnosis:</strong> {certificate.diagnosis}</p>
+            {certificate.historyAndPhysicalExamination && (
+              <p className="text-black"><strong>History & PE:</strong> {certificate.historyAndPhysicalExamination}</p>
+            )}
             <p className="text-black"><strong>Treatment:</strong> {certificate.treatment}</p>
             {certificate.recommendations && (
               <p className="text-black"><strong>Recommendations:</strong> {certificate.recommendations}</p>
@@ -142,8 +145,8 @@ const PrintableMedicalCertificate = ({ certificate, onClose }) => {
           <h3 className="text-sm font-bold text-black underline mb-2">Issued By</h3>
           <div className="text-sm">
             <p className="text-black"><strong>Dr.</strong> {certificate.doctor.fullname}</p>
-            {certificate.doctor.qualifications && (
-              <p className="text-black">{certificate.doctor.qualifications}</p>
+            {(certificate.doctor.specialty || certificate.doctor.qualifications) && (
+              <p className="text-black">{certificate.doctor.specialty || (Array.isArray(certificate.doctor.qualifications) ? certificate.doctor.qualifications.join(', ') : certificate.doctor.qualifications) || ''}</p>
             )}
           </div>
         </div>
