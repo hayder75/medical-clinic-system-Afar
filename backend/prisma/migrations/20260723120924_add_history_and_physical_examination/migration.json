@@ -1,0 +1,9 @@
+{
+  "version": "5.2",
+  "steps": [
+    {
+      "tag": "CreateMigration",
+      "sql": "ALTER TABLE \"MedicalCertificate\" ADD COLUMN \"historyAndPhysicalExamination\" TEXT"
+    }
+  ]
+}
