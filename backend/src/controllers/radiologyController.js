@@ -644,6 +644,7 @@ exports.getOrganizedInvestigationTypes = async (req, res) => {
 
     const organized = {};
     for (const cat of categories) {
+      if (cat.investigationTypes.length === 0) continue;
       organized[cat.name] = {
         id: cat.id,
         displayOrder: cat.displayOrder,
