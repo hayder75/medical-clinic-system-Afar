@@ -3,8 +3,24 @@ import { Activity, CheckCircle, Clock, Plus, Trash2, ShieldCheck, AlertCircle, C
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-const CATEGORIES = ['GYNECOLOGY', 'SURGERY', 'ORTHOPEDIC', 'OTHER'];
-const CATEGORY_LABELS = { GYNECOLOGY: 'Gynecology', SURGERY: 'Surgery', ORTHOPEDIC: 'Orthopedic', OTHER: 'Other' };
+const CATEGORIES = ['GYNECOLOGY', 'OBSTETRICS', 'SURGERY', 'ORTHOPEDIC', 'DENTAL', 'ENT', 'OPHTHALMOLOGY', 'DERMATOLOGY', 'CARDIOLOGY', 'NEUROLOGY', 'UROLOGY', 'PEDIATRICS', 'INTERNAL_MEDICINE', 'GENERAL', 'OTHER'];
+const CATEGORY_LABELS = {
+    GYNECOLOGY: 'Gynecology',
+    OBSTETRICS: 'Obstetrics',
+    SURGERY: 'Surgery',
+    ORTHOPEDIC: 'Orthopedic',
+    DENTAL: 'Dental',
+    ENT: 'ENT',
+    OPHTHALMOLOGY: 'Ophthalmology',
+    DERMATOLOGY: 'Dermatology',
+    CARDIOLOGY: 'Cardiology',
+    NEUROLOGY: 'Neurology',
+    UROLOGY: 'Urology',
+    PEDIATRICS: 'Pediatrics',
+    INTERNAL_MEDICINE: 'Internal Medicine',
+    GENERAL: 'General Medicine',
+    OTHER: 'Other'
+};
 
 const ProcedureOrdering = ({ visit, onOrdersPlaced }) => {
     const [services, setServices] = useState([]);

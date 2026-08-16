@@ -685,8 +685,19 @@ const ServiceCatalog = () => {
                       >
                         <option value="">Select group...</option>
                         <option value="GYNECOLOGY">Gynecology</option>
+                        <option value="OBSTETRICS">Obstetrics</option>
                         <option value="SURGERY">Surgery</option>
                         <option value="ORTHOPEDIC">Orthopedic</option>
+                        <option value="DENTAL">Dental</option>
+                        <option value="ENT">ENT</option>
+                        <option value="OPHTHALMOLOGY">Ophthalmology</option>
+                        <option value="DERMATOLOGY">Dermatology</option>
+                        <option value="CARDIOLOGY">Cardiology</option>
+                        <option value="NEUROLOGY">Neurology</option>
+                        <option value="UROLOGY">Urology</option>
+                        <option value="PEDIATRICS">Pediatrics</option>
+                        <option value="INTERNAL_MEDICINE">Internal Medicine</option>
+                        <option value="GENERAL">General Medicine</option>
                         <option value="OTHER">Other</option>
                       </select>
                     </div>
